@@ -1,0 +1,14 @@
+.nav-icon i{
+    font-size: 30px;
+}
+.icons-div{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    padding: 10px;
+}
+.icons-div:hover{
+    color: gold;
+}

@@ -1,0 +1,50 @@
+.main-image {
+  transition: background-color 0.3s;
+}
+
+.main-image img {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.main-image .frame-container {
+  margin: 0 auto;
+  position: relative;
+}
+
+.crop-container {
+  position: relative;
+  width: 90%;
+  height: 80%;
+}
+
+.crop-controls {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.crop-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.crop-btn i {
+  font-size: 16px;
+}
+
+.thumbnail:hover {
+  transform: scale(1.05);
+  transition: transform 0.2s;
+}
+

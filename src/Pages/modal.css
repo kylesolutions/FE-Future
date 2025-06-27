@@ -1,0 +1,68 @@
+.custom-modal {
+  background-color: #000;
+  color: #ffd700;
+}
+
+.custom-modal .modal-header {
+  border-bottom: 1px solid gold;
+}
+
+.custom-modal .modal-title {
+  color: #ffffff;
+}
+
+.custom-modal .input {
+  background-color: #333;
+  color: gold;
+  border: 1px solid #ffffff;
+  border-radius: 5px;
+  padding: 8px;
+  width: 100%;
+}
+
+.custom-modal .input::placeholder {
+  color:gold;
+}
+
+.custom-modal label {
+  color: #ffffff;
+}
+
+.custom-modal .error {
+  color: #ff4d4d;
+  font-size: 0.9em;
+}
+
+.custom-modal button {
+  background-color: #ffffff;
+  color: #000;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.custom-modal button:hover {
+  background-color: gold;
+}
+
+.custom-modal .footer-message {
+  color: gold;
+}
+
+.custom-modal .footer-message a {
+  color: gold;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.login-form, .signup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.login-form h2, .signup-form h2 {
+  color: gold;
+  text-align: center;
+}
