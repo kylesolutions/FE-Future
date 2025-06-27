@@ -16,7 +16,7 @@ function Navbar({ onLoginClick }) {
       try {
         const token = localStorage.getItem('token');
         if (token) {
-          const response = await axios.get('http://localhost:8000/user/', {
+          const response = await axios.get('http://143.110.178.225/user/', {
             headers: { Authorization: `Bearer ${token}` },
           });
           setIsAdmin(response.data.is_staff || false);

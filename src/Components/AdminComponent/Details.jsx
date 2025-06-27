@@ -6,7 +6,7 @@ import './Details.css';
 import { logoutUser } from '../../Redux/slices/userSlice';
 
 // Base URL for images
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = 'http://143.110.178.225';
 // Fallback image for broken or missing images
 const FALLBACK_IMAGE = 'https://via.placeholder.com/100x100?text=Image+Not+Found';
 
@@ -54,7 +54,7 @@ function Details() {
     try {
       const refresh = localStorage.getItem('refresh_token');
       if (!refresh) throw new Error('No refresh token available');
-      const response = await axios.post('http://localhost:8000/api/token/refresh/', { refresh });
+      const response = await axios.post('http://143.110.178.225/api/token/refresh/', { refresh });
       localStorage.setItem('token', response.data.access);
       return response.data.access;
     } catch (err) {
@@ -78,12 +78,12 @@ function Details() {
           return;
         }
 
-        const framesResponse = await axios.get('http://localhost:8000/frames/', {
+        const framesResponse = await axios.get('http://143.110.178.225/frames/', {
           headers: { Authorization: `Bearer ${token}` },
         });
         setFrames(framesResponse.data);
 
-        const usersResponse = await axios.get('http://localhost:8000/users/', {
+        const usersResponse = await axios.get('http://143.110.178.225/users/', {
           headers: { Authorization: `Bearer ${token}` },
         });
         setUsers(usersResponse.data);
@@ -92,12 +92,12 @@ function Details() {
           const newToken = await refreshToken();
           if (newToken) {
             try {
-              const framesResponse = await axios.get('http://localhost:8000/frames/', {
+              const framesResponse = await axios.get('http://143.110.178.225/frames/', {
                 headers: { Authorization: `Bearer ${newToken}` },
               });
               setFrames(framesResponse.data);
 
-              const usersResponse = await axios.get('http://localhost:8000/users/', {
+              const usersResponse = await axios.get('http://143.110.178.225/users/', {
                 headers: { Authorization: `Bearer ${newToken}` },
               });
               setUsers(usersResponse.data);
@@ -135,22 +135,22 @@ function Details() {
     let url;
     switch (type) {
       case 'frame':
-        url = `http://localhost:8000/frames/${id}/`;
+        url = `http://143.110.178.225/frames/${id}/`;
         break;
       case 'color':
-        url = `http://localhost:8000/variants/color/${id}/`;
+        url = `http://143.110.178.225/variants/color/${id}/`;
         break;
       case 'size':
-        url = `http://localhost:8000/variants/size/${id}/`;
+        url = `http://143.110.178.225/variants/size/${id}/`;
         break;
       case 'finish':
-        url = `http://localhost:8000/variants/finish/${id}/`;
+        url = `http://143.110.178.225/variants/finish/${id}/`;
         break;
       case 'hanging':
-        url = `http://localhost:8000/variants/hanging/${id}/`;
+        url = `http://143.110.178.225/variants/hanging/${id}/`;
         break;
       case 'user':
-        url = `http://localhost:8000/users/${id}/`;
+        url = `http://143.110.178.225/users/${id}/`;
         break;
       default:
         return;
@@ -173,7 +173,7 @@ function Details() {
       } else if (type === 'user') {
         setUsers(users.map((u) => (u.id === id ? response.data : u)));
       } else {
-        const framesResponse = await axios.get('http://localhost:8000/frames/', {
+        const framesResponse = await axios.get('http://143.110.178.225/frames/', {
           headers: { Authorization: `Bearer ${token}` },
         });
         setFrames(framesResponse.data);
@@ -197,7 +197,7 @@ function Details() {
             } else if (type === 'user') {
               setUsers(users.map((u) => (u.id === id ? retryResponse.data : u)));
             } else {
-              const framesResponse = await axios.get('http://localhost:8000/frames/', {
+              const framesResponse = await axios.get('http://143.110.178.225/frames/', {
                 headers: { Authorization: `Bearer ${newToken}` },
               });
               setFrames(framesResponse.data);
@@ -227,22 +227,22 @@ function Details() {
     let url;
     switch (type) {
       case 'frame':
-        url = `http://localhost:8000/frames/${id}/`;
+        url = `http://143.110.178.225/frames/${id}/`;
         break;
       case 'color':
-        url = `http://localhost:8000/variants/color/${id}/`;
+        url = `http://143.110.178.225/variants/color/${id}/`;
         break;
       case 'size':
-        url = `http://localhost:8000/variants/size/${id}/`;
+        url = `http://143.110.178.225/variants/size/${id}/`;
         break;
       case 'finish':
-        url = `http://localhost:8000/variants/finish/${id}/`;
+        url = `http://143.110.178.225/variants/finish/${id}/`;
         break;
       case 'hanging':
-        url = `http://localhost:8000/variants/hanging/${id}/`;
+        url = `http://143.110.178.225/variants/hanging/${id}/`;
         break;
       case 'user':
-        url = `http://localhost:8000/users/${id}/`;
+        url = `http://143.110.178.225/users/${id}/`;
         break;
       default:
         return;
@@ -262,7 +262,7 @@ function Details() {
       } else if (type === 'user') {
         setUsers(users.filter((u) => u.id !== id));
       } else {
-        const framesResponse = await axios.get('http://localhost:8000/frames/', {
+        const framesResponse = await axios.get('http://143.110.178.225/frames/', {
           headers: { Authorization: `Bearer ${token}` },
         });
         setFrames(framesResponse.data);
@@ -283,7 +283,7 @@ function Details() {
             } else if (type === 'user') {
               setUsers(users.filter((u) => u.id !== id));
             } else {
-              const framesResponse = await axios.get('http://localhost:8000/frames/', {
+              const framesResponse = await axios.get('http://143.110.178.225/frames/', {
                 headers: { Authorization: `Bearer ${newToken}` },
               });
               setFrames(framesResponse.data);

@@ -37,7 +37,7 @@ function Admin() {
   useEffect(() => {
     const fetchFrames = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/frames/');
+        const response = await axios.get('http://143.110.178.225/frames/');
         setFrames(response.data);
       } catch (err) {
         console.error('Failed to fetch frames:', err);
@@ -52,7 +52,7 @@ function Admin() {
     try {
       const refresh = localStorage.getItem('refresh_token');
       if (!refresh) throw new Error('No refresh token available');
-      const response = await axios.post('http://localhost:8000/api/token/refresh/', { refresh });
+      const response = await axios.post('http://143.110.178.225/api/token/refresh/', { refresh });
       localStorage.setItem('token', response.data.access);
       return response.data.access;
     } catch (err) {
@@ -122,7 +122,7 @@ function Admin() {
         for (let [key, value] of formData.entries()) {
           console.log(`${key}: ${value}`);
         }
-        const frameResponse = await axios.post('http://localhost:8000/frames/', formData, {
+        const frameResponse = await axios.post('http://143.110.178.225/frames/', formData, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
@@ -182,7 +182,7 @@ function Admin() {
         }
 
         const variantResponse = await axios.post(
-          `http://localhost:8000/frames/${frameId}/variants/`, // Fixed endpoint
+          `http://143.110.178.225/frames/${frameId}/variants/`, // Fixed endpoint
           variantFormData,
           {
             headers: {
@@ -228,7 +228,7 @@ function Admin() {
                   formData.append(key, frameData[key]);
                 }
               }
-              frameResponse = await axios.post('http://localhost:8000/frames/', formData, {
+              frameResponse = await axios.post('http://143.110.178.225/frames/', formData, {
                 headers: {
                   Authorization: `Bearer ${newToken}`,
                   'Content-Type': 'multipart/form-data',
@@ -272,7 +272,7 @@ function Admin() {
               });
 
               await axios.post(
-                `http://localhost:8000/frames/${frameId}/variants/`, // Fixed endpoint
+                `http://143.110.178.225/frames/${frameId}/variants/`, // Fixed endpoint
                 variantFormData,
                 {
                   headers: {

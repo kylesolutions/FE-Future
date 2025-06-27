@@ -32,7 +32,7 @@ function Signup() {
       const formData = new FormData();
       Object.keys(values).forEach(key => formData.append(key, values[key]));
       try {
-        const res = await axios.post('http://localhost:8000/api/user_registration/', formData, {
+        const res = await axios.post('http://143.110.178.225/api/user_registration/', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         if (res.data.result) {

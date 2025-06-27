@@ -23,7 +23,7 @@ function Login() {
     }),
     onSubmit: async (values) => {
       try {
-        const response = await axios.post('http://localhost:8000/login/', {
+        const response = await axios.post('http://143.110.178.225/login/', {
           username: values.username,
           password: values.password,
         });
@@ -31,7 +31,7 @@ function Login() {
           localStorage.setItem('token', response.data.access);
           localStorage.setItem('refresh_token', response.data.refresh);
           console.log('Tokens stored:', { access: response.data.access, refresh: response.data.refresh });
-          const userResponse = await axios.get('http://localhost:8000/user/', {
+          const userResponse = await axios.get('http://143.110.178.225/user/', {
             headers: { Authorization: `Bearer ${response.data.access}` },
           });
           dispatch(updateUser({
