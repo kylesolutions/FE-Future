@@ -5,7 +5,7 @@ import * as Yup from 'yup';
 import axios from 'axios';
 import { updateUser } from '../../Redux/slices/userSlice';
 
-function Login() {
+function Login({ onLoginSuccess }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -20,7 +20,7 @@ function Login() {
         .min(8, 'Password must be at least 8 characters')
         .matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/, 'Password must include one uppercase letter, one lowercase letter, and one digit')
         .required('Password is required'),
-    }),
+    }),//
     onSubmit: async (values) => {
       try {
         const response = await axios.post('http://143.110.178.225/login/', {
@@ -43,6 +43,7 @@ function Login() {
             id: userResponse.data.id || '',
             is_blocked: userResponse.data.is_blocked || false,
           }));
+          onLoginSuccess(); // Call the prop to close the modal
           navigate('/');
         } else {
           formik.setStatus('Invalid login response');
@@ -53,6 +54,13 @@ function Login() {
       }
     },
   });
+
+  // Handle Enter key press
+  const handleKeyPress = (event) => {
+    if (event.key === 'Enter') {
+      formik.handleSubmit();
+    }
+  };
 
   return (
     <div className="login-form">
@@ -65,6 +73,7 @@ function Login() {
           name="username"
           onChange={formik.handleChange}
           onBlur={formik.handleBlur}
+          onKeyPress={handleKeyPress} // Add Enter key handler
           value={formik.values.username}
         />
         {formik.touched.username && formik.errors.username && <p className="error">{formik.errors.username}</p>}
@@ -77,6 +86,7 @@ function Login() {
           name="password"
           onChange={formik.handleChange}
           onBlur={formik.handleBlur}
+          onKeyPress={handleKeyPress} // Add Enter key handler
           value={formik.values.password}
         />
         {formik.touched.password && formik.errors.password && <p className="error">{formik.errors.password}</p>}
