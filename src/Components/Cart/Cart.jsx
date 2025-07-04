@@ -66,8 +66,8 @@ function Cart() {
   };
 
   const getImageUrl = (path) => {
-    if (!path) return null;
-    if (path.startsWith('http')) return path;
+    if (!path) return 'https://via.placeholder.com/100x100?text=Image+Not+Found';
+    if (path.startsWith('http') || path.startsWith('blob:') || path.startsWith('data:')) return path;
     return `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
   };
 
@@ -88,7 +88,7 @@ function Cart() {
                 <div className="d-flex">
                   <div>
                     <img
-                      src={item.adjusted_image || 'https://via.placeholder.com/100x100?text=Image+Not+Found'}
+                      src={getImageUrl(item.adjusted_image || item.cropped_image || item.original_image)}
                       alt="Adjusted item"
                       style={{ height: '100px', width: '100px', objectFit: 'cover' }}
                       onError={(e) => { e.target.src = 'https://via.placeholder.com/100x100?text=Image+Not+Found'; }}
@@ -96,7 +96,7 @@ function Cart() {
                   </div>
                 </div>
                 <div className="flex-grow-1 mx-3">
-                  <p><strong>Frame:</strong> {item.frame.name}</p>
+                  <p><strong>Frame:</strong> {item.frame?.name || 'None'}</p>
                   {item.color_variant && <p><strong>Color:</strong> {item.color_variant.color_name}</p>}
                   {item.size_variant && <p><strong>Size:</strong> {item.size_variant.size_name}</p>}
                   {item.finish_variant && <p><strong>Finish:</strong> {item.finish_variant.finish_name}</p>}
@@ -127,11 +127,16 @@ function Cart() {
                       original_image: item.original_image ? getImageUrl(item.original_image) : null,
                       cropped_image: item.cropped_image ? getImageUrl(item.cropped_image) : null,
                       adjusted_image: item.adjusted_image ? getImageUrl(item.adjusted_image) : null,
-                      frame: item.frame,
-                      color_variant: item.color_variant,
-                      size_variant: item.size_variant,
-                      finish_variant: item.finish_variant,
-                      hanging_variant: item.hanging_variant,
+                      frame: item.frame || null,
+                      color_variant: item.color_variant || null,
+                      size_variant: item.size_variant || null,
+                      finish_variant: item.finish_variant || null,
+                      hanging_variant: item.hanging_variant || null,
+                      transform_x: item.transform_x || 0,
+                      transform_y: item.transform_y || 0,
+                      scale: item.scale || 1,
+                      rotation: item.rotation || 0,
+                      frame_rotation: item.frame_rotation || 0,
                     } } })}
                   >
                     <i className="bi bi-pencil-square"></i>

@@ -5,7 +5,8 @@ import * as Yup from 'yup';
 import axios from 'axios';
 import { updateUser } from '../../Redux/slices/userSlice';
 
-function Login({ onLoginSuccess }) {
+
+function Login() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -20,7 +21,7 @@ function Login({ onLoginSuccess }) {
         .min(8, 'Password must be at least 8 characters')
         .matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/, 'Password must include one uppercase letter, one lowercase letter, and one digit')
         .required('Password is required'),
-    }),//
+    }),
     onSubmit: async (values) => {
       try {
         const response = await axios.post('http://143.110.178.225/login/', {
@@ -43,7 +44,6 @@ function Login({ onLoginSuccess }) {
             id: userResponse.data.id || '',
             is_blocked: userResponse.data.is_blocked || false,
           }));
-          onLoginSuccess(); // Call the prop to close the modal
           navigate('/');
         } else {
           formik.setStatus('Invalid login response');
@@ -55,7 +55,6 @@ function Login({ onLoginSuccess }) {
     },
   });
 
-  // Handle Enter key press
   const handleKeyPress = (event) => {
     if (event.key === 'Enter') {
       formik.handleSubmit();
@@ -63,40 +62,139 @@ function Login({ onLoginSuccess }) {
   };
 
   return (
-    <div className="login-form">
-      <h2>LOGIN</h2>
-      <div>
-        <label>Username</label>
-        <input
-          className="input"
-          type="text"
-          name="username"
-          onChange={formik.handleChange}
-          onBlur={formik.handleBlur}
-          onKeyPress={handleKeyPress} // Add Enter key handler
-          value={formik.values.username}
-        />
-        {formik.touched.username && formik.errors.username && <p className="error">{formik.errors.username}</p>}
+    <div className="login-wrapper-1">
+      <style>{`
+        .login-wrapper {
+          display: flex;
+          flex-direction: column;
+          border: 1px solid #6c757d;
+          border-radius: 10px;
+          width: 100%;
+          max-width: 350px;
+          padding: 20px;
+          align-items: center;
+          justify-content: center;
+          background-image: linear-gradient(#313030, #9c9696);
+          transition: box-shadow 0.3s ease;
+        }
+        .login-wrapper:hover {
+          cursor: pointer;
+          box-shadow: 0 4px 8px rgba(245, 245, 245, 0.5);
+        }
+        .login-wrapper-1 {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 100vh;
+          padding-top: 10px;
+          background: #f8f9fa;
+        }
+        .login-wrapper-1 p {
+          color: #ffffff;
+        }
+        .login {
+          display: flex;
+          justify-content: center;
+          width: 100%;
+        }
+        .form-label {
+          color: #ffffff;
+          font-weight: 500;
+        }
+        .form-control {
+          background-color: #495057;
+          color: #ffffff;
+          border-color: #6c757d;
+        }
+        .form-control:focus {
+          background-color: #495057;
+          color: #ffffff;
+          border-color: #007bff;
+          box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+        .error {
+          color: #dc3545;
+          font-size: 0.875rem;
+          margin-top: 0.25rem;
+        }
+        .btn-primary {
+          width: 100%;
+          background-color: #007bff;
+          border-color: #007bff;
+        }
+        .btn-primary:hover {
+          background-color: #0056b3;
+          border-color: #004085;
+        }
+        .btn-primary:disabled {
+          background-color: #6c757d;
+          border-color: #6c757d;
+        }
+        .signup-link {
+          color: #007bff;
+          text-decoration: none;
+        }
+        .signup-link:hover {
+          text-decoration: underline;
+        }
+      `}</style>
+      <div className="login-wrapper">
+        <h2 className="text-white text-center mb-4">LOGIN</h2>
+        <div className="w-100">
+          <label className="form-label">Username</label>
+          <input
+            className="form-control"
+            type="text"
+            name="username"
+            onChange={formik.handleChange}
+            onBlur={formik.handleBlur}
+            onKeyPress={handleKeyPress}
+            value={formik.values.username}
+          />
+          {formik.touched.username && formik.errors.username && (
+            <p className="error">{formik.errors.username}</p>
+          )}
+        </div>
+        <div className="w-100 mt-3">
+          <label className="form-label">Password</label>
+          <input
+            className="form-control"
+            type="password"
+            name="password"
+            onChange={formik.handleChange}
+            onBlur={formik.handleBlur}
+            onKeyPress={handleKeyPress}
+            value={formik.values.password}
+          />
+          {formik.touched.password && formik.errors.password && (
+            <p className="error">{formik.errors.password}</p>
+          )}
+        </div>
+        <div className="login mt-3">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={formik.handleSubmit}
+            disabled={formik.isSubmitting}
+          >
+            {formik.isSubmitting ? 'Logging in...' : 'LOGIN'}
+          </button>
+        </div>
+        {formik.status && <p className="error text-center">{formik.status}</p>}
+        <p className="mt-3 text-center">
+          Not registered?{' '}
+          <a
+            href="/signup"
+            className="signup-link"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/signup');
+            }}
+          >
+            Signup here
+          </a>
+        </p>
       </div>
-      <div>
-        <label>Password</label>
-        <input
-          className="input"
-          type="password"
-          name="password"
-          onChange={formik.handleChange}
-          onBlur={formik.handleBlur}
-          onKeyPress={handleKeyPress} // Add Enter key handler
-          value={formik.values.password}
-        />
-        {formik.touched.password && formik.errors.password && <p className="error">{formik.errors.password}</p>}
-      </div>
-      <div className="login">
-        <button type="button" onClick={formik.handleSubmit} disabled={formik.isSubmitting}>
-          {formik.isSubmitting ? 'Logging in...' : 'LOGIN'}
-        </button>
-      </div>
-      {formik.status && <p className="error">{formik.status}</p>}
     </div>
   );
 }

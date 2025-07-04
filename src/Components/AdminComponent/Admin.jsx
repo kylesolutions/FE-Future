@@ -15,11 +15,12 @@ function Admin() {
     inner_width: '',
     inner_height: '',
     image: null,
+    corner_image: null,
   });
   const [variants, setVariants] = useState({
-    color: [{ color_name: '', image: null, image_key: `color_0_${Date.now()}`, price: '' }],
-    size: [{ size_name: '', inner_width: '', inner_height: '', image: null, image_key: `size_0_${Date.now()}`, price: '' }],
-    finish: [{ finish_name: '', image: null, image_key: `finish_0_${Date.now()}`, price: '' }],
+    color: [{ color_name: '', image: null, corner_image: null, image_key: `color_0_${Date.now()}`, price: '' }],
+    size: [{ size_name: '', inner_width: '', inner_height: '', image: null, corner_image: null, image_key: `size_0_${Date.now()}`, price: '' }],
+    finish: [{ finish_name: '', image: null, corner_image: null, image_key: `finish_0_${Date.now()}`, price: '' }],
     hanging: [{ hanging_name: '', image: null, image_key: `hanging_0_${Date.now()}`, price: '' }],
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -83,9 +84,9 @@ function Admin() {
     const newVariants = { ...variants };
     const timestamp = Date.now();
     newVariants[variantType].push({
-      ...(variantType === 'color' && { color_name: '', image: null, image_key: `color_${newVariants[variantType].length}_${timestamp}`, price: '' }),
-      ...(variantType === 'size' && { size_name: '', inner_width: '', inner_height: '', image: null, image_key: `size_${newVariants[variantType].length}_${timestamp}`, price: '' }),
-      ...(variantType === 'finish' && { finish_name: '', image: null, image_key: `finish_${newVariants[variantType].length}_${timestamp}`, price: '' }),
+      ...(variantType === 'color' && { color_name: '', image: null, corner_image: null, image_key: `color_${newVariants[variantType].length}_${timestamp}`, price: '' }),
+      ...(variantType === 'size' && { size_name: '', inner_width: '', inner_height: '', image: null, corner_image: null, image_key: `size_${newVariants[variantType].length}_${timestamp}`, price: '' }),
+      ...(variantType === 'finish' && { finish_name: '', image: null, corner_image: null, image_key: `finish_${newVariants[variantType].length}_${timestamp}`, price: '' }),
       ...(variantType === 'hanging' && { hanging_name: '', image: null, image_key: `hanging_${newVariants[variantType].length}_${timestamp}`, price: '' }),
     });
     setVariants(newVariants);
@@ -155,7 +156,7 @@ function Admin() {
             image_key: variant.image_key,
           };
           for (const key in variant) {
-            if (key !== 'image' && key !== 'image_key' && variant[key] !== '' && variant[key] !== null) {
+            if (key !== 'image' && key !== 'corner_image' && key !== 'image_key' && variant[key] !== '' && variant[key] !== null) {
               variantData[key] = variant[key];
             }
           }
@@ -167,11 +168,14 @@ function Admin() {
         const variantFormData = new FormData();
         variantFormData.append('variants', JSON.stringify(variantsData));
         variantsData.forEach((variant) => {
-          const variantImage = variants[variant.variant_type].find(
+          const variantEntry = variants[variant.variant_type].find(
             (v) => v.image_key === variant.image_key
-          )?.image;
-          if (variantImage) {
-            variantFormData.append(variant.image_key, variantImage);
+          );
+          if (variantEntry?.image) {
+            variantFormData.append(variant.image_key, variantEntry.image);
+          }
+          if (variantEntry?.corner_image && variant.variant_type !== 'hanging') {
+            variantFormData.append(`${variant.image_key}_corner`, variantEntry.corner_image);
           }
         });
 
@@ -182,7 +186,7 @@ function Admin() {
         }
 
         const variantResponse = await axios.post(
-          `http://143.110.178.225/frames/${frameId}/variants/`, // Fixed endpoint
+          `http://143.110.178.225/frames/${frameId}/variants/`,
           variantFormData,
           {
             headers: {
@@ -205,19 +209,20 @@ function Admin() {
         inner_width: '',
         inner_height: '',
         image: null,
+        corner_image: null,
       });
       setVariants({
-        color: [{ color_name: '', image: null, image_key: `color_0_${Date.now()}` }],
-        size: [{ size_name: '', inner_width: '', inner_height: '', image: null, image_key: `size_0_${Date.now()}` }],
-        finish: [{ finish_name: '', image: null, image_key: `finish_0_${Date.now()}` }],
-        hanging: [{ hanging_name: '', image: null, image_key: `hanging_0_${Date.now()}` }],
+        color: [{ color_name: '', image: null, corner_image: null, image_key: `color_0_${Date.now()}`, price: '' }],
+        size: [{ size_name: '', inner_width: '', inner_height: '', image: null, corner_image: null, image_key: `size_0_${Date.now()}`, price: '' }],
+        finish: [{ finish_name: '', image: null, corner_image: null, image_key: `finish_0_${Date.now()}`, price: '' }],
+        hanging: [{ hanging_name: '', image: null, image_key: `hanging_0_${Date.now()}`, price: '' }],
       });
       setSelectedFrameId('');
       setMode('create');
     } catch (error) {
       console.error('Submission error:', error.response?.data || error.message);
       if (error.response?.status === 401) {
-        const newToken = await refreshToken(); // Fixed typo
+        const newToken = await refreshToken();
         if (newToken) {
           try {
             let frameResponse;
@@ -251,7 +256,7 @@ function Admin() {
                   image_key: variant.image_key,
                 };
                 for (const key in variant) {
-                  if (key !== 'image' && key !== 'image_key' && variant[key] !== '') {
+                  if (key !== 'image' && key !== 'corner_image' && key !== 'image_key' && variant[key] !== '' && variant[key] !== null) {
                     variantData[key] = variant[key];
                   }
                 }
@@ -263,16 +268,19 @@ function Admin() {
               const variantFormData = new FormData();
               variantFormData.append('variants', JSON.stringify(variantsData));
               variantsData.forEach((variant) => {
-                const variantImage = variants[variant.variant_type].find(
+                const variantEntry = variants[variant.variant_type].find(
                   (v) => v.image_key === variant.image_key
-                )?.image;
-                if (variantImage) {
-                  variantFormData.append(variant.image_key, variantImage);
+                );
+                if (variantEntry?.image) {
+                  variantFormData.append(variant.image_key, variantEntry.image);
+                }
+                if (variantEntry?.corner_image && variant.variant_type !== 'hanging') {
+                  variantFormData.append(`${variant.image_key}_corner`, variantEntry.corner_image);
                 }
               });
 
               await axios.post(
-                `http://143.110.178.225/frames/${frameId}/variants/`, // Fixed endpoint
+                `http://143.110.178.225/frames/${frameId}/variants/`,
                 variantFormData,
                 {
                   headers: {
@@ -293,12 +301,13 @@ function Admin() {
               inner_width: '',
               inner_height: '',
               image: null,
+              corner_image: null,
             });
             setVariants({
-              color: [{ color_name: '', image: null, image_key: `color_0_${Date.now()}`,price: '' }],
-              size: [{ size_name: '', inner_width: '', inner_height: '', image: null, image_key: `size_0_${Date.now()}`,price: '' }],
-              finish: [{ finish_name: '', image: null, image_key: `finish_0_${Date.now()}`,price: '' }],
-              hanging: [{ hanging_name: '', image: null, image_key: `hanging_0_${Date.now()}`,price: '' }],
+              color: [{ color_name: '', image: null, corner_image: null, image_key: `color_0_${Date.now()}`, price: '' }],
+              size: [{ size_name: '', inner_width: '', inner_height: '', image: null, corner_image: null, image_key: `size_0_${Date.now()}`, price: '' }],
+              finish: [{ finish_name: '', image: null, corner_image: null, image_key: `finish_0_${Date.now()}`, price: '' }],
+              hanging: [{ hanging_name: '', image: null, image_key: `hanging_0_${Date.now()}`, price: '' }],
             });
             setSelectedFrameId('');
             setMode('create');
@@ -408,6 +417,17 @@ function Admin() {
                 required
               />
             </div>
+            <div className="mb-3">
+              <label>Frame Corner Image</label>
+              <input
+                type="file"
+                name="corner_image"
+                onChange={handleFrameChange}
+                className="form-control"
+                accept="image/*"
+                required
+              />
+            </div>
           </>
         )}
         {mode === 'add_variants' && (
@@ -457,6 +477,16 @@ function Admin() {
               <input
                 type="file"
                 name="image"
+                onChange={(e) => handleVariantChange('color', index, e)}
+                className="form-control"
+                accept="image/*"
+              />
+            </div>
+            <div className="mb-3">
+              <label>Color Corner Image</label>
+              <input
+                type="file"
+                name="corner_image"
                 onChange={(e) => handleVariantChange('color', index, e)}
                 className="form-control"
                 accept="image/*"
@@ -533,6 +563,16 @@ function Admin() {
                 accept="image/*"
               />
             </div>
+            <div className="mb-3">
+              <label>Size Corner Image (Optional)</label>
+              <input
+                type="file"
+                name="corner_image"
+                onChange={(e) => handleVariantChange('size', index, e)}
+                className="form-control"
+                accept="image/*"
+              />
+            </div>
             <button
               type="button"
               className="btn btn-danger btn-sm"
@@ -579,6 +619,16 @@ function Admin() {
               <input
                 type="file"
                 name="image"
+                onChange={(e) => handleVariantChange('finish', index, e)}
+                className="form-control"
+                accept="image/*"
+              />
+            </div>
+            <div className="mb-3">
+              <label>Finish Corner Image</label>
+              <input
+                type="file"
+                name="corner_image"
                 onChange={(e) => handleVariantChange('finish', index, e)}
                 className="form-control"
                 accept="image/*"
@@ -660,7 +710,6 @@ function Admin() {
                 : 'Add Variants'}
           </button>
         </div>
-
       </form>
     </div>
   );

@@ -4,7 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import './Nav.css';
 
-function Navbar({ onLoginClick }) {
+function Navbar() {
   const navigate = useNavigate();
   const user = useSelector(state => state.user); // Access user state from Redux
   const [isAdmin, setIsAdmin] = useState(false);
@@ -88,7 +88,7 @@ function Navbar({ onLoginClick }) {
                 <i className="bi bi-bag-check me-1"></i>Cart
               </Link>
             </li>
-            {(user.type == "admin") && (
+            {isAdmin && (
               <>
                 <li className="nav-item">
                   <Link className="nav-link" to="/admin/create-frame">Create Frame</Link>
@@ -114,9 +114,14 @@ function Navbar({ onLoginClick }) {
                 </button>
               </div>
             ) : (
-              <button className="login-button btn btn-primary" onClick={onLoginClick}>
-                Login/Signup
-              </button>
+              <div className="d-flex gap-2">
+                <button className="btn btn-outline-primary" onClick={() => navigate('/login')}>
+                  Login
+                </button>
+                <button className="btn btn-primary" onClick={() => navigate('/signup')}>
+                  Signup
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -126,3 +131,4 @@ function Navbar({ onLoginClick }) {
 }
 
 export default Navbar;
+

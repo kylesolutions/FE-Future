@@ -8,16 +8,21 @@ import Signup from '../Components/SignupLogin/Signup';
 import './modal.css';
 
 function DesignPage() {
-  const [activeCategory, setActiveCategory] = useState(null);
+  const [activeCategory, setActiveCategory] = useState('frame');
   const [selectedFrame, setSelectedFrame] = useState(null);
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
-  const [cartItem, setCartItem] = useState(null); // Add state for cartItem
-  const location = useLocation(); // Use location to access navigation state
+  const [cartItem, setCartItem] = useState(null);
+  const [hasUploadedImages, setHasUploadedImages] = useState(false);
+  const location = useLocation();
 
-  // Update cartItem when location.state changes
   useEffect(() => {
-    setCartItem(location.state?.cartItem || null);
+    if (location.state?.cartItem) {
+      setCartItem(location.state.cartItem);
+      setHasUploadedImages(true);
+      setSelectedFrame(location.state.cartItem.frame || null);
+      setActiveCategory('frame');
+    }
   }, [location.state]);
 
   const handleLoginClose = () => setShowLogin(false);
@@ -34,22 +39,25 @@ function DesignPage() {
           <div className="col-12">
             <Navbar onLoginClick={() => setShowLogin(true)} />
           </div>
-          <div className="col-lg-1">
-            <NavIcons onCategorySelect={setActiveCategory} />
-          </div>
-          <div className="col-lg-11">
+        </div>
+        <div className="row">
+          {hasUploadedImages && (
+            <div className="col-lg-1">
+              <NavIcons onCategorySelect={setActiveCategory} />
+            </div>
+          )}
+          <div className={hasUploadedImages ? "col-lg-11" : "col-lg-12"}>
             <Headers
               activeCategory={activeCategory}
-              selectedFrame={selectedFrame}
-              onSelectFrame={setSelectedFrame}
               onCategorySelect={setActiveCategory}
-              cartItem={cartItem} // Pass cartItem as a prop
+              cartItem={cartItem}
+              setHasUploadedImages={setHasUploadedImages}
+              onSelectFrame={setSelectedFrame}
             />
           </div>
         </div>
       </div>
 
-      {/* Login and Signup modals remain unchanged */}
       {showLogin && (
         <div className="modal fade show" style={{ display: 'block' }} onClick={handleLoginClose}>
           <div className="modal-dialog" onClick={e => e.stopPropagation()}>
@@ -80,7 +88,7 @@ function DesignPage() {
                 <button type="button" className="btn-close" onClick={handleSignupClose}></button>
               </div>
               <div className="modal-body">
-                <Signup/>
+                <Signup onSignupSuccess={handleSignupClose}/>
               </div>
             </div>
           </div>

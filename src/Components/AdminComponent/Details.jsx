@@ -131,95 +131,43 @@ function Details() {
 
   const handleUpdate = async (e, id, type, data) => {
     e.preventDefault();
-    let token = localStorage.getItem('token');
-    let url;
-    switch (type) {
-      case 'frame':
-        url = `http://143.110.178.225/frames/${id}/`;
-        break;
-      case 'color':
-        url = `http://143.110.178.225/variants/color/${id}/`;
-        break;
-      case 'size':
-        url = `http://143.110.178.225/variants/size/${id}/`;
-        break;
-      case 'finish':
-        url = `http://143.110.178.225/variants/finish/${id}/`;
-        break;
-      case 'hanging':
-        url = `http://143.110.178.225/variants/hanging/${id}/`;
-        break;
-      case 'user':
-        url = `http://143.110.178.225/users/${id}/`;
-        break;
-      default:
-        return;
+    const formData = new FormData();
+    formData.append('name', data.get('name'));
+    formData.append('price', Number(data.get('price')));
+    formData.append('inner_width', Number(data.get('inner_width')));
+    formData.append('inner_height', Number(data.get('inner_height')));
+    const image = data.get('image');
+    const cornerImage = data.get('corner_image');
+    if (image && image.size > 0) formData.append('image', image);
+    if (cornerImage && cornerImage.size > 0) formData.append('corner_image', cornerImage);
+
+    console.log('Form data being sent:');
+    for (let [key, value] of formData.entries()) {
+        console.log(`${key}: ${value}`);
     }
 
+    let token = localStorage.getItem('token');
+    let url = `http://143.110.178.225/frames/${id}/`;
     try {
-      if (!token) {
-        setError('Session expired. Please log in again.');
-        navigate('/login');
-        return;
-      }
-      const response = await axios.put(url, data, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      if (type === 'frame') {
-        setFrames(frames.map((f) => (f.id === id ? response.data : f)));
-      } else if (type === 'user') {
-        setUsers(users.map((u) => (u.id === id ? response.data : u)));
-      } else {
-        const framesResponse = await axios.get('http://143.110.178.225/frames/', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setFrames(framesResponse.data);
-      }
-      handleCloseModal();
-      alert('Update successful');
-    } catch (err) {
-      console.error('Update error:', err);
-      if (err.response?.status === 401) {
-        const newToken = await refreshToken();
-        if (newToken) {
-          try {
-            const retryResponse = await axios.put(url, data, {
-              headers: {
-                Authorization: `Bearer ${newToken}`,
-                'Content-Type': 'multipart/form-data',
-              },
-            });
-            if (type === 'frame') {
-              setFrames(frames.map((f) => (f.id === id ? retryResponse.data : f)));
-            } else if (type === 'user') {
-              setUsers(users.map((u) => (u.id === id ? retryResponse.data : u)));
-            } else {
-              const framesResponse = await axios.get('http://143.110.178.225/frames/', {
-                headers: { Authorization: `Bearer ${newToken}` },
-              });
-              setFrames(framesResponse.data);
-            }
-            handleCloseModal();
-            alert('Update successful');
-          } catch (retryErr) {
+        if (!token) {
             setError('Session expired. Please log in again.');
             navigate('/login');
-          }
-        } else {
-          setError('Session expired. Please log in again.');
-          navigate('/login');
+            return;
         }
-      } else if (err.response?.status === 403) {
-        setError('Only admins can update items. Please log in with an admin account.');
-        navigate('/login');
-      } else {
-        alert('Failed to update item: ' + (err.response?.data?.error || err.message));
-      }
+        const response = await axios.put(url, formData, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        setFrames(frames.map((f) => (f.id === id ? response.data : f)));
+        handleCloseModal();
+        alert('Update successful');
+    } catch (err) {
+        console.error('Update error:', err);
+        alert('Failed to update: ' + (err.response?.data?.error || err.message));
     }
-  };
+};
 
   const handleDelete = async (id, type) => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
@@ -364,6 +312,7 @@ function Details() {
                             <th scope="col">Name</th>
                             <th scope="col">Price</th>
                             <th scope="col">Image</th>
+                            <th scope="col">Corner Image</th>
                             <th scope="col">Dimensions</th>
                             <th scope="col">Created By</th>
                             <th scope="col">Color Variants</th>
@@ -388,6 +337,19 @@ function Details() {
                                 />
                               </td>
                               <td>
+                                {frame.corner_image ? (
+                                  <img
+                                    src={getImageUrl(frame.corner_image)}
+                                    alt={`${frame.name} corner`}
+                                    className="img-thumbnail"
+                                    style={{ width: '80px', height: '80px', objectFit: 'cover' }}
+                                    onError={handleImageError}
+                                  />
+                                ) : (
+                                  <span>No corner image</span>
+                                )}
+                              </td>
+                              <td>
                                 {frame.inner_width} x {frame.inner_height}
                               </td>
                               <td>
@@ -407,6 +369,15 @@ function Details() {
                                         style={{ width: '40px', height: '40px', objectFit: 'cover' }}
                                         onError={handleImageError}
                                       />
+                                      {variant.corner_image && (
+                                        <img
+                                          src={getImageUrl(variant.corner_image)}
+                                          alt={`${variant.color_name} corner`}
+                                          className="img-thumbnail ms-2"
+                                          style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                                          onError={handleImageError}
+                                        />
+                                      )}
                                       <button
                                         className="btn btn-sm btn-info ms-2"
                                         onClick={() => handleSelectItem(variant, 'color')}
@@ -426,6 +397,15 @@ function Details() {
                                         <img
                                           src={getImageUrl(variant.image)}
                                           alt={variant.size_name}
+                                          className="img-thumbnail ms-2"
+                                          style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                                          onError={handleImageError}
+                                        />
+                                      )}
+                                      {variant.corner_image && (
+                                        <img
+                                          src={getImageUrl(variant.corner_image)}
+                                          alt={`${variant.size_name} corner`}
                                           className="img-thumbnail ms-2"
                                           style={{ width: '40px', height: '40px', objectFit: 'cover' }}
                                           onError={handleImageError}
@@ -453,6 +433,15 @@ function Details() {
                                         style={{ width: '40px', height: '40px', objectFit: 'cover' }}
                                         onError={handleImageError}
                                       />
+                                      {variant.corner_image && (
+                                        <img
+                                          src={getImageUrl(variant.corner_image)}
+                                          alt={`${variant.finish_name} corner`}
+                                          className="img-thumbnail ms-2"
+                                          style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                                          onError={handleImageError}
+                                        />
+                                      )}
                                       <button
                                         className="btn btn-sm btn-info ms-2"
                                         onClick={() => handleSelectItem(variant, 'finish')}
@@ -610,6 +599,19 @@ function Details() {
                       )}
                     </div>
                     <div className="mb-3">
+                      <label className="form-label">Corner Image</label>
+                      <input type="file" className="form-control" name="corner_image" accept="image/*" />
+                      {selectedItem.corner_image && (
+                        <img
+                          src={getImageUrl(selectedItem.corner_image)}
+                          alt={`${selectedItem.name} corner`}
+                          className="img-thumbnail mt-2"
+                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
+                          onError={handleImageError}
+                        />
+                      )}
+                    </div>
+                    <div className="mb-3">
                       <label className="form-label">Inner Width</label>
                       <input
                         type="number"
@@ -687,6 +689,19 @@ function Details() {
                         />
                       )}
                     </div>
+                    <div className="mb-3">
+                      <label className="form-label">Corner Image</label>
+                      <input type="file" className="form-control" name="corner_image" accept="image/*" />
+                      {selectedItem.corner_image && (
+                        <img
+                          src={getImageUrl(selectedItem.corner_image)}
+                          alt={`${selectedItem.color_name} corner`}
+                          className="img-thumbnail mt-2"
+                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
+                          onError={handleImageError}
+                        />
+                      )}
+                    </div>
                     <div className="modal-footer">
                       <button type="submit" className="btn btn-primary">Update</button>
                       <button
@@ -751,12 +766,25 @@ function Details() {
                       />
                     </div>
                     <div className="mb-3">
-                      <label className="form-label">Image</label>
+                      <label className="form-label">Image (Optional)</label>
                       <input type="file" className="form-control" name="image" accept="image/*" />
                       {selectedItem.image && (
                         <img
                           src={getImageUrl(selectedItem.image)}
                           alt={selectedItem.size_name}
+                          className="img-thumbnail mt-2"
+                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
+                          onError={handleImageError}
+                        />
+                      )}
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Corner Image (Optional)</label>
+                      <input type="file" className="form-control" name="corner_image" accept="image/*" />
+                      {selectedItem.corner_image && (
+                        <img
+                          src={getImageUrl(selectedItem.corner_image)}
+                          alt={`${selectedItem.size_name} corner`}
                           className="img-thumbnail mt-2"
                           style={{ width: '100px', height: '100px', objectFit: 'cover' }}
                           onError={handleImageError}
@@ -813,6 +841,19 @@ function Details() {
                         <img
                           src={getImageUrl(selectedItem.image)}
                           alt={selectedItem.finish_name}
+                          className="img-thumbnail mt-2"
+                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
+                          onError={handleImageError}
+                        />
+                      )}
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Corner Image</label>
+                      <input type="file" className="form-control" name="corner_image" accept="image/*" />
+                      {selectedItem.corner_image && (
+                        <img
+                          src={getImageUrl(selectedItem.corner_image)}
+                          alt={`${selectedItem.finish_name} corner`}
                           className="img-thumbnail mt-2"
                           style={{ width: '100px', height: '100px', objectFit: 'cover' }}
                           onError={handleImageError}
