@@ -21,7 +21,7 @@ function Profile() {
     try {
       dispatch(logoutUser());
       localStorage.removeItem('token');
-      navigate('/');
+      navigate('/login');
     } catch (error) {
       console.error('Logout failed:', error);
       setError('Failed to logout. Please try again.');
@@ -55,7 +55,7 @@ function Profile() {
 
     try {
       // Placeholder for password reset API call
-      // await axios.post('http://143.110.178.225/api/reset-password/', resetPassword, {
+      // await axios.post('http://localhost:8000/api/reset-password/', resetPassword, {
       //   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       // });
       setSuccess('Password updated successfully!');

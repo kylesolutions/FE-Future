@@ -15,6 +15,7 @@ function DesignPage() {
   const [cartItem, setCartItem] = useState(null);
   const [hasUploadedImages, setHasUploadedImages] = useState(false);
   const location = useLocation();
+  const isPrintOnly = location.state?.isPrintOnly || false;
 
   useEffect(() => {
     if (location.state?.cartItem) {
@@ -41,18 +42,19 @@ function DesignPage() {
           </div>
         </div>
         <div className="row">
-          {hasUploadedImages && (
+          {hasUploadedImages && !isPrintOnly && (
             <div className="col-lg-1">
               <NavIcons onCategorySelect={setActiveCategory} />
             </div>
           )}
-          <div className={hasUploadedImages ? "col-lg-11" : "col-lg-12"}>
+          <div className={hasUploadedImages && !isPrintOnly ? "col-lg-11" : "col-lg-12"}>
             <Headers
               activeCategory={activeCategory}
               onCategorySelect={setActiveCategory}
               cartItem={cartItem}
               setHasUploadedImages={setHasUploadedImages}
               onSelectFrame={setSelectedFrame}
+              isPrintOnly={isPrintOnly}
             />
           </div>
         </div>
@@ -88,7 +90,7 @@ function DesignPage() {
                 <button type="button" className="btn-close" onClick={handleSignupClose}></button>
               </div>
               <div className="modal-body">
-                <Signup onSignupSuccess={handleSignupClose}/>
+                <Signup onSignupSuccess={handleSignupClose} />
               </div>
             </div>
           </div>

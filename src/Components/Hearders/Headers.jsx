@@ -3,18 +3,18 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './Headers.css';
 
-const BASE_URL = 'http://143.110.178.225';
+const BASE_URL = 'http://localhost:8000';
 const FALLBACK_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAABYSURBVHhe7cExAQAwDMCg7f8/8A2BFXgJAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACA+yU/AJSsIW0W2i4AAAAASUVORK5CYII=';
-
-// Define default dimensions (in pixels)
 const DEFAULT_CANVAS_WIDTH = 400;
 const DEFAULT_CANVAS_HEIGHT = 400;
 const DEFAULT_INNER_WIDTH = 320;
 const DEFAULT_INNER_HEIGHT = 320;
-const DPI = 96; // Pixels per inch for conversion
+const DPI = 96;
 
-function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedImages }) {
+function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedImages, isPrintOnly }) {
   const [frames, setFrames] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [selectedImageId, setSelectedImageId] = useState(null);
   const [nextId, setNextId] = useState(0);
@@ -38,6 +38,16 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     return `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
   }, []);
 
+  const updatePrintOptions = (key, value) => {
+    setUploadedImages((prev) =>
+      prev.map((img) =>
+        img.id === selectedImageId
+          ? { ...img, printOptions: { ...img.printOptions, [key]: value } }
+          : img
+      )
+    );
+  };
+
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !originalImage) return;
@@ -46,20 +56,21 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     if (!ctx) return;
 
     const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
-    const hasFrame = selectedImage && selectedImage.frame && frameImage;
+    const hasFrame = !isPrintOnly && selectedImage && selectedImage.frame && frameImage;
 
-    // Calculate canvas dimensions based on custom size (in inches converted to pixels) or default
     let canvasWidth = DEFAULT_CANVAS_WIDTH;
     let canvasHeight = DEFAULT_CANVAS_HEIGHT;
     let innerWidth = selectedImage?.variants?.size?.inner_width || selectedImage?.frame?.inner_width || DEFAULT_INNER_WIDTH;
     let innerHeight = selectedImage?.variants?.size?.inner_height || selectedImage?.frame?.inner_height || DEFAULT_INNER_HEIGHT;
 
-    if (selectedImage?.customSize?.applied && selectedImage?.customSize?.width && selectedImage?.customSize?.height) {
-      const aspectRatio = DEFAULT_CANVAS_WIDTH / DEFAULT_CANVAS_HEIGHT;
-      canvasWidth = Math.min(selectedImage.customSize.width * DPI, DEFAULT_CANVAS_WIDTH);
-      canvasHeight = canvasWidth / aspectRatio;
-      innerWidth = canvasWidth * (innerWidth / DEFAULT_CANVAS_WIDTH);
-      innerHeight = canvasHeight * (innerHeight / DEFAULT_CANVAS_HEIGHT);
+    if (isPrintOnly && selectedImage?.printOptions?.size?.width && selectedImage?.printOptions?.size?.height && !cropping) {
+      const widthInInches = selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.width / 2.54 : selectedImage.printOptions.size.width;
+      const heightInInches = selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.height / 2.54 : selectedImage.printOptions.size.height;
+      canvasWidth = widthInInches * DPI;
+      canvasHeight = heightInInches * DPI;
+    } else if (!isPrintOnly && hasFrame) {
+      canvasWidth = DEFAULT_CANVAS_WIDTH;
+      canvasHeight = DEFAULT_CANVAS_HEIGHT;
     }
 
     canvas.width = canvasWidth;
@@ -104,52 +115,172 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       handles.forEach((handle) => {
         ctx.fillRect(handle.x - handleSize / 2, handle.y - handleSize / 2, handleSize, handleSize);
       });
+    } else if (isPrintOnly) {
+      if (selectedImage.printOptions.fit === 'borderless') {
+        const scale = Math.max(canvasWidth / originalImage.width, canvasHeight / originalImage.height);
+        const scaledWidth = originalImage.width * scale;
+        const scaledHeight = originalImage.height * scale;
+        const x = (canvasWidth - scaledWidth) / 2;
+        const y = (canvasHeight - scaledHeight) / 2;
+        ctx.drawImage(originalImage, x, y, scaledWidth, scaledHeight);
+      } else {
+        const borderDepth = parseInt(selectedImage.printOptions.borderDepth) || 0;
+        const borderColor = selectedImage.printOptions.borderColor || '#ffffff';
+        
+        // Draw border
+        if (borderDepth > 0) {
+          ctx.fillStyle = borderColor;
+          // Top border
+          ctx.fillRect(0, 0, canvasWidth, borderDepth);
+          // Bottom border
+          ctx.fillRect(0, canvasHeight - borderDepth, canvasWidth, borderDepth);
+          // Left border
+          ctx.fillRect(0, borderDepth, borderDepth, canvasHeight - 2 * borderDepth);
+          // Right border
+          ctx.fillRect(canvasWidth - borderDepth, borderDepth, borderDepth, canvasHeight - 2 * borderDepth);
+        }
+        
+        const imageWidth = canvasWidth - 2 * borderDepth;
+        const imageHeight = canvasHeight - 2 * borderDepth;
+        if (imageWidth > 0 && imageHeight > 0) {
+          const scale = Math.min(imageWidth / originalImage.width, imageHeight / originalImage.height);
+          const scaledWidth = originalImage.width * scale;
+          const scaledHeight = originalImage.height * scale;
+          const x = (canvasWidth - scaledWidth) / 2;
+          const y = (canvasHeight - scaledHeight) / 2;
+          ctx.drawImage(originalImage, x, y, scaledWidth, scaledHeight);
+        }
+      }
     } else {
-      // Draw image, clipped to inner frame area if frame is present
-      ctx.save();
+      const frameDepth = selectedImage?.printOptions?.frameDepth ? parseInt(selectedImage.printOptions.frameDepth) : 0;
+      const borderDepth = selectedImage?.printOptions?.borderDepth ? parseInt(selectedImage.printOptions.borderDepth) : 0;
+      const borderColor = selectedImage?.printOptions?.borderColor || '#ffffff';
+      
       if (hasFrame) {
+        // Adjust inner dimensions for frame and border
+        innerX = (canvasWidth - innerWidth) / 2 + frameDepth;
+        innerY = (canvasHeight - innerHeight) / 2 + frameDepth;
+        innerWidth -= 2 * frameDepth;
+        innerHeight -= 2 * frameDepth;
+
+        // Draw border if specified
+        if (borderDepth > 0) {
+          ctx.fillStyle = borderColor;
+          // Top border
+          ctx.fillRect(innerX, innerY, innerWidth, borderDepth);
+          // Bottom border
+          ctx.fillRect(innerX, innerY + innerHeight - borderDepth, innerWidth, borderDepth);
+          // Left border
+          ctx.fillRect(innerX, innerY + borderDepth, borderDepth, innerHeight - 2 * borderDepth);
+          // Right border
+          ctx.fillRect(innerX + innerWidth - borderDepth, innerY + borderDepth, borderDepth, innerHeight - 2 * borderDepth);
+          
+          // Adjust inner dimensions for image
+          innerX += borderDepth;
+          innerY += borderDepth;
+          innerWidth -= 2 * borderDepth;
+          innerHeight -= 2 * borderDepth;
+        }
+
+        ctx.save();
         ctx.beginPath();
         ctx.rect(innerX, innerY, innerWidth, innerHeight);
         ctx.clip();
-      }
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate((imageTransform.rotation * Math.PI) / 180);
-      ctx.scale(imageTransform.scale, imageTransform.scale);
-      ctx.translate(imageTransform.x, imageTransform.y);
-      ctx.drawImage(originalImage, -originalImage.width / 2, -originalImage.height / 2);
-      ctx.restore();
-
-      // Draw frame
-      if (hasFrame) {
-        ctx.save();
         ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate((frameTransform.rotation * Math.PI) / 180);
-        ctx.drawImage(frameImage, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+        ctx.rotate((imageTransform.rotation * Math.PI) / 180);
+        ctx.scale(imageTransform.scale, imageTransform.scale);
+        ctx.translate(imageTransform.x, imageTransform.y);
+        ctx.drawImage(originalImage, -originalImage.width / 2, -originalImage.height / 2);
+        ctx.restore();
+
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        if (!tempCtx) return;
+
+        tempCtx.save();
+        tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+        tempCtx.rotate((frameTransform.rotation * Math.PI) / 180);
+        tempCtx.drawImage(frameImage, -tempCanvas.width / 2, -tempCanvas.height / 2, tempCanvas.width, tempCanvas.height);
+        tempCtx.restore();
+
+        if (selectedImage.customFrameColor) {
+          const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+          const data = imageData.data;
+
+          const hex = selectedImage.customFrameColor.replace('#', '');
+          const r = parseInt(hex.substring(0, 2), 16);
+          const g = parseInt(hex.substring(2, 4), 16);
+          const b = parseInt(hex.substring(4, 6), 16);
+
+          for (let i = 0; i < data.length; i += 4) {
+            const alpha = data[i + 3];
+            if (alpha > 0) {
+              data[i] = r;
+              data[i + 1] = g;
+              data[i + 2] = b;
+            }
+          }
+
+          tempCtx.putImageData(imageData, 0, 0);
+        }
+
+        ctx.drawImage(tempCanvas, 0, 0);
+      } else {
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate((imageTransform.rotation * Math.PI) / 180);
+        ctx.scale(imageTransform.scale, imageTransform.scale);
+        ctx.translate(imageTransform.x, imageTransform.y);
+        ctx.drawImage(originalImage, -originalImage.width / 2, -originalImage.height / 2);
         ctx.restore();
       }
     }
-  }, [cropping, cropBox, originalImage, imageTransform, frameTransform, frameImage, selectedImageId, uploadedImages]);
+  }, [cropping, cropBox, originalImage, imageTransform, frameTransform, frameImage, selectedImageId, uploadedImages, isPrintOnly]);
 
   useEffect(() => {
     drawCanvas();
   }, [drawCanvas]);
 
+  const fetchFrames = async (categoryId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+      let url = `${BASE_URL}/frames/`;
+      if (categoryId) {
+        url += `?category_id=${categoryId}`;
+      }
+      const response = await axios.get(url, config);
+      setFrames(response.data);
+    } catch (error) {
+      console.error('Error fetching frames:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+      }
+    }
+  };
+
   useEffect(() => {
-    const fetchFrames = async () => {
+    fetchFrames(selectedCategory);
+  }, [selectedCategory, navigate]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
       try {
         const token = localStorage.getItem('token');
         const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-        const response = await axios.get(`${BASE_URL}/frames/`, config);
-        setFrames(response.data);
+        const response = await axios.get(`${BASE_URL}/categories/`, config);
+        setCategories(response.data);
       } catch (error) {
-        console.error('Error fetching frames:', error.response?.data || error.message);
+        console.error('Error fetching categories:', error.response?.data || error.message);
         if (error.response?.status === 401) {
           localStorage.removeItem('token');
           navigate('/');
         }
       }
     };
-    fetchFrames();
+    fetchCategories();
   }, [navigate]);
 
   useEffect(() => {
@@ -178,17 +309,10 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     img.crossOrigin = 'anonymous';
     img.src = getImageUrl(selectedImage.cropped_url || selectedImage.original_url);
     img.onload = () => {
-      console.log('Loaded originalImage:', img.src);
       if (selectedImageId === selectedImage.id) {
         setOriginalImage(img);
         setFrameTransform({ rotation: selectedImage.frameTransform?.rotation || 0 });
         setCustomSize(selectedImage.customSize || { width: '', height: '', applied: false });
-      }
-    };
-    img.onerror = () => {
-      console.error(`Failed to load image: ${img.src}`);
-      if (selectedImageId === selectedImage.id) {
-        setOriginalImage(null);
       }
     };
   }, [selectedImageId, uploadedImages, getImageUrl]);
@@ -196,24 +320,18 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   useEffect(() => {
     const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
     if (selectedImage && selectedImage.frame) {
-      const frameSrc = selectedImage.variants?.finish?.image ||
-        selectedImage.variants?.color?.image ||
-        selectedImage.variants?.size?.image ||
-        selectedImage.variants?.hanging?.image ||
-        selectedImage.frame.image;
+      let frameSrc;
+      if (selectedImage.customFrameColor) {
+        frameSrc = selectedImage.frame.image;
+      } else {
+        frameSrc = selectedImage.variants?.finish?.image || selectedImage.variants?.color?.image || selectedImage.variants?.size?.image || selectedImage.variants?.hanging?.image || selectedImage.frame.image;
+      }
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.src = getImageUrl(frameSrc);
       img.onload = () => {
-        console.log('Frame image loaded:', img.src);
         if (selectedImageId === selectedImage.id) {
           setFrameImage(img);
-        }
-      };
-      img.onerror = () => {
-        console.error(`Failed to load frame image: ${img.src}`);
-        if (selectedImageId === selectedImage.id) {
-          setFrameImage(null);
         }
       };
     } else {
@@ -250,6 +368,16 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           frameTransform: { rotation: cartItem.frame_rotation || 0 },
           customSize: cartItem.custom_size || { width: '', height: '', applied: false },
           cartItemId: cartItem.id,
+          printOptions: cartItem.printOptions || {
+            size: { width: cartItem.print_width || '', height: cartItem.print_height || '', unit: cartItem.print_unit || 'inches' },
+            mediaType: cartItem.media_type || 'Photopaper',
+            paperType: cartItem.paper_type || 'Premium Luster',
+            fit: cartItem.fit || 'borderless',
+            borderDepth: cartItem.border_depth || '0',
+            borderColor: cartItem.border_color || '#ffffff',
+            frameDepth: cartItem.frame_depth || '0',
+          },
+          customFrameColor: cartItem.custom_frame_color || null,
         };
         setUploadedImages([image]);
         setSelectedImageId(nextId);
@@ -270,8 +398,8 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         const img = new Image();
         img.src = getImageUrl(selectedImage.cropped_url || selectedImage.original_url);
         img.onload = () => {
-          const canvasWidth = selectedImage.customSize?.applied ? Math.min(selectedImage.customSize.width * DPI, DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_WIDTH;
-          const canvasHeight = selectedImage.customSize?.applied ? canvasWidth * (DEFAULT_CANVAS_HEIGHT / DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_HEIGHT;
+          const canvasWidth = DEFAULT_CANVAS_WIDTH;
+          const canvasHeight = DEFAULT_CANVAS_HEIGHT;
           const innerWidth = selectedImage.variants?.size?.inner_width || selectedImage.frame?.inner_width || DEFAULT_INNER_WIDTH;
           const innerHeight = selectedImage.variants?.size?.inner_height || selectedImage.frame?.inner_height || DEFAULT_INNER_HEIGHT;
           const scale = Math.min(innerWidth / img.width, innerHeight / img.height);
@@ -290,12 +418,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             isResizing: false,
             resizeHandle: '',
           });
-          setCropping(true);
-        };
-        img.onerror = () => {
-          console.error(`Failed to load image for cropping: ${img.src}`);
-          setImageTransform({ x: 0, y: 0, scale: 1, rotation: 0 });
-          setCropBox({ x: 100, y: 100, width: 200, height: 200, startX: 0, startY: 0, isResizing: false, resizeHandle: '' });
           setCropping(true);
         };
       }
@@ -331,6 +453,16 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           transform: { x: 0, y: 0, scale, rotation: 0 },
           frameTransform: { rotation: 0 },
           customSize: { width: '', height: '', applied: false },
+          printOptions: {
+            size: { width: '', height: '', unit: 'inches' },
+            mediaType: 'Photopaper',
+            paperType: 'Premium Luster',
+            fit: 'borderless',
+            borderDepth: '0',
+            borderColor: '#ffffff',
+            frameDepth: '0',
+          },
+          customFrameColor: null,
         };
         setUploadedImages((prev) => [...prev, newImage]);
         setSelectedImageId(nextId);
@@ -354,7 +486,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   };
 
   const handleImageError = (e) => {
-    console.warn(`Image failed to load: ${e.target.src}`);
     e.target.src = FALLBACK_IMAGE;
   };
 
@@ -408,8 +539,8 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     const mouseY = e.clientY - rect.top;
 
     const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
-    const canvasWidth = selectedImage?.customSize?.applied ? Math.min(selectedImage.customSize.width * DPI, DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_WIDTH;
-    const canvasHeight = selectedImage?.customSize?.applied ? canvasWidth * (DEFAULT_CANVAS_HEIGHT / DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_HEIGHT;
+    const canvasWidth = DEFAULT_CANVAS_WIDTH;
+    const canvasHeight = DEFAULT_CANVAS_HEIGHT;
 
     if (cropping) {
       const handleSize = 8;
@@ -470,7 +601,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
               newBox.y = Math.max(0, prev.y + deltaY);
               newBox.width = Math.max(50, mouseX - prev.x);
               newBox.height = Math.max(50, prev.height - deltaY);
-              if (newBox.y > canvasHeight - newBox.height) newBox.y = canvasHeight - newBox.height;
+              if (newBox.y > maxY) newBox.y = maxY;
               break;
             case 'sw':
               newBox.x = Math.max(0, prev.x + deltaX);
@@ -498,8 +629,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             case 'e':
               newBox.width = Math.max(50, mouseX - prev.x);
               break;
-            default:
-              return prev;
           }
           newBox.startX = mouseX;
           newBox.startY = mouseY;
@@ -578,15 +707,15 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       img.crossOrigin = 'anonymous';
       img.src = getImageUrl(original.original_url);
       img.onload = () => {
-        const canvasWidth = original.customSize?.applied ? Math.min(original.customSize.width * DPI, DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_WIDTH;
-        const canvasHeight = original.customSize?.applied ? canvasWidth * (DEFAULT_CANVAS_HEIGHT / DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_HEIGHT;
+        const canvasWidth = DEFAULT_CANVAS_WIDTH;
+        const canvasHeight = DEFAULT_CANVAS_HEIGHT;
         const innerWidth = original.variants?.size?.inner_width || original.frame?.inner_width || DEFAULT_INNER_WIDTH;
         const innerHeight = original.variants?.size?.inner_height || original.frame?.inner_height || DEFAULT_INNER_HEIGHT;
         const scale = Math.min(innerWidth / img.width, innerHeight / img.height);
         const newTransform = { x: 0, y: 0, scale, rotation: 0 };
         const newFrameTransform = { rotation: 0 };
         setUploadedImages((prev) =>
-          prev.map((img) => (img.id === selectedImageId ? { ...img, cropped_file: null, cropped_url: null, adjusted_file: null, adjusted_url: null, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false } } : img))
+          prev.map((img) => (img.id === selectedImageId ? { ...img, cropped_file: null, cropped_url: null, adjusted_file: null, adjusted_url: null, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false }, customFrameColor: null, printOptions: { ...img.printOptions, frameDepth: '0' } } : img))
         );
         setImageTransform(newTransform);
         setFrameTransform(newFrameTransform);
@@ -600,8 +729,8 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     if (!cropping) {
       if (originalImage && imageTransform) {
         const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
-        const canvasWidth = selectedImage?.customSize?.applied ? Math.min(selectedImage.customSize.width * DPI, DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_WIDTH;
-        const canvasHeight = selectedImage?.customSize?.applied ? canvasWidth * (DEFAULT_CANVAS_HEIGHT / DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_HEIGHT;
+        const canvasWidth = DEFAULT_CANVAS_WIDTH;
+        const canvasHeight = DEFAULT_CANVAS_HEIGHT;
         const innerWidth = selectedImage?.variants?.size?.inner_width || selectedImage?.frame?.inner_width || DEFAULT_INNER_WIDTH;
         const innerHeight = selectedImage?.variants?.size?.inner_height || selectedImage?.frame?.inner_height || DEFAULT_INNER_HEIGHT;
         const displayedWidth = originalImage.width * imageTransform.scale;
@@ -627,8 +756,8 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     if (!originalImage || !cropping) return;
 
     const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
-    const canvasWidth = selectedImage?.customSize?.applied ? Math.min(selectedImage.customSize.width * DPI, DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_WIDTH;
-    const canvasHeight = selectedImage?.customSize?.applied ? canvasWidth * (DEFAULT_CANVAS_HEIGHT / DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_HEIGHT;
+    const canvasWidth = DEFAULT_CANVAS_WIDTH;
+    const canvasHeight = DEFAULT_CANVAS_HEIGHT;
 
     const cropCanvas = document.createElement('canvas');
     const ctx = cropCanvas.getContext('2d');
@@ -693,7 +822,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
               headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
             });
             croppedUrl = response.data.cropped_url;
-            console.log('Cropped image uploaded successfully:', croppedUrl);
           } catch (error) {
             console.error('Error saving cropped image:', error.response?.data || error.message);
             if (error.response?.status === 401) {
@@ -702,7 +830,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
               navigate('/');
               return;
             }
-            console.warn('Using blob URL due to upload failure:', croppedUrl);
           }
         }
 
@@ -714,21 +841,41 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           const innerHeight = selectedImage.variants?.size?.inner_height || selectedImage.frame?.inner_height || DEFAULT_INNER_HEIGHT;
           const scale = Math.min(innerWidth / img.width, innerHeight / img.height);
           const newTransform = { x: 0, y: 0, scale, rotation: 0 };
+
+          const croppedWidthInches = (cropBox.width / DPI).toFixed(2);
+          const croppedHeightInches = (cropBox.height / DPI).toFixed(2);
+
+          const currentPrintOptions = selectedImage.printOptions || {};
+          const defaultSize = {
+            width: currentPrintOptions.size?.width || croppedWidthInches,
+            height: currentPrintOptions.size?.height || croppedHeightInches,
+            unit: currentPrintOptions.size?.unit || 'inches',
+          };
+
           setUploadedImages((prev) =>
             prev.map((img) =>
               img.id === selectedImageId
-                ? { ...img, cropped_file: croppedFile, cropped_url: croppedUrl, transform: newTransform }
+                ? {
+                    ...img,
+                    cropped_file: croppedFile,
+                    cropped_url: croppedUrl,
+                    transform: newTransform,
+                    printOptions: {
+                      ...currentPrintOptions,
+                      size: defaultSize,
+                    },
+                  }
                 : img
             )
           );
           setImageTransform(newTransform);
           setOriginalImage(img);
           setCropping(false);
-          onCategorySelect('frame');
+          onCategorySelect(isPrintOnly ? 'print' : 'frame');
         };
       }, 'image/png', 1.0);
     }
-  }, [cropping, cropBox, originalImage, selectedImageId, uploadedImages, imageTransform, onCategorySelect, navigate, getImageUrl]);
+  }, [cropping, cropBox, originalImage, selectedImageId, uploadedImages, imageTransform, onCategorySelect, navigate, getImageUrl, isPrintOnly]);
 
   const cancelCrop = useCallback(() => setCropping(false), []);
 
@@ -739,15 +886,15 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       img.crossOrigin = 'anonymous';
       img.src = getImageUrl(original.original_url);
       img.onload = () => {
-        const canvasWidth = original.customSize?.applied ? Math.min(original.customSize.width * DPI, DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_WIDTH;
-        const canvasHeight = original.customSize?.applied ? canvasWidth * (DEFAULT_CANVAS_HEIGHT / DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_HEIGHT;
+        const canvasWidth = DEFAULT_CANVAS_WIDTH;
+        const canvasHeight = DEFAULT_CANVAS_HEIGHT;
         const innerWidth = original.variants?.size?.inner_width || original.frame?.inner_width || DEFAULT_INNER_WIDTH;
         const innerHeight = original.variants?.size?.inner_height || original.frame?.inner_height || DEFAULT_INNER_HEIGHT;
         const scale = Math.min(innerWidth / img.width, innerHeight / img.height);
         const newTransform = { x: 0, y: 0, scale, rotation: 0 };
         const newFrameTransform = { rotation: 0 };
         setUploadedImages((prev) =>
-          prev.map((img) => (img.id === selectedImageId ? { ...img, cropped_file: null, cropped_url: null, adjusted_file: null, adjusted_url: null, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false } } : img))
+          prev.map((img) => (img.id === selectedImageId ? { ...img, cropped_file: null, cropped_url: null, adjusted_file: null, adjusted_url: null, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false }, customFrameColor: null, printOptions: { ...img.printOptions, frameDepth: '0' } } : img))
         );
         setImageTransform(newTransform);
         setFrameTransform(newFrameTransform);
@@ -765,23 +912,15 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       img.crossOrigin = 'anonymous';
       img.src = getImageUrl(selectedImage.cropped_url || selectedImage.original_url);
       img.onload = () => {
-        // Calculate canvas dimensions
-        const canvasWidth = selectedImage.customSize?.applied ? Math.min(selectedImage.customSize.width * DPI, DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_WIDTH;
-        const canvasHeight = selectedImage.customSize?.applied ? canvasWidth * (DEFAULT_CANVAS_HEIGHT / DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_HEIGHT;
+        const canvasWidth = DEFAULT_CANVAS_WIDTH;
+        const canvasHeight = DEFAULT_CANVAS_HEIGHT;
         const innerWidth = frame.inner_width || DEFAULT_INNER_WIDTH;
         const innerHeight = frame.inner_height || DEFAULT_INNER_HEIGHT;
-
-        // Calculate scale to cover frame's inner dimensions
         const scale = Math.max(innerWidth / img.width, innerHeight / img.height);
-
-        // Calculate the center of the frame's inner area
         const innerX = (canvasWidth - innerWidth) / 2;
         const innerY = (canvasHeight - innerHeight) / 2;
         const innerCenterX = innerX + innerWidth / 2;
         const innerCenterY = innerY + innerHeight / 2;
-
-        // Since drawCanvas translates to canvas center (canvasWidth/2, canvasHeight/2),
-        // adjust x and y to align image center with inner frame center
         const newTransform = {
           x: (innerCenterX - canvasWidth / 2) / scale,
           y: (innerCenterY - canvasHeight / 2) / scale,
@@ -789,19 +928,10 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           rotation: 0,
         };
         const newFrameTransform = { rotation: 0 };
-
         setUploadedImages((prev) =>
           prev.map((img) =>
             img.id === selectedImageId
-              ? {
-                  ...img,
-                  frame,
-                  variants: { color: null, size: null, finish: null, hanging: null },
-                  transform: newTransform,
-                  frameTransform: newFrameTransform,
-                  customSize: { width: '', height: '', applied: false },
-                  cartItemId: img.cartItemId,
-                }
+              ? { ...img, frame, variants: { color: null, size: null, finish: null, hanging: null }, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false }, customFrameColor: null, cartItemId: img.cartItemId, printOptions: { ...img.printOptions, frameDepth: '0' } }
               : img
           )
         );
@@ -809,9 +939,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         setFrameTransform(newFrameTransform);
         setCustomSize({ width: '', height: '', applied: false });
         setOriginalImage(img);
-      };
-      img.onerror = () => {
-        console.error(`Failed to load image: ${img.src}`);
       };
     }
   }, [selectedImageId, uploadedImages, getImageUrl]);
@@ -823,6 +950,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           ? {
               ...img,
               variants: { ...img.variants, [type]: variant },
+              customFrameColor: type === 'color' ? null : img.customFrameColor,
               customSize: type === 'size' ? { width: '', height: '', applied: false } : img.customSize,
               cartItemId: img.cartItemId,
             }
@@ -836,29 +964,21 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         img.crossOrigin = 'anonymous';
         img.src = getImageUrl(selectedImage.cropped_url || selectedImage.original_url);
         img.onload = () => {
-          // Calculate canvas dimensions
-          const canvasWidth = selectedImage.customSize?.applied ? Math.min(selectedImage.customSize.width * DPI, DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_WIDTH;
-          const canvasHeight = selectedImage.customSize?.applied ? canvasWidth * (DEFAULT_CANVAS_HEIGHT / DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_HEIGHT;
+          const canvasWidth = DEFAULT_CANVAS_WIDTH;
+          const canvasHeight = DEFAULT_CANVAS_HEIGHT;
           const innerWidth = variant.inner_width || DEFAULT_INNER_WIDTH;
           const innerHeight = variant.inner_height || DEFAULT_INNER_HEIGHT;
-
-          // Calculate scale to cover size variant's inner dimensions
           const scale = Math.max(innerWidth / img.width, innerHeight / img.height);
-
-          // Calculate the center of the frame's inner area
           const innerX = (canvasWidth - innerWidth) / 2;
           const innerY = (canvasHeight - innerHeight) / 2;
           const innerCenterX = innerX + innerWidth / 2;
           const innerCenterY = innerY + innerHeight / 2;
-
-          // Adjust x and y to align image center with inner frame center
           const newTransform = {
             x: (innerCenterX - canvasWidth / 2) / scale,
             y: (innerCenterY - canvasHeight / 2) / scale,
             scale,
             rotation: 0,
           };
-
           setUploadedImages((prev) =>
             prev.map((img) =>
               img.id === selectedImageId
@@ -870,9 +990,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           setCustomSize({ width: '', height: '', applied: false });
           setOriginalImage(img);
         };
-        img.onerror = () => {
-          console.error(`Failed to load image: ${img.src}`);
-        };
       }
     }
   }, [selectedImageId, uploadedImages, getImageUrl]);
@@ -882,45 +999,24 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     const width = parseFloat(customSize.width);
     const height = parseFloat(customSize.height);
     if (width > 0 && height > 0) {
-      const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
-      if (selectedImage) {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = getImageUrl(selectedImage.cropped_url || selectedImage.original_url);
-        img.onload = () => {
-          const canvasWidth = Math.min(width * DPI, DEFAULT_CANVAS_WIDTH);
-          const canvasHeight = canvasWidth * (DEFAULT_CANVAS_HEIGHT / DEFAULT_CANVAS_WIDTH);
-          const innerWidth = selectedImage.variants?.size?.inner_width || selectedImage.frame?.inner_width || DEFAULT_INNER_WIDTH;
-          const innerHeight = selectedImage.variants?.size?.inner_height || selectedImage.frame?.inner_height || DEFAULT_INNER_HEIGHT;
-          const scale = Math.min(innerWidth / img.width, innerHeight / img.height);
-          const newTransform = { x: 0, y: 0, scale, rotation: 0 };
-          setUploadedImages((prev) =>
-            prev.map((img) =>
-              img.id === selectedImageId
-                ? {
-                    ...img,
-                    customSize: { width, height, applied: true },
-                    variants: { ...img.variants, size: null },
-                    transform: newTransform,
-                  }
-                : img
-            )
-          );
-          setImageTransform(newTransform);
-          setCustomSize({ width, height, applied: true });
-          setOriginalImage(img);
-        };
-      }
+      setUploadedImages((prev) =>
+        prev.map((img) =>
+          img.id === selectedImageId
+            ? { ...img, customSize: { width, height, applied: false } }
+            : img
+        )
+      );
+      setCustomSize({ width, height, applied: false });
     } else {
       alert('Please enter valid width and height values in inches.');
     }
-  }, [customSize, selectedImageId, uploadedImages, getImageUrl]);
+  }, [customSize, selectedImageId]);
 
   const resetVariants = useCallback(() => {
     setUploadedImages((prev) =>
       prev.map((img) =>
         img.id === selectedImageId
-          ? { ...img, frame: null, variants: { color: null, size: null, finish: null, hanging: null }, frameTransform: { rotation: 0 }, customSize: { width: '', height: '', applied: false } }
+          ? { ...img, frame: null, variants: { color: null, size: null, finish: null, hanging: null }, frameTransform: { rotation: 0 }, customSize: { width: '', height: '', applied: false }, customFrameColor: null, printOptions: { ...img.printOptions, frameDepth: '0' } }
           : img
       )
     );
@@ -930,24 +1026,54 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   }, [selectedImageId]);
 
   const calculatePrice = (image) => {
-    if (!image || !image.frame) return 0;
+    if (!image) return 0;
+    if (isPrintOnly) {
+      let price = 5;
+      const area = (image.printOptions.size.width || 0) * (image.printOptions.size.height || 0);
+      price += area * 0.3;
+      return price;
+    }
+    if (!image.frame) return 0;
     let price = parseFloat(image.frame.price || 0);
     if (image.variants.color) price += parseFloat(image.variants.color.price || 0);
     if (image.variants.size) price += parseFloat(image.variants.size.price || 0);
     if (image.variants.finish) price += parseFloat(image.variants.finish.price || 0);
     if (image.variants.hanging) price += parseFloat(image.variants.hanging.price || 0);
-    if (image.customSize.applied) price += 10; // Example: Add $10 for custom size
+    if (image.customSize.width && image.customSize.height) price += 10;
+    if (image.printOptions.frameDepth && parseInt(image.printOptions.frameDepth) > 0) price += 5;
     return price;
   };
 
-  const handleAddToCart = async () => {
+  const handleSave = async () => {
     const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
-    if (!selectedImage || !selectedImage.frame) {
+    if (!isPrintOnly && (!selectedImage || !selectedImage.frame)) {
       alert('Please select a frame');
       return;
     }
+
+    let printWidth = selectedImage.printOptions.size.width;
+    let printHeight = selectedImage.printOptions.size.height;
+    if (!printWidth || !printHeight) {
+      const croppedWidthInches = (cropBox.width / DPI).toFixed(2);
+      const croppedHeightInches = (cropBox.height / DPI).toFixed(2);
+      printWidth = printWidth || croppedWidthInches;
+      printHeight = printHeight || croppedHeightInches;
+      setUploadedImages((prev) =>
+        prev.map((img) =>
+          img.id === selectedImageId
+            ? {
+                ...img,
+                printOptions: {
+                  ...img.printOptions,
+                  size: { width: printWidth, height: printHeight, unit: img.printOptions.size.unit || 'inches' },
+                },
+              }
+            : img
+        )
+      );
+    }
+
     const canvas = canvasRef.current;
-    
     if (!canvas) return;
 
     const adjustedImageUrl = canvas.toDataURL('image/png', 1.0);
@@ -962,22 +1088,35 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     });
 
     const formData = new FormData();
-    formData.append('frame', selectedImage.frame.id);
-    formData.append('adjusted_image', adjustedFile);
-    if (selectedImage.variants.color) formData.append('color_variant', selectedImage.variants.color.id);
-    if (selectedImage.variants.size) formData.append('size_variant', selectedImage.variants.size.id);
-    if (selectedImage.variants.finish) formData.append('finish_variant', selectedImage.variants.finish.id);
-    if (selectedImage.variants.hanging) formData.append('hanging_variant', selectedImage.variants.hanging.id);
-    if (selectedImage.customSize.applied) {
-      formData.append('custom_width', selectedImage.customSize.width);
-      formData.append('custom_height', selectedImage.customSize.height);
+    formData.append('print_width', printWidth);
+    formData.append('print_height', printHeight);
+    formData.append('print_unit', selectedImage.printOptions.size.unit || 'inches');
+    formData.append('media_type', selectedImage.printOptions.mediaType);
+    formData.append('paper_type', selectedImage.printOptions.paperType);
+    formData.append('fit', selectedImage.printOptions.fit);
+    formData.append('border_depth', selectedImage.printOptions.borderDepth);
+    formData.append('border_color', selectedImage.printOptions.borderColor);
+    formData.append('frame_depth', selectedImage.printOptions.frameDepth || '0');
+    formData.append('custom_frame_color', selectedImage.customFrameColor || '');
+
+    if (!isPrintOnly) {
+      formData.append('frame', selectedImage.frame.id);
+      if (selectedImage.variants.color) formData.append('color_variant', selectedImage.variants.color.id);
+      if (selectedImage.variants.size) formData.append('size_variant', selectedImage.variants.size.id);
+      if (selectedImage.variants.finish) formData.append('finish_variant', selectedImage.variants.finish.id);
+      if (selectedImage.variants.hanging) formData.append('hanging_variant', selectedImage.variants.hanging.id);
+      if (selectedImage.customSize.width && selectedImage.customSize.height) {
+        formData.append('custom_width', selectedImage.customSize.width);
+        formData.append('custom_height', selectedImage.customSize.height);
+      }
+      formData.append('transform_x', selectedImage.transform.x);
+      formData.append('transform_y', selectedImage.transform.y);
+      formData.append('scale', selectedImage.transform.scale);
+      formData.append('rotation', selectedImage.transform.rotation);
+      formData.append('frame_rotation', selectedImage.frameTransform.rotation);
     }
-    formData.append('quantity', 1);
-    formData.append('transform_x', selectedImage.transform.x);
-    formData.append('transform_y', selectedImage.transform.y);
-    formData.append('scale', selectedImage.transform.scale);
-    formData.append('rotation', selectedImage.transform.rotation);
-    formData.append('frame_rotation', selectedImage.frameTransform.rotation);
+
+    formData.append('adjusted_image', adjustedFile);
 
     if (!selectedImage.cartItemId) {
       if (selectedImage.original_file) {
@@ -988,23 +1127,25 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       }
     }
 
+    const price = calculatePrice(selectedImage);
+    formData.append('total_price', price.toFixed(2));
+
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Not authenticated');
 
       let response;
       if (selectedImage.cartItemId) {
-        response = await axios.put(`${BASE_URL}/cart/items/${selectedImage.cartItemId}/`, formData, {
+        response = await axios.put(`${BASE_URL}/save-items/${selectedImage.cartItemId}/`, formData, {
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
         });
       } else {
-        response = await axios.post(`${BASE_URL}/add-to-cart/`, formData, {
+        response = await axios.post(`${BASE_URL}/save-items/`, formData, {
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
         });
       }
 
-      alert(selectedImage.cartItemId ? 'Cart item updated successfully' : 'Added to cart successfully');
-
+      alert(selectedImage.cartItemId ? 'Item updated successfully' : 'Item saved successfully');
       setUploadedImages((prev) =>
         prev.map((img) =>
           img.id === selectedImageId
@@ -1012,14 +1153,14 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             : img
         )
       );
-      navigate('/cart');
+      navigate('/savedorder');
     } catch (error) {
-      console.error('Error updating cart:', error.response?.data || error.message);
+      console.error('Error saving item:', error.response?.data || error.message);
       if (error.response?.status === 401) {
         localStorage.removeItem('token');
         navigate('/');
       } else {
-        alert('Error updating cart: ' + (error.response?.data?.error || 'Unknown error'));
+        alert('Error saving item: ' + (error.response?.data?.error || 'Unknown error'));
       }
     }
   };
@@ -1037,6 +1178,132 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
 
   const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
 
+  const renderPrintOptions = () => {
+    if (!selectedImage || !selectedImage.printOptions) {
+      return <div className="print-options mt-3 p-3 bg-light rounded" style={{ border: '1px solid #ffc800' }}>
+        <p className="text-center text-muted">No image selected or print options unavailable</p>
+      </div>;
+    }
+
+    return (
+      <div className="print-options mt-3 p-3 bg-light rounded" style={{ border: '1px solid #ffc800' }}>
+        <h4>Print Options</h4>
+        <div className="mb-2">
+          <label>Size:</label>
+          <input
+            type="number"
+            placeholder="Width"
+            value={selectedImage.printOptions.size.width || ''}
+            onChange={(e) => updatePrintOptions('size', { ...selectedImage.printOptions.size, width: e.target.value })}
+            className="form-control d-inline-block w-auto mx-2"
+            min="1"
+          />
+
+          <span>x</span>
+          <input
+            type="number"
+            placeholder="Height"
+            value={selectedImage.printOptions.size.height || ''}
+            onChange={(e) => updatePrintOptions('size', { ...selectedImage.printOptions.size, height: e.target.value })}
+            className="form-control d-inline-block w-auto mx-2"
+            min="1"
+          />
+          <select
+            value={selectedImage.printOptions.size.unit || 'inches'}
+            onChange={(e) => updatePrintOptions('size', { ...selectedImage.printOptions.size, unit: e.target.value })}
+            className="form-select d-inline-block w-auto"
+          >
+            <option value="inches">Inches</option>
+            <option value="cm">Cm</option>
+          </select>
+        </div>
+        <div className="mb-2">
+          <label>Media:</label>
+          <select
+            value={selectedImage.printOptions.mediaType || 'Photopaper'}
+            onChange={(e) => updatePrintOptions('mediaType', e.target.value)}
+            className="form-select w-auto d-inline-block mx-2"
+          >
+            <option value="Photopaper">Photopaper</option>
+            <option value="Fine Art Paper">Fine Art Paper</option>
+            <option value="Canvas">Canvas</option>
+          </select>
+          {selectedImage.printOptions.mediaType === 'Photopaper' && (
+            <select
+              value={selectedImage.printOptions.paperType || 'Premium Luster'}
+              onChange={(e) => updatePrintOptions('paperType', e.target.value)}
+              className="form-select w-auto d-inline-block mx-2"
+            >
+              <option value="Premium Luster">Premium Luster</option>
+              <option value="Premium Matte">Premium Matte</option>
+              <option value="Premium Glossy">Premium Glossy</option>
+              <option value="Metallic Glossy">Metallic Glossy</option>
+              <option value="Premium Satin">Premium Satin</option>
+            </select>
+          )}
+        </div>
+        <div className="mb-2">
+          <label>Fit:</label>
+          <div className="form-check form-check-inline mx-2">
+            <input
+              type="radio"
+              name="fit"
+              value="borderless"
+              checked={selectedImage.printOptions.fit === 'borderless'}
+              onChange={() => updatePrintOptions('fit', 'borderless')}
+              className="form-check-input"
+            />
+            <label className="form-check-label">Borderless</label>
+          </div>
+          <div className="form-check form-check-inline">
+            <input
+              type="radio"
+              name="fit"
+              value="bordered"
+              checked={selectedImage.printOptions.fit === 'bordered'}
+              onChange={() => updatePrintOptions('fit', 'bordered')}
+              className="form-check-input"
+            />
+            <label className="form-check-label">Bordered</label>
+          </div>
+        </div>
+        {selectedImage.printOptions.fit === 'bordered' && (
+          <div className="mb-2">
+            <label>Border Settings:</label>
+            <input
+              type="number"
+              placeholder="Depth (px)"
+              value={selectedImage.printOptions.borderDepth || '0'}
+              onChange={(e) => updatePrintOptions('borderDepth', e.target.value)}
+              className="form-control d-inline-block w-auto mx-2"
+              min="0"
+            />
+            <input
+              type="color"
+              value={selectedImage.printOptions.borderColor || '#ffffff'}
+              onChange={(e) => updatePrintOptions('borderColor', e.target.value)}
+              className="form-control-color d-inline-block mx-2"
+            />
+          </div>
+        )}
+
+        {!isPrintOnly && selectedImage.frame && (
+          <div className="mb-2">
+            <label>Frame Depth:</label>
+            <input
+              type="number"
+              placeholder="Depth (px)"
+              value={selectedImage.printOptions.frameDepth || '0'}
+              onChange={(e) => updatePrintOptions('frameDepth', e.target.value)}
+              className="form-control d-inline-block w-auto mx-2"
+              min="0"
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="row">
       <div className="col-lg-12">
@@ -1047,8 +1314,8 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           >
             <canvas
               ref={canvasRef}
-              width={selectedImage.customSize?.applied ? Math.min(selectedImage.customSize.width * DPI, DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_WIDTH}
-              height={selectedImage.customSize?.applied ? Math.min(selectedImage.customSize.width * DPI, DEFAULT_CANVAS_WIDTH) * (DEFAULT_CANVAS_HEIGHT / DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_HEIGHT}
+              width={DEFAULT_CANVAS_WIDTH}
+              height={DEFAULT_CANVAS_HEIGHT}
               className="border border-gray-300 rounded"
               onMouseDown={handleCanvasMouseDown}
               onMouseMove={handleCanvasMouseMove}
@@ -1074,10 +1341,11 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             className="main-image mb-3 d-flex flex-column justify-content-center align-items-center"
             style={{ height: '500px', border: '1px solid #ddd' }}
           >
+
             <canvas
               ref={canvasRef}
-              width={selectedImage?.customSize?.applied ? Math.min(selectedImage.customSize.width * DPI, DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_WIDTH}
-              height={selectedImage?.customSize?.applied ? Math.min(selectedImage.customSize.width * DPI, DEFAULT_CANVAS_WIDTH) * (DEFAULT_CANVAS_HEIGHT / DEFAULT_CANVAS_WIDTH) : DEFAULT_CANVAS_HEIGHT}
+              width={DEFAULT_CANVAS_WIDTH}
+              height={DEFAULT_CANVAS_HEIGHT}
               className="border border-gray-300 rounded"
               onMouseDown={handleCanvasMouseDown}
               onMouseMove={handleCanvasMouseMove}
@@ -1093,10 +1361,10 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                   <i className="bi bi-zoom-out"></i>
                 </button>
                 <button className="btn btn-outline" onClick={() => adjustImageRotation(90)} title="Rotate Image Right">
-                  <i className="bi bi-arrow-clockwise"></i>
+                  <i className="bi bi-arrow-clockwise"></i>Image
                 </button>
                 <button className="btn btn-outline" onClick={() => adjustImageRotation(-90)} title="Rotate Image Left">
-                  <i className="bi bi-arrow-counterclockwise"></i>
+                  <i className="bi bi-arrow-counterclockwise"></i>Image
                 </button>
                 {selectedImage.frame && (
                   <>
@@ -1117,7 +1385,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                 <button className="btn btn-outline" onClick={resetTransform} title="Reset Image">
                   <i className="bi bi-bootstrap-reboot"></i>
                 </button>
-                <button className="btn btn-outline" onClick={resetVariants}>None Frame</button>
+                {!isPrintOnly && <button className="btn btn-outline" onClick={resetVariants}>None Frame</button>}
               </div>
             )}
           </div>
@@ -1146,237 +1414,311 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} accept="image/*" />
         </div>
       </div>
-
+ 
       <div className="row">
         <div className="col-12">
-          <div className="p-4 bg-light rounded shadow-sm" style={{ border: '1px solid #ddd', minHeight: '200px', overflow: 'auto' }}>
-            {activeCategory === 'frame' && (
-              <div>
-                <h3 className="mb-3 text-center">Select Frame</h3>
-                <div className="frame-list d-flex flex-wrap justify-content-center gap-3">
-                  {frames.length > 0 ? (
-                    frames.map((frame) => (
-                      <div
-                        key={frame.id}
-                        className={`frame-item p-3 bg-white rounded shadow-sm ${selectedImage?.frame?.id === frame.id ? 'border border-primary' : 'border border-light'}`}
-                        onClick={() => handleSelectFrame(frame)}
-                        style={{ cursor: 'pointer', width: '150px', textAlign: 'center' }}
-                      >
-                        <img
-                          src={getImageUrl(frame.corner_image)}
-                          alt={frame.name}
-                          style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }}
-                          onError={handleImageError}
-                        />
-                        <p className="mt-2 mb-0">${frame.price}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-center text-muted">No frames available</p>
-                  )}
-                </div>
-              </div>
-            )}
-            {activeCategory === 'color' && (
-              <div>
-                <h3 className="mb-3 text-center">Select Color</h3>
-                <div className="frame-list d-flex flex-wrap justify-content-center gap-3">
-                  {selectedImage?.frame ? (
-                    selectedImage.frame.color_variants.length > 0 ? (
-                      selectedImage.frame.color_variants.map((variant) => (
-                        <div
-                          key={variant.id}
-                          className={`frame-item p-3 bg-white rounded shadow-sm ${selectedImage.variants.color?.id === variant.id ? 'border border-primary' : 'border border-light'}`}
-                          onClick={() => handleVariantSelect(variant, 'color')}
-                          style={{ cursor: 'pointer', width: '150px', textAlign: 'center' }}
-                        >
-                          <img
-                            src={getImageUrl(variant.corner_image)}
-                            alt={variant.color_name}
-                            style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }}
-                            onError={handleImageError}
-                          />
-                          <p className="mt-2 mb-0">{variant.color_name || 'No name'}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-center text-muted">No color variants available</p>
-                    )
-                  ) : (
-                    <p className="text-center text-muted">Please select a frame first</p>
-                  )}
-                </div>
-              </div>
-            )}
-            {activeCategory === 'size' && (
-              <div>
-                <h3 className="mb-3 text-center">Select Size</h3>
-                <div className="frame-list d-flex flex-wrap justify-content-center gap-3">
-                  {selectedImage?.frame ? (
-                    <>
-                      <div className="custom-size p-3 bg-white rounded shadow-sm" style={{ width: '200px', textAlign: 'center' }}>
-                        <h4>Custom Size</h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <input
-                            type="number"
-                            step="0.1"
-                            placeholder="Width (inches)"
-                            value={customSize.width}
-                            onChange={(e) => setCustomSize({ ...customSize, width: e.target.value })}
-                            style={{ padding: '5px', borderRadius: '4px', border: '1px solid #ddd' }}
-                          />
-                          <input
-                            type="number"
-                            step="0.1"
-                            placeholder="Height (inches)"
-                            value={customSize.height}
-                            onChange={(e) => setCustomSize({ ...customSize, height: e.target.value })}
-                            style={{ padding: '5px', borderRadius: '4px', border: '1px solid #ddd' }}
-                          />
-                          <button
-                            className="btn btn-primary"
-                            onClick={handleCustomSizeSubmit}
-                            disabled={!customSize.width || !customSize.height}
-                          >
-                            Apply Custom Size
-                          </button>
-                        </div>
-                      </div>
-                      {selectedImage.frame.size_variants.length > 0 ? (
-                        selectedImage.frame.size_variants.map((variant) => (
+          <div className="p-4 bg-light rounded shadow-sm" style={{ border: '1px solid #ffc800', minHeight: '200px', overflow: 'auto' }}>
+            {!cropping && selectedImage && renderPrintOptions()}
+            {!isPrintOnly && !cropping && (
+              <>
+                {activeCategory === 'frame' && (
+                  <div>
+                    <h3 className="mb-3 text-center">Select Frame Category</h3>
+                    <select
+                      value={selectedCategory || ''}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="form-select mb-3 mx-auto"
+                      style={{ maxWidth: '300px' }}
+                    >
+                      <option value="">All Categories</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.frameCategory}
+                        </option>
+                      ))}
+                    </select>
+                    <h3 className="mb-3 text-center">Select Frame</h3>
+                    <div className="frame-list d-flex flex-wrap justify-content-center gap-3">
+                      {frames.length > 0 ? (
+                        frames.map((frame) => (
                           <div
-                            key={variant.id}
-                            className={`frame-item p-3 bg-white rounded shadow-sm ${selectedImage.variants.size?.id === variant.id ? 'border border-primary' : 'border border-light'}`}
-                            onClick={() => handleVariantSelect(variant, 'size')}
+                            key={frame.id}
+                            className={`frame-item p-3 bg-white rounded shadow-sm ${selectedImage?.frame?.id === frame.id ? 'border border-primary' : 'border border-light'}`}
+                            onClick={() => handleSelectFrame(frame)}
                             style={{ cursor: 'pointer', width: '150px', textAlign: 'center' }}
                           >
                             <img
-                              src={getImageUrl(variant.corner_image)}
-                              alt={variant.size_name}
+                              src={getImageUrl(frame.corner_image)}
+                              alt={frame.name}
                               style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }}
                               onError={handleImageError}
                             />
-                            <p className="mt-2 mb-0">{variant.size_name || 'No name'}</p>
+                            <p className="mt-2 mb-0">${frame.price}</p>
                           </div>
                         ))
                       ) : (
-                        <p className="text-center text-muted">No predefined size variants available</p>
+                        <p className="text-center text-muted">No frames available</p>
                       )}
-                    </>
-                  ) : (
-                    <p className="text-center text-muted">Please select a frame first</p>
-                  )}
-                </div>
-              </div>
-            )}
-            {activeCategory === 'finish' && (
-              <div>
-                <h3 className="mb-3 text-center">Select Finish</h3>
-                <div className="frame-list d-flex flex-wrap justify-content-center gap-3">
-                  {selectedImage?.frame ? (
-                    selectedImage.frame.finishing_variants.length > 0 ? (
-                      selectedImage.frame.finishing_variants.map((variant) => (
-                        <div
-                          key={variant.id}
-                          className={`frame-item p-3 bg-white rounded shadow-sm ${selectedImage.variants.finish?.id === variant.id ? 'border border-primary' : 'border border-light'}`}
-                          onClick={() => handleVariantSelect(variant, 'finish')}
-                          style={{ cursor: 'pointer', width: '150px', textAlign: 'center' }}
-                        >
-                          <img
-                            src={getImageUrl(variant.corner_image)}
-                            alt={variant.finish_name}
-                            style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }}
-                            onError={handleImageError}
-                          />
-                          <p className="mt-2 mb-0">{variant.finish_name || 'No name'}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-center text-muted">No finishing variants available</p>
-                    )
-                  ) : (
-                    <p className="text-center text-muted">Please select a frame first</p>
-                  )}
-                </div>
-              </div>
-            )}
-            {activeCategory === 'hanging' && (
-              <div>
-                <h3 className="mb-3 text-center">Select Hanging</h3>
-                <div className="frame-list d-flex flex-wrap justify-content-center gap-3">
-                  {selectedImage?.frame ? (
-                    selectedImage.frame.frameHanging_variant?.length > 0 ? (
-                      selectedImage.frame.frameHanging_variant.map((variant) => (
-                        <div
-                          key={variant.id}
-                          className={`frame-item p-3 bg-white rounded shadow-sm ${selectedImage.variants.hanging?.id === variant.id ? 'border border-primary' : 'border border-light'}`}
-                          onClick={() => handleVariantSelect(variant, 'hanging')}
-                          style={{ cursor: 'pointer', width: '150px', textAlign: 'center' }}
-                        >
-                          <img
-                            src={getImageUrl(variant.image)}
-                            alt={variant.hanging_name}
-                            style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }}
-                            onError={handleImageError}
-                          />
-                          <p className="mt-2 mb-0">{variant.hanging_name || 'No name'}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-center text-muted">No hanging variants available</p>
-                    )
-                  ) : (
-                    <p className="text-center text-muted">Please select a frame first</p>
-                  )}
-                </div>
-              </div>
+                    </div>
+                  </div>
+                )}
+                {activeCategory === 'color' && (
+                  <div>
+                    <h3 className="mb-3 text-center">Select Color</h3>
+                    <div className="frame-list d-flex flex-wrap justify-content-center gap-3">
+                      {selectedImage?.frame ? (
+                        <>
+                          {selectedImage.frame.color_variants.length > 0 ? (
+                            selectedImage.frame.color_variants.map((variant) => (
+                              <div
+                                key={variant.id}
+                                className={`frame-item p-3 bg-white rounded shadow-sm ${selectedImage.variants.color?.id === variant.id ? 'border border-primary' : 'border border-light'}`}
+                                onClick={() => handleVariantSelect(variant, 'color')}
+                                style={{ cursor: 'pointer', width: '150px', textAlign: 'center' }}
+                              >
+                                <img
+                                  src={getImageUrl(variant.corner_image)}
+                                  alt={variant.color_name}
+                                  style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }}
+                                  onError={handleImageError}
+                                />
+                                <p className="mt-2 mb-0">{variant.color_name || 'No name'}</p>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-center text-muted">No color variants available</p>
+                          )}
+                          <div className="custom-color p-3 bg-white rounded shadow-sm" style={{ width: '150px', textAlign: 'center' }}>
+                            <h4>Custom Color</h4>
+                            <input
+                              type="color"
+                              value={selectedImage.customFrameColor || '#000000'}
+                              onChange={(e) => {
+                                setUploadedImages((prev) =>
+                                  prev.map((img) =>
+                                    img.id === selectedImageId ? { ...img, customFrameColor: e.target.value, variants: { ...img.variants, color: null } } : img
+                                  )
+                                );
+                              }}
+                              className="form-control-color"
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-center text-muted">Please select a frame first</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {activeCategory === 'size' && (
+                  <div>
+                    <h3 className="mb-3 text-center">Select Size</h3>
+                    <div className="frame-list d-flex flex-wrap justify-content-center gap-3">
+                      {selectedImage?.frame ? (
+                        <>
+                          <div className="custom-size p-3 bg-white rounded shadow-sm" style={{ width: '200px', textAlign: 'center' }}>
+                            <h4>Custom Size</h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              <input
+                                type="number"
+                                step="0.1"
+                                placeholder="Width (inches)"
+                                value={customSize.width}
+                                onChange={(e) => setCustomSize({ ...customSize, width: e.target.value })}
+                                style={{ padding: '5px', borderRadius: '4px', border: '1px solid #ddd' }}
+                              />
+                              <input
+                                type="number"
+                                step="0.1"
+                                placeholder="Height (inches)"
+                                value={customSize.height}
+                                onChange={(e) => setCustomSize({ ...customSize, height: e.target.value })}
+                                style={{ padding: '5px', borderRadius: '4px', border: '1px solid #ddd' }}
+                              />
+                              <button
+                                className="btn btn-primary"
+                                onClick={handleCustomSizeSubmit}
+                                disabled={!customSize.width || !customSize.height}
+                              >
+                                Apply Custom Size
+                              </button>
+                            </div>
+                          </div>
+                          {selectedImage.frame.size_variants.length > 0 ? (
+                            selectedImage.frame.size_variants.map((variant) => (
+                              <div
+                                key={variant.id}
+                                className={`frame-item p-3 bg-white rounded shadow-sm ${selectedImage.variants.size?.id === variant.id ? 'border border-primary' : 'border border-light'}`}
+                                onClick={() => handleVariantSelect(variant, 'size')}
+                                style={{ cursor: 'pointer', width: '150px', textAlign: 'center' }}
+                              >
+                                <img
+                                  src={getImageUrl(variant.corner_image)}
+                                  alt={variant.size_name}
+                                  style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }}
+                                  onError={handleImageError}
+                                />
+                                <p className="mt-2 mb-0">{variant.size_name || 'No name'}</p>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-center text-muted">No predefined size variants available</p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-center text-muted">Please select a frame first</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {activeCategory === 'finish' && (
+                  <div>
+                    <h3 className="mb-3 text-center">Select Finish</h3>
+                    <div className="frame-list d-flex flex-wrap justify-content-center gap-3">
+                      {selectedImage?.frame ? (
+                        selectedImage.frame.finishing_variants.length > 0 ? (
+                          selectedImage.frame.finishing_variants.map((variant) => (
+                            <div
+                              key={variant.id}
+                              className={`frame-item p-3 bg-white rounded shadow-sm ${selectedImage.variants.finish?.id === variant.id ? 'border border-primary' : 'border border-light'}`}
+                              onClick={() => handleVariantSelect(variant, 'finish')}
+                              style={{ cursor: 'pointer', width: '150px', textAlign: 'center' }}
+                            >
+                              <img
+                                src={getImageUrl(variant.corner_image)}
+                                alt={variant.finish_name}
+                                style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }}
+                                onError={handleImageError}
+                              />
+                              <p className="mt-2 mb-0">{variant.finish_name || 'No name'}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-center text-muted">No finishing variants available</p>
+                        )
+                      ) : (
+                        <p className="text-center text-muted">Please select a frame first</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {activeCategory === 'hanging' && (
+                  <div>
+                    <h3 className="mb-3 text-center">Select Hanging</h3>
+                    <div className="frame-list d-flex flex-wrap justify-content-center gap-3">
+                      {selectedImage?.frame ? (
+                        selectedImage.frame.frameHanging_variant?.length > 0 ? (
+                          selectedImage.frame.frameHanging_variant.map((variant) => (
+                            <div
+                              key={variant.id}
+                              className={`frame-item p-3 bg-white rounded shadow-sm ${selectedImage.variants.hanging?.id === variant.id ? 'border border-primary' : 'border border-light'}`}
+                              onClick={() => handleVariantSelect(variant, 'hanging')}
+                              style={{ cursor: 'pointer', width: '150px', textAlign: 'center' }}
+                            >
+                              <img
+                                src={getImageUrl(variant.image)}
+                                alt={variant.hanging_name}
+                                style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }}
+                                onError={handleImageError}
+                              />
+                              <p className="mt-2 mb-0">{variant.hanging_name || 'No name'}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-center text-muted">No hanging variants available</p>
+                        )
+                      ) : (
+                        <p className="text-center text-muted">Please select a frame first</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
             <div className="mt-4">
               <h3 className="mb-3 text-center">Selected Options</h3>
               <div className="options-list bg-white p-3 rounded shadow-sm">
                 <div className="d-flex justify-content-between mb-2">
-                  <strong>Frame:</strong>
-                  <span>{selectedImage?.frame?.name || 'None'}</span>
-                </div>
-                <div className="d-flex justify-content-between mb-2">
-                  <strong>Color:</strong>
-                  <span>{selectedImage?.variants?.color?.color_name || 'None'}</span>
-                </div>
-                <div className="d-flex justify-content-between mb-2">
                   <strong>Size:</strong>
                   <span>
-                    {selectedImage?.customSize?.applied
+                    {(selectedImage?.customSize?.width && selectedImage?.customSize?.height)
                       ? `${selectedImage.customSize.width}x${selectedImage.customSize.height} inches (Custom)`
-                      : selectedImage?.variants?.size?.size_name || 'None'}
+                      : `${selectedImage?.printOptions?.size?.width || 'N/A'}x${selectedImage?.printOptions?.size?.height || 'N/A'} ${selectedImage?.printOptions?.size?.unit || 'inches'}`}
                   </span>
                 </div>
                 <div className="d-flex justify-content-between mb-2">
-                  <strong>Finish:</strong>
-                  <span>{selectedImage?.variants?.finish?.finish_name || 'None'}</span>
+                  <strong>Media:</strong>
+                  <span>{selectedImage?.printOptions?.mediaType || 'None'}</span>
                 </div>
+                {selectedImage?.printOptions?.mediaType === 'Photopaper' && (
+                  <div className="d-flex justify-content-between mb-2">
+                    <strong>Paper Type:</strong>
+                    <span>{selectedImage?.printOptions?.paperType || 'None'}</span>
+                  </div>
+                )}
                 <div className="d-flex justify-content-between mb-2">
-                  <strong>Hanging:</strong>
-                  <span>{selectedImage?.variants?.hanging?.hanging_name || 'None'}</span>
+                  <strong>Fit:</strong>
+                  <span>{selectedImage?.printOptions?.fit || 'None'}</span>
                 </div>
-                <div className="d-flex justify-content-between mb-2">
-                  <strong>Image Rotation:</strong>
-                  <span>{selectedImage?.transform?.rotation || 0}°</span>
-                </div>
-                <div className="d-flex justify-content-between mb-2">
-                  <strong>Frame Rotation:</strong>
-                  <span>{selectedImage?.frameTransform?.rotation || 0}°</span>
-                </div>
-                {selectedImage && selectedImage.frame && (
+                {selectedImage?.printOptions?.fit === 'bordered' && (
+                  <>
+                    <div className="d-flex justify-content-between mb-2">
+                      <strong>Border Depth:</strong>
+                      <span>{selectedImage?.printOptions?.borderDepth || '0'} px</span>
+                    </div>
+                    <div className="d-flex justify-content-between mb-2">
+                      <strong>Border Color:</strong>
+                      <span>{selectedImage?.printOptions?.borderColor || '#ffffff'}</span>
+                    </div>
+                  </>
+                )}
+                {!isPrintOnly && (
+                  <>
+                    <div className="d-flex justify-content-between mb-2">
+                      <strong>Frame:</strong>
+                      <span>{selectedImage?.frame?.name || 'None'}</span>
+                    </div>
+                    <div className="d-flex justify-content-between mb-2">
+                      <strong>Frame Color:</strong>
+                      <span>{selectedImage?.customFrameColor ? `Custom (${selectedImage.customFrameColor})` : selectedImage?.variants?.color?.color_name || 'None'}</span>
+                    </div>
+                    <div className="d-flex justify-content-between mb-2">
+                      <strong>Size:</strong>
+                      <span>{selectedImage?.variants?.size?.size_name || 'None'}</span>
+                    </div>
+                    <div className="d-flex justify-content-between mb-2">
+                      <strong>Finish:</strong>
+                      <span>{selectedImage?.variants?.finish?.finish_name || 'None'}</span>
+                    </div>
+                    <div className="d-flex justify-content-between mb-2">
+                      <strong>Hanging:</strong>
+                      <span>{selectedImage?.variants?.hanging?.hanging_name || 'None'}</span>
+                    </div>
+                    <div className="d-flex justify-content-between mb-2">
+                      <strong>Image Rotation:</strong>
+                      <span>{selectedImage?.transform?.rotation || 0}°</span>
+                    </div>
+                    <div className="d-flex justify-content-between mb-2">
+                      <strong>Frame Rotation:</strong>
+                      <span>{selectedImage?.frameTransform?.rotation || 0}°</span>
+                    </div>
+                    <div className="d-flex justify-content-between mb-2">
+                      <strong>Frame Depth:</strong>
+                      <span>{selectedImage?.printOptions?.frameDepth || 0} px</span>
+                    </div>
+                  </>
+                )}
+                {(isPrintOnly ? (selectedImage?.printOptions?.size?.width && selectedImage?.printOptions?.size?.height) : selectedImage?.frame) && (
                   <div className="d-flex justify-content-between mb-2">
                     <strong>Price:</strong>
                     <span>${calculatePrice(selectedImage).toFixed(2)}</span>
                   </div>
                 )}
               </div>
-              {selectedImage && selectedImage.frame && (
+              {selectedImage && (selectedImage.frame || isPrintOnly) && (
                 <div className="d-flex justify-content-end mt-3">
-                  <button className="btn btn-primary" onClick={handleAddToCart}>
-                    {selectedImage.cartItemId ? 'Update Cart' : 'Add to Cart'}
+                  <button className="btn btn-primary" onClick={handleSave}>
+                    {selectedImage.cartItemId ? 'Update' : 'Save'}
                   </button>
                 </div>
               )}

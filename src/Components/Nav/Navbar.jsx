@@ -16,7 +16,7 @@ function Navbar() {
       try {
         const token = localStorage.getItem('token');
         if (token) {
-          const response = await axios.get('http://143.110.178.225/user/', {
+          const response = await axios.get('http://localhost:8000/user/', {
             headers: { Authorization: `Bearer ${token}` },
           });
           setIsAdmin(response.data.is_staff || false);
@@ -75,17 +75,8 @@ function Navbar() {
               <Link className="nav-link" to="/" onClick={handleDesignClick}>Design</Link>
             </li>
             <li className="nav-item">
-              <Link className="nav-link" to="/cluster">Cluster</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/installation-care">Installation & Care</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/faqs">FAQs</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/cart">
-                <i className="bi bi-bag-check me-1"></i>Cart
+              <Link className="nav-link" to="/savedorder">
+                <i className="bi bi-bag-check me-1"></i>SavedOrder
               </Link>
             </li>
             {isAdmin && (
@@ -95,6 +86,9 @@ function Navbar() {
                 </li>
                 <li className="nav-item">
                   <Link className="nav-link" to="/details">Details</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/ordersview">Order List</Link>
                 </li>
               </>
             )}

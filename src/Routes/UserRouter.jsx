@@ -7,6 +7,10 @@ import ProfilePage from '../Pages/ProfilePage';
 import AdminPage from '../Pages/AdminPage';
 import DetailsPage from '../Pages/DetailsPage';
 import CartPage from '../Pages/CartPage';
+import FirstTabPage from '../Pages/FirstTabPage';
+import SaveOrderPage from '../Pages/SaveOrderPage';
+import OrdersViewPage from '../Pages/OrdersViewPage';
+import PaymentPage from '../Pages/PaymentPage';
 
 function ProtectedAdminRoute({ children }) {
   const user = useSelector(state => state.user);
@@ -16,19 +20,17 @@ function ProtectedAdminRoute({ children }) {
 function UserRouter() {
   return (
     <Routes>
-      <Route path="/" element={<DesignPage activeCategory="frame" onCategorySelect={() => {}}/>} />
+      <Route path='/' element={<FirstTabPage/>}/>
+      <Route path="design" element={<DesignPage activeCategory="frame" onCategorySelect={() => {}}/>} />
       <Route path="signup" element={<SignupPage />} />
       <Route path="login" element={<LoginPage/>} />
       <Route path="profile" element={<ProfilePage />} />
       <Route path='cart' element={<CartPage/>}/>
-      <Route
-        path="/admin/create-frame"
-        element={<ProtectedAdminRoute><AdminPage /></ProtectedAdminRoute>}
-      />
-      <Route
-        path="/details"
-        element={<ProtectedAdminRoute><DetailsPage /></ProtectedAdminRoute>}
-      />
+      <Route path='savedorder' element={<SaveOrderPage/>}/>
+      <Route path="/admin/create-frame" element={<ProtectedAdminRoute><AdminPage /></ProtectedAdminRoute>}/>
+      <Route path="/details" element={<ProtectedAdminRoute><DetailsPage /></ProtectedAdminRoute>}/>
+      <Route path='ordersview' element={<OrdersViewPage/>}/>
+      <Route path='payment' element={<PaymentPage/>}/>
     </Routes>
   );
 }

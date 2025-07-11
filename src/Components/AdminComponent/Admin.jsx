@@ -6,8 +6,9 @@ import { useSelector } from 'react-redux';
 function Admin() {
   const navigate = useNavigate();
   const user = useSelector((state) => state.user);
-  const [mode, setMode] = useState('create'); // 'create' or 'add_variants'
+  const [mode, setMode] = useState('create'); // 'create', 'add_variants', or 'edit'
   const [frames, setFrames] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [selectedFrameId, setSelectedFrameId] = useState('');
   const [frameData, setFrameData] = useState({
     name: '',
@@ -16,7 +17,9 @@ function Admin() {
     inner_height: '',
     image: null,
     corner_image: null,
+    category_id: '', // Add category_id
   });
+  const [categoryData, setCategoryData] = useState({ frameCategory: '' }); // For creating new categories
   const [variants, setVariants] = useState({
     color: [{ color_name: '', image: null, corner_image: null, image_key: `color_0_${Date.now()}`, price: '' }],
     size: [{ size_name: '', inner_width: '', inner_height: '', image: null, corner_image: null, image_key: `size_0_${Date.now()}`, price: '' }],
@@ -34,18 +37,22 @@ function Admin() {
     }
   }, [user, navigate]);
 
-  // Fetch frames for dropdown
+  // Fetch frames and categories
   useEffect(() => {
-    const fetchFrames = async () => {
+    const fetchData = async () => {
       try {
-        const response = await axios.get('http://143.110.178.225/frames/');
-        setFrames(response.data);
+        const [framesResponse, categoriesResponse] = await Promise.all([
+          axios.get('http://localhost:8000/frames/'),
+          axios.get('http://localhost:8000/categories/')
+        ]);
+        setFrames(framesResponse.data);
+        setCategories(categoriesResponse.data);
       } catch (err) {
-        console.error('Failed to fetch frames:', err);
-        setError('Failed to load frames.');
+        console.error('Failed to fetch data:', err);
+        setError('Failed to load frames or categories.');
       }
     };
-    fetchFrames();
+    fetchData();
   }, []);
 
   // Refresh token function
@@ -53,7 +60,7 @@ function Admin() {
     try {
       const refresh = localStorage.getItem('refresh_token');
       if (!refresh) throw new Error('No refresh token available');
-      const response = await axios.post('http://143.110.178.225/api/token/refresh/', { refresh });
+      const response = await axios.post('http://localhost:8000/api/token/refresh/', { refresh });
       localStorage.setItem('token', response.data.access);
       return response.data.access;
     } catch (err) {
@@ -68,6 +75,11 @@ function Admin() {
   const handleFrameChange = (e) => {
     const { name, value, files } = e.target;
     setFrameData({ ...frameData, [name]: files ? files[0] : value });
+  };
+
+  const handleCategoryChange = (e) => {
+    const { name, value } = e.target;
+    setCategoryData({ ...categoryData, [name]: value });
   };
 
   const handleVariantChange = (variantType, index, e) => {
@@ -98,6 +110,50 @@ function Admin() {
     setVariants(newVariants);
   };
 
+  const handleCategorySubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      const response = await axios.post('http://localhost:8000/categories/', categoryData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setCategories([...categories, response.data]);
+      setCategoryData({ frameCategory: '' });
+      alert('Category created successfully!');
+    } catch (error) {
+      console.error('Category creation error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (newToken) {
+          try {
+            const response = await axios.post('http://localhost:8000/categories/', categoryData, {
+              headers: { Authorization: `Bearer ${newToken}` },
+            });
+            setCategories([...categories, response.data]);
+            setCategoryData({ frameCategory: '' });
+            alert('Category created successfully!');
+          } catch (retryError) {
+            setError('Session expired. Please log in again.');
+            navigate('/login');
+          }
+        } else {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+        }
+      } else {
+        setError('Failed to create category: ' + (error.response?.data?.frameCategory?.[0] || error.message));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -123,7 +179,7 @@ function Admin() {
         for (let [key, value] of formData.entries()) {
           console.log(`${key}: ${value}`);
         }
-        const frameResponse = await axios.post('http://143.110.178.225/frames/', formData, {
+        const frameResponse = await axios.post('http://localhost:8000/frames/', formData, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
@@ -131,8 +187,34 @@ function Admin() {
         });
         frameId = frameResponse.data.id;
         console.log('Frame created:', frameResponse.data);
+        setFrames([...frames, frameResponse.data]); // Update frames list
+      } else if (mode === 'edit') {
+        // Update existing frame
+        frameId = selectedFrameId;
+        if (!frameId) {
+          setError('Please select a frame to edit.');
+          return;
+        }
+        const formData = new FormData();
+        for (const key in frameData) {
+          if (frameData[key] !== '' && frameData[key] !== null) {
+            formData.append(key, frameData[key]);
+          }
+        }
+        console.log('Updating frame data:');
+        for (let [key, value] of formData.entries()) {
+          console.log(`${key}: ${value}`);
+        }
+        const frameResponse = await axios.put(`http://localhost:8000/frames/${frameId}/`, formData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        console.log('Frame updated:', frameResponse.data);
+        setFrames(frames.map(f => f.id === Number(frameId) ? frameResponse.data : f));
       } else {
-        // Use selected frame for adding variants
+        // Add variants to existing frame
         frameId = selectedFrameId;
         if (!frameId) {
           setError('Please select a frame to add variants.');
@@ -186,7 +268,7 @@ function Admin() {
         }
 
         const variantResponse = await axios.post(
-          `http://143.110.178.225/frames/${frameId}/variants/`,
+          `http://localhost:8000/frames/${frameId}/variants/`,
           variantFormData,
           {
             headers: {
@@ -201,6 +283,8 @@ function Admin() {
       alert(
         mode === 'create'
           ? 'Frame and variants created successfully!'
+          : mode === 'edit'
+          ? 'Frame updated successfully!'
           : 'Variants added successfully!'
       );
       setFrameData({
@@ -210,6 +294,7 @@ function Admin() {
         inner_height: '',
         image: null,
         corner_image: null,
+        category_id: '',
       });
       setVariants({
         color: [{ color_name: '', image: null, corner_image: null, image_key: `color_0_${Date.now()}`, price: '' }],
@@ -233,13 +318,29 @@ function Admin() {
                   formData.append(key, frameData[key]);
                 }
               }
-              frameResponse = await axios.post('http://143.110.178.225/frames/', formData, {
+              frameResponse = await axios.post('http://localhost:8000/frames/', formData, {
                 headers: {
                   Authorization: `Bearer ${newToken}`,
                   'Content-Type': 'multipart/form-data',
                 },
               });
               frameId = frameResponse.data.id;
+              setFrames([...frames, frameResponse.data]);
+            } else if (mode === 'edit') {
+              frameId = selectedFrameId;
+              const formData = new FormData();
+              for (const key in frameData) {
+                if (frameData[key] !== '' && frameData[key] !== null) {
+                  formData.append(key, frameData[key]);
+                }
+              }
+              frameResponse = await axios.put(`http://localhost:8000/frames/${frameId}/`, formData, {
+                headers: {
+                  Authorization: `Bearer ${newToken}`,
+                  'Content-Type': 'multipart/form-data',
+                },
+              });
+              setFrames(frames.map(f => f.id === Number(frameId) ? frameResponse.data : f));
             } else {
               frameId = selectedFrameId;
             }
@@ -280,7 +381,7 @@ function Admin() {
               });
 
               await axios.post(
-                `http://143.110.178.225/frames/${frameId}/variants/`,
+                `http://localhost:8000/frames/${frameId}/variants/`,
                 variantFormData,
                 {
                   headers: {
@@ -293,6 +394,8 @@ function Admin() {
             alert(
               mode === 'create'
                 ? 'Frame and variants created successfully!'
+                : mode === 'edit'
+                ? 'Frame updated successfully!'
                 : 'Variants added successfully!'
             );
             setFrameData({
@@ -302,6 +405,7 @@ function Admin() {
               inner_height: '',
               image: null,
               corner_image: null,
+              category_id: '',
             });
             setVariants({
               color: [{ color_name: '', image: null, corner_image: null, image_key: `color_0_${Date.now()}`, price: '' }],
@@ -313,11 +417,11 @@ function Admin() {
             setMode('create');
           } catch (retryError) {
             setError('Session expired. Please log in again.');
-            navigate('/');
+            navigate('/login');
           }
         } else {
           setError('Session expired. Please log in again.');
-          navigate('/');
+          navigate('/login');
         }
       } else if (error.response?.status === 403) {
         setError('Only admins can perform this action.');
@@ -335,6 +439,29 @@ function Admin() {
     }
   };
 
+  const handleEditFrame = async (frameId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`http://localhost:8000/frames/${frameId}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setFrameData({
+        name: response.data.name,
+        price: response.data.price,
+        inner_width: response.data.inner_width,
+        inner_height: response.data.inner_height,
+        image: null, // File inputs are cleared; user must re-upload if updating
+        corner_image: null,
+        category_id: response.data.category?.id || '',
+      });
+      setSelectedFrameId(frameId);
+      setMode('edit');
+    } catch (error) {
+      console.error('Error fetching frame:', error);
+      setError('Failed to load frame data.');
+    }
+  };
+
   if (error) {
     return <div className="alert alert-danger">{error}</div>;
   }
@@ -343,7 +470,26 @@ function Admin() {
 
   return (
     <div className="container mt-5">
-      <h2>{mode === 'create' ? 'Create Frame' : 'Add Variants to Frame'}</h2>
+      <h3>Create Category</h3>
+      <form onSubmit={handleCategorySubmit} className="mb-4">
+        <div className="mb-3">
+          <label className="form-label">Category Name</label>
+          <input
+            type="text"
+            name="frameCategory"
+            value={categoryData.frameCategory}
+            onChange={handleCategoryChange}
+            className="form-control"
+            required
+          />
+        </div>
+        <button type="submit" className="btn btn-primary" disabled={isLoading}>
+          {isLoading ? 'Creating...' : 'Create Category'}
+        </button>
+      </form>
+
+      <h2>{mode === 'create' ? 'Create Frame' : mode === 'edit' ? 'Edit Frame' : 'Add Variants to Frame'}</h2>
+      {/* Frame Form */}
       <div className="mb-3">
         <label className="form-label">Mode</label>
         <select
@@ -352,15 +498,16 @@ function Admin() {
           onChange={(e) => setMode(e.target.value)}
         >
           <option value="create">Create New Frame</option>
+          <option value="edit">Edit Existing Frame</option>
           <option value="add_variants">Add Variants to Existing Frame</option>
         </select>
       </div>
       <form onSubmit={handleSubmit}>
-        {mode === 'create' && (
+        {(mode === 'create' || mode === 'edit') && (
           <>
             <h3>Frame Details</h3>
             <div className="mb-3">
-              <label>Name</label>
+              <label className="form-label">Name</label>
               <input
                 type="text"
                 name="name"
@@ -371,7 +518,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Price</label>
+              <label className="form-label">Price</label>
               <input
                 type="number"
                 name="price"
@@ -383,7 +530,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Inner Width</label>
+              <label className="form-label">Inner Width</label>
               <input
                 type="number"
                 name="inner_width"
@@ -395,7 +542,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Inner Height</label>
+              <label className="form-label">Inner Height</label>
               <input
                 type="number"
                 name="inner_height"
@@ -407,32 +554,66 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Frame Image</label>
+              <label className="form-label">Category</label>
+              <select
+                name="category_id"
+                value={frameData.category_id}
+                onChange={handleFrameChange}
+                className="form-control"
+              >
+                <option value="">-- Select Category (Optional) --</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.frameCategory}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mb-3">
+              <label className="form-label">Frame Image{mode === 'edit' ? ' (Optional)' : ''}</label>
               <input
                 type="file"
                 name="image"
                 onChange={handleFrameChange}
                 className="form-control"
                 accept="image/*"
-                required
+                required={mode === 'create'}
               />
             </div>
             <div className="mb-3">
-              <label>Frame Corner Image</label>
+              <label className="form-label">Frame Corner Image{mode === 'edit' ? ' (Optional)' : ''}</label>
               <input
                 type="file"
                 name="corner_image"
                 onChange={handleFrameChange}
                 className="form-control"
                 accept="image/*"
-                required
+                required={mode === 'create'}
               />
             </div>
           </>
         )}
+        {mode === 'edit' && (
+          <div className="mb-3">
+            <label className="form-label">Select Frame to Edit</label>
+            <select
+              className="form-control"
+              value={selectedFrameId}
+              onChange={(e) => handleEditFrame(e.target.value)}
+              required
+            >
+              <option value="">-- Select Frame --</option>
+              {frames.map((frame) => (
+                <option key={frame.id} value={frame.id}>
+                  {frame.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         {mode === 'add_variants' && (
           <div className="mb-3">
-            <label>Select Frame</label>
+            <label className="form-label">Select Frame</label>
             <select
               className="form-control"
               value={selectedFrameId}
@@ -452,7 +633,7 @@ function Admin() {
         {variants.color.map((variant, index) => (
           <div key={variant.image_key} className="border p-3 mb-3">
             <div className="mb-3">
-              <label>Color Name</label>
+              <label className="form-label">Color Name</label>
               <input
                 type="text"
                 name="color_name"
@@ -462,7 +643,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Price</label>
+              <label className="form-label">Price</label>
               <input
                 type="number"
                 name="price"
@@ -473,7 +654,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Color Image</label>
+              <label className="form-label">Color Image</label>
               <input
                 type="file"
                 name="image"
@@ -483,7 +664,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Color Corner Image</label>
+              <label className="form-label">Color Corner Image</label>
               <input
                 type="file"
                 name="corner_image"
@@ -513,7 +694,7 @@ function Admin() {
         {variants.size.map((variant, index) => (
           <div key={variant.image_key} className="border p-3 mb-3">
             <div className="mb-3">
-              <label>Size Name</label>
+              <label className="form-label">Size Name</label>
               <input
                 type="text"
                 name="size_name"
@@ -523,7 +704,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Inner Width</label>
+              <label className="form-label">Inner Width</label>
               <input
                 type="number"
                 name="inner_width"
@@ -533,7 +714,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Inner Height</label>
+              <label className="form-label">Inner Height</label>
               <input
                 type="number"
                 name="inner_height"
@@ -543,7 +724,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Price</label>
+              <label className="form-label">Price</label>
               <input
                 type="number"
                 name="price"
@@ -554,7 +735,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Size Image (Optional)</label>
+              <label className="form-label">Size Image (Optional)</label>
               <input
                 type="file"
                 name="image"
@@ -564,7 +745,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Size Corner Image (Optional)</label>
+              <label className="form-label">Size Corner Image (Optional)</label>
               <input
                 type="file"
                 name="corner_image"
@@ -594,7 +775,7 @@ function Admin() {
         {variants.finish.map((variant, index) => (
           <div key={variant.image_key} className="border p-3 mb-3">
             <div className="mb-3">
-              <label>Finish Name</label>
+              <label className="form-label">Finish Name</label>
               <input
                 type="text"
                 name="finish_name"
@@ -604,7 +785,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Price</label>
+              <label className="form-label">Price</label>
               <input
                 type="number"
                 name="price"
@@ -615,7 +796,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Finish Image</label>
+              <label className="form-label">Finish Image</label>
               <input
                 type="file"
                 name="image"
@@ -625,7 +806,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Finish Corner Image</label>
+              <label className="form-label">Finish Corner Image</label>
               <input
                 type="file"
                 name="corner_image"
@@ -655,7 +836,7 @@ function Admin() {
         {variants.hanging.map((variant, index) => (
           <div key={variant.image_key} className="border p-3 mb-3">
             <div className="mb-3">
-              <label>Hanging Name</label>
+              <label className="form-label">Hanging Name</label>
               <input
                 type="text"
                 name="hanging_name"
@@ -665,7 +846,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Price</label>
+              <label className="form-label">Price</label>
               <input
                 type="number"
                 name="price"
@@ -676,7 +857,7 @@ function Admin() {
               />
             </div>
             <div className="mb-3">
-              <label>Hanging Image</label>
+              <label className="form-label">Hanging Image</label>
               <input
                 type="file"
                 name="image"
@@ -706,8 +887,10 @@ function Admin() {
             {isLoading
               ? 'Submitting...'
               : mode === 'create'
-                ? 'Create Frame'
-                : 'Add Variants'}
+              ? 'Create Frame'
+              : mode === 'edit'
+              ? 'Update Frame'
+              : 'Add Variants'}
           </button>
         </div>
       </form>

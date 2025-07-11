@@ -6,7 +6,7 @@ import './Details.css';
 import { logoutUser } from '../../Redux/slices/userSlice';
 
 // Base URL for images
-const BASE_URL = 'http://143.110.178.225';
+const BASE_URL = 'http://localhost:8000';
 // Fallback image for broken or missing images
 const FALLBACK_IMAGE = 'https://via.placeholder.com/100x100?text=Image+Not+Found';
 
@@ -16,6 +16,7 @@ function Details() {
   const user = useSelector((state) => state.user);
   const [frames, setFrames] = useState([]);
   const [users, setUsers] = useState([]);
+  const [categories, setCategories] = useState([]); // New state for categories
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('frames');
@@ -54,7 +55,7 @@ function Details() {
     try {
       const refresh = localStorage.getItem('refresh_token');
       if (!refresh) throw new Error('No refresh token available');
-      const response = await axios.post('http://143.110.178.225/api/token/refresh/', { refresh });
+      const response = await axios.post('http://localhost:8000/api/token/refresh/', { refresh });
       localStorage.setItem('token', response.data.access);
       return response.data.access;
     } catch (err) {
@@ -78,29 +79,39 @@ function Details() {
           return;
         }
 
-        const framesResponse = await axios.get('http://143.110.178.225/frames/', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const [framesResponse, usersResponse, categoriesResponse] = await Promise.all([
+          axios.get('http://localhost:8000/frames/', {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get('http://localhost:8000/users/', {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get('http://localhost:8000/categories/', {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
         setFrames(framesResponse.data);
-
-        const usersResponse = await axios.get('http://143.110.178.225/users/', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
         setUsers(usersResponse.data);
+        setCategories(categoriesResponse.data);
       } catch (err) {
         if (err.response?.status === 401) {
           const newToken = await refreshToken();
           if (newToken) {
             try {
-              const framesResponse = await axios.get('http://143.110.178.225/frames/', {
-                headers: { Authorization: `Bearer ${newToken}` },
-              });
+              const [framesResponse, usersResponse, categoriesResponse] = await Promise.all([
+                axios.get('http://localhost:8000/frames/', {
+                  headers: { Authorization: `Bearer ${newToken}` },
+                }),
+                axios.get('http://localhost:8000/users/', {
+                  headers: { Authorization: `Bearer ${newToken}` },
+                }),
+                axios.get('http://localhost:8000/categories/', {
+                  headers: { Authorization: `Bearer ${newToken}` },
+                }),
+              ]);
               setFrames(framesResponse.data);
-
-              const usersResponse = await axios.get('http://143.110.178.225/users/', {
-                headers: { Authorization: `Bearer ${newToken}` },
-              });
               setUsers(usersResponse.data);
+              setCategories(categoriesResponse.data);
             } catch (retryErr) {
               setError('Session expired. Please log in again.');
               navigate('/login');
@@ -132,42 +143,145 @@ function Details() {
   const handleUpdate = async (e, id, type, data) => {
     e.preventDefault();
     const formData = new FormData();
-    formData.append('name', data.get('name'));
-    formData.append('price', Number(data.get('price')));
-    formData.append('inner_width', Number(data.get('inner_width')));
-    formData.append('inner_height', Number(data.get('inner_height')));
-    const image = data.get('image');
-    const cornerImage = data.get('corner_image');
-    if (image && image.size > 0) formData.append('image', image);
-    if (cornerImage && cornerImage.size > 0) formData.append('corner_image', cornerImage);
+    let url;
+
+    switch (type) {
+      case 'frame':
+        formData.append('name', data.get('name'));
+        formData.append('price', Number(data.get('price')));
+        formData.append('inner_width', Number(data.get('inner_width')));
+        formData.append('inner_height', Number(data.get('inner_height')));
+        const frameCategoryId = data.get('category_id');
+        if (frameCategoryId) formData.append('category_id', frameCategoryId);
+        const frameImage = data.get('image');
+        const frameCornerImage = data.get('corner_image');
+        if (frameImage && frameImage.size > 0) formData.append('image', frameImage);
+        if (frameCornerImage && frameCornerImage.size > 0) formData.append('corner_image', frameCornerImage);
+        url = `http://localhost:8000/frames/${id}/`;
+        break;
+      case 'color':
+        formData.append('color_name', data.get('color_name'));
+        formData.append('price', Number(data.get('price')));
+        const colorImage = data.get('image');
+        const colorCornerImage = data.get('corner_image');
+        if (colorImage && colorImage.size > 0) formData.append('image', colorImage);
+        if (colorCornerImage && colorCornerImage.size > 0) formData.append('corner_image', colorCornerImage);
+        url = `http://localhost:8000/variants/color/${id}/`;
+        break;
+      case 'size':
+        formData.append('size_name', data.get('size_name'));
+        formData.append('inner_width', Number(data.get('inner_width')));
+        formData.append('inner_height', Number(data.get('inner_height')));
+        formData.append('price', Number(data.get('price')));
+        const sizeImage = data.get('image');
+        const sizeCornerImage = data.get('corner_image');
+        if (sizeImage && sizeImage.size > 0) formData.append('image', sizeImage);
+        if (sizeCornerImage && sizeCornerImage.size > 0) formData.append('corner_image', sizeCornerImage);
+        url = `http://localhost:8000/variants/size/${id}/`;
+        break;
+      case 'finish':
+        formData.append('finish_name', data.get('finish_name'));
+        formData.append('price', Number(data.get('price')));
+        const finishImage = data.get('image');
+        const finishCornerImage = data.get('corner_image');
+        if (finishImage && finishImage.size > 0) formData.append('image', finishImage);
+        if (finishCornerImage && finishCornerImage.size > 0) formData.append('corner_image', finishCornerImage);
+        url = `http://localhost:8000/variants/finish/${id}/`;
+        break;
+      case 'hanging':
+        formData.append('hanging_name', data.get('hanging_name'));
+        formData.append('price', Number(data.get('price')));
+        const hangingImage = data.get('image');
+        if (hangingImage && hangingImage.size > 0) formData.append('image', hangingImage);
+        url = `http://localhost:8000/variants/hanging/${id}/`;
+        break;
+      case 'user':
+        formData.append('username', data.get('username'));
+        formData.append('email', data.get('email'));
+        formData.append('name', data.get('name'));
+        formData.append('phone', data.get('phone'));
+        formData.append('is_blocked', data.get('is_blocked') === 'true');
+        url = `http://localhost:8000/users/${id}/`;
+        break;
+      case 'category':
+        formData.append('frameCategory', data.get('frameCategory'));
+        url = `http://localhost:8000/categories/${id}/`;
+        break;
+      default:
+        return;
+    }
 
     console.log('Form data being sent:');
     for (let [key, value] of formData.entries()) {
-        console.log(`${key}: ${value}`);
+      console.log(`${key}: ${value}`);
     }
 
     let token = localStorage.getItem('token');
-    let url = `http://143.110.178.225/frames/${id}/`;
     try {
-        if (!token) {
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      const response = await axios.put(url, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': type !== 'user' && type !== 'category' ? 'multipart/form-data' : 'application/json',
+        },
+      });
+      if (type === 'frame') {
+        setFrames(frames.map((f) => (f.id === id ? response.data : f)));
+      } else if (type === 'user') {
+        setUsers(users.map((u) => (u.id === id ? response.data : u)));
+      } else if (type === 'category') {
+        setCategories(categories.map((c) => (c.id === id ? response.data : c)));
+      } else {
+        const framesResponse = await axios.get('http://localhost:8000/frames/', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setFrames(framesResponse.data);
+      }
+      handleCloseModal();
+      alert('Update successful');
+    } catch (err) {
+      console.error('Update error:', err);
+      if (err.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (newToken) {
+          try {
+            const response = await axios.put(url, formData, {
+              headers: {
+                Authorization: `Bearer ${newToken}`,
+                'Content-Type': type !== 'user' && type !== 'category' ? 'multipart/form-data' : 'application/json',
+              },
+            });
+            if (type === 'frame') {
+              setFrames(frames.map((f) => (f.id === id ? response.data : f)));
+            } else if (type === 'user') {
+              setUsers(users.map((u) => (u.id === id ? response.data : u)));
+            } else if (type === 'category') {
+              setCategories(categories.map((c) => (c.id === id ? response.data : c)));
+            } else {
+              const framesResponse = await axios.get('http://localhost:8000/frames/', {
+                headers: { Authorization: `Bearer ${newToken}` },
+              });
+              setFrames(framesResponse.data);
+            }
+            handleCloseModal();
+            alert('Update successful');
+          } catch (retryErr) {
             setError('Session expired. Please log in again.');
             navigate('/login');
-            return;
+          }
+        } else {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
         }
-        const response = await axios.put(url, formData, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'multipart/form-data',
-            },
-        });
-        setFrames(frames.map((f) => (f.id === id ? response.data : f)));
-        handleCloseModal();
-        alert('Update successful');
-    } catch (err) {
-        console.error('Update error:', err);
+      } else {
         alert('Failed to update: ' + (err.response?.data?.error || err.message));
+      }
     }
-};
+  };
 
   const handleDelete = async (id, type) => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
@@ -175,22 +289,25 @@ function Details() {
     let url;
     switch (type) {
       case 'frame':
-        url = `http://143.110.178.225/frames/${id}/`;
+        url = `http://localhost:8000/frames/${id}/`;
         break;
       case 'color':
-        url = `http://143.110.178.225/variants/color/${id}/`;
+        url = `http://localhost:8000/variants/color/${id}/`;
         break;
       case 'size':
-        url = `http://143.110.178.225/variants/size/${id}/`;
+        url = `http://localhost:8000/variants/size/${id}/`;
         break;
       case 'finish':
-        url = `http://143.110.178.225/variants/finish/${id}/`;
+        url = `http://localhost:8000/variants/finish/${id}/`;
         break;
       case 'hanging':
-        url = `http://143.110.178.225/variants/hanging/${id}/`;
+        url = `http://localhost:8000/variants/hanging/${id}/`;
         break;
       case 'user':
-        url = `http://143.110.178.225/users/${id}/`;
+        url = `http://localhost:8000/users/${id}/`;
+        break;
+      case 'category':
+        url = `http://localhost:8000/categories/${id}/`;
         break;
       default:
         return;
@@ -209,8 +326,10 @@ function Details() {
         setFrames(frames.filter((f) => f.id !== id));
       } else if (type === 'user') {
         setUsers(users.filter((u) => u.id !== id));
+      } else if (type === 'category') {
+        setCategories(categories.filter((c) => c.id !== id));
       } else {
-        const framesResponse = await axios.get('http://143.110.178.225/frames/', {
+        const framesResponse = await axios.get('http://localhost:8000/frames/', {
           headers: { Authorization: `Bearer ${token}` },
         });
         setFrames(framesResponse.data);
@@ -230,8 +349,10 @@ function Details() {
               setFrames(frames.filter((f) => f.id !== id));
             } else if (type === 'user') {
               setUsers(users.filter((u) => u.id !== id));
+            } else if (type === 'category') {
+              setCategories(categories.filter((c) => c.id !== id));
             } else {
-              const framesResponse = await axios.get('http://143.110.178.225/frames/', {
+              const framesResponse = await axios.get('http://localhost:8000/frames/', {
                 headers: { Authorization: `Bearer ${newToken}` },
               });
               setFrames(framesResponse.data);
@@ -290,6 +411,14 @@ function Details() {
                     <i className="bi bi-people"></i> Users
                   </button>
                 </li>
+                <li className="nav-item">
+                  <button
+                    className={`nav-link ${activeTab === 'categories' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('categories')}
+                  >
+                    <i className="bi bi-tags"></i> Categories
+                  </button>
+                </li>
               </ul>
             </div>
           </div>
@@ -314,6 +443,7 @@ function Details() {
                             <th scope="col">Image</th>
                             <th scope="col">Corner Image</th>
                             <th scope="col">Dimensions</th>
+                            <th scope="col">Category</th>
                             <th scope="col">Created By</th>
                             <th scope="col">Color Variants</th>
                             <th scope="col">Size Variants</th>
@@ -352,6 +482,7 @@ function Details() {
                               <td>
                                 {frame.inner_width} x {frame.inner_height}
                               </td>
+                              <td>{frame.category?.frameCategory || 'None'}</td>
                               <td>
                                 {frame.created_by
                                   ? frame.created_by.name || frame.created_by.username || 'Unknown'
@@ -535,6 +666,41 @@ function Details() {
                   )}
                 </div>
               )}
+
+              {activeTab === 'categories' && (
+                <div>
+                  <h2 className="card-title mb-4">Frame Categories</h2>
+                  {categories.length === 0 ? (
+                    <p className="text-muted">No categories available</p>
+                  ) : (
+                    <div className="table-responsive">
+                      <table className="table table-hover">
+                        <thead className="table-light">
+                          <tr>
+                            <th scope="col">Category Name</th>
+                            <th scope="col">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {categories.map((category) => (
+                            <tr key={category.id}>
+                              <td>{category.frameCategory}</td>
+                              <td>
+                                <button
+                                  className="btn btn-sm btn-info me-2"
+                                  onClick={() => handleSelectItem(category, 'category')}
+                                >
+                                  Edit
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -550,9 +716,10 @@ function Details() {
                   {modalType === 'frame' && 'Frame Details'}
                   {modalType === 'color' && 'Color Variant Details'}
                   {modalType === 'size' && 'Size Variant Details'}
-                  {modalType === 'finish' && 'Finishing Variant Details'}
+                  {modalType === 'finish' && 'Finishing Variants'}
                   {modalType === 'hanging' && 'Hanging Variant Details'}
                   {modalType === 'user' && 'User Details'}
+                  {modalType === 'category' && 'Category Details'}
                 </h5>
                 <button type="button" className="btn-close" onClick={handleCloseModal}></button>
               </div>
@@ -584,6 +751,21 @@ function Details() {
                         step="0.01"
                         required
                       />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Category</label>
+                      <select
+                        className="form-control"
+                        name="category_id"
+                        defaultValue={selectedItem.category?.id || ''}
+                      >
+                        <option value="">-- Select Category (Optional) --</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.frameCategory}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div className="mb-3">
                       <label className="form-label">Image</label>
@@ -992,6 +1174,38 @@ function Details() {
                         type="button"
                         className="btn btn-danger"
                         onClick={() => handleDelete(selectedItem.id, 'user')}
+                      >
+                        Delete
+                      </button>
+                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
+                        Close
+                      </button>
+                    </div>
+                  </form>
+                )}
+                {modalType === 'category' && (
+                  <form
+                    onSubmit={(e) => {
+                      const formData = new FormData(e.target);
+                      handleUpdate(e, selectedItem.id, 'category', formData);
+                    }}
+                  >
+                    <div className="mb-3">
+                      <label className="form-label">Category Name</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="frameCategory"
+                        defaultValue={selectedItem.frameCategory}
+                        required
+                      />
+                    </div>
+                    <div className="modal-footer">
+                      <button type="submit" className="btn btn-primary">Update</button>
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={() => handleDelete(selectedItem.id, 'category')}
                       >
                         Delete
                       </button>

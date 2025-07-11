@@ -10,47 +10,83 @@ function Signup() {
   const dispatch = useDispatch();
 
   const formik = useFormik({
-    initialValues: { username: '', password: '', email: '' },
+    initialValues: {
+      username: '',
+      password1: '',
+      password2: '',
+      email: '',
+      name: '',
+      phone: '',
+    },
     validationSchema: Yup.object({
       username: Yup.string()
         .min(3, 'Username must be at least 3 characters')
         .max(25, 'Username must be at most 25 characters')
         .required('Username is required'),
-      password: Yup.string()
+      password1: Yup.string()
         .min(8, 'Password must be at least 8 characters')
-        .matches(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/, 'Password must include one uppercase letter, one lowercase letter, and one digit')
+        .matches(
+          /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/,
+          'Password must include one uppercase letter, one lowercase letter, and one digit'
+        )
         .required('Password is required'),
-      email: Yup.string().email('Invalid email address').required('Email is required'),
+      password2: Yup.string()
+        .oneOf([Yup.ref('password1'), null], 'Passwords must match')
+        .required('Confirm Password is required'),
+      email: Yup.string()
+        .email('Invalid email address')
+        .required('Email is required'),
+      name: Yup.string()
+        .max(100, 'Name must be at most 100 characters')
+        .optional(),
+      phone: Yup.string()
+        .matches(/^\d{10}$/, 'Phone number must be 10 digits')
+        .optional(),
     }),
-    onSubmit: async (values) => {
+    onSubmit: async (values, { setStatus, setErrors }) => {
       try {
-        const response = await axios.post('http://143.110.178.225/signup/', {
+        const response = await axios.post('http://localhost:8000/api/user_registration/', {
           username: values.username,
-          password: values.password,
+          password1: values.password1, // Send password1
+          password2: values.password2, // Send password2
           email: values.email,
+          name: values.name || null,
+          phone: values.phone || null,
         });
-        if (response.data.access) {
-          localStorage.setItem('token', response.data.access);
+        console.log('Signup response:', response.data);
+        if (response.data.result && response.data.access) {
+          localStorage.setItem('token', response.data.access); // Fixed typo
           localStorage.setItem('refresh_token', response.data.refresh);
-          const userResponse = await axios.get('http://143.110.178.225/user/', {
+          const userResponse = await axios.get('http://localhost:8000/user/', {
             headers: { Authorization: `Bearer ${response.data.access}` },
           });
-          dispatch(updateUser({
-            username: userResponse.data.username,
-            name: userResponse.data.name || '',
-            email: userResponse.data.email || '',
-            phone: userResponse.data.phone || '',
-            type: userResponse.data.is_staff ? 'admin' : 'user',
-            id: userResponse.data.id || '',
-            is_blocked: userResponse.data.is_blocked || false,
-          }));
+          console.log('User response:', userResponse.data);
+          dispatch(
+            updateUser({
+              username: userResponse.data.username,
+              name: userResponse.data.name || '',
+              email: userResponse.data.email || '',
+              phone: userResponse.data.phone || '',
+              type: userResponse.data.is_staff ? 'admin' : 'user',
+              id: userResponse.data.id || '',
+              is_blocked: userResponse.data.is_blocked || false,
+            })
+          );
           navigate('/');
         } else {
-          formik.setStatus('Invalid signup response');
+          setStatus('Invalid signup response');
         }
       } catch (error) {
         console.error('Error during signup:', error.response?.data || error.message);
-        formik.setStatus(error.response?.data?.detail || 'Signup failed');
+        if (error.response?.data?.errors) {
+          setErrors(error.response.data.errors); // Map all server-side errors
+        } else {
+          setStatus(
+            error.response?.data?.detail ||
+              JSON.stringify(error.response?.data) ||
+              'Signup failed. Please try again.'
+          );
+        }
       }
     },
   });
@@ -171,18 +207,63 @@ function Signup() {
           )}
         </div>
         <div className="w-100 mt-3">
+          <label className="form-label">Name</label>
+          <input
+            className="form-control"
+            type="text"
+            name="name"
+            onChange={formik.handleChange}
+            onBlur={formik.handleBlur}
+            onKeyPress={handleKeyPress}
+            value={formik.values.name}
+          />
+          {formik.touched.name && formik.errors.name && (
+            <p className="error">{formik.errors.name}</p>
+          )}
+        </div>
+        <div className="w-100 mt-3">
+          <label className="form-label">Phone</label>
+          <input
+            className="form-control"
+            type="text"
+            name="phone"
+            onChange={formik.handleChange}
+            onBlur={formik.handleBlur}
+            onKeyPress={handleKeyPress}
+            value={formik.values.phone}
+          />
+          {formik.touched.phone && formik.errors.phone && (
+            <p className="error">{formik.errors.phone}</p>
+          )}
+        </div>
+        <div className="w-100 mt-3">
           <label className="form-label">Password</label>
           <input
             className="form-control"
             type="password"
-            name="password"
+            name="password1"
             onChange={formik.handleChange}
             onBlur={formik.handleBlur}
             onKeyPress={handleKeyPress}
-            value={formik.values.password}
+            value={formik.values.password1}
           />
-          {formik.touched.password && formik.errors.password && (
-            <p className="error">{formik.errors.password}</p>
+          {formik.touched.password1 && formik.errors.password1 && (
+            <p className="error">{formik.errors.password1}</p>
+          )}
+        </div>
+        <div className="w-100 mt-3">
+          <label className="form-label">Confirm Password</label>
+          <input
+            className="form-control"
+            type="password"
+            name="password2"
+            onChange={formik.handleChange}
+            onBlur={formik.handleBlur}
+            onKeyPress={handleKeyPress}
+            value={formik.values.password2}
+          />
+          {formik.touched.password2 && formik.errors.password2 && (
+            <p className="error">{formik.errors.password2}</p>
           )}
         </div>
         <div className="signup mt-3">
