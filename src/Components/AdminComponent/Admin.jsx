@@ -42,8 +42,8 @@ function Admin() {
     const fetchData = async () => {
       try {
         const [framesResponse, categoriesResponse] = await Promise.all([
-          axios.get('http://localhost:8000/frames/'),
-          axios.get('http://localhost:8000/categories/')
+          axios.get('http://82.180.146.4:8000/frames/'),
+          axios.get('http://82.180.146.4:8000/categories/')
         ]);
         setFrames(framesResponse.data);
         setCategories(categoriesResponse.data);
@@ -60,7 +60,7 @@ function Admin() {
     try {
       const refresh = localStorage.getItem('refresh_token');
       if (!refresh) throw new Error('No refresh token available');
-      const response = await axios.post('http://localhost:8000/api/token/refresh/', { refresh });
+      const response = await axios.post('http://82.180.146.4:8000/api/token/refresh/', { refresh });
       localStorage.setItem('token', response.data.access);
       return response.data.access;
     } catch (err) {
@@ -120,7 +120,7 @@ function Admin() {
         navigate('/login');
         return;
       }
-      const response = await axios.post('http://localhost:8000/categories/', categoryData, {
+      const response = await axios.post('http://82.180.146.4:8000/categories/', categoryData, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setCategories([...categories, response.data]);
@@ -132,7 +132,7 @@ function Admin() {
         const newToken = await refreshToken();
         if (newToken) {
           try {
-            const response = await axios.post('http://localhost:8000/categories/', categoryData, {
+            const response = await axios.post('http://82.180.146.4:8000/categories/', categoryData, {
               headers: { Authorization: `Bearer ${newToken}` },
             });
             setCategories([...categories, response.data]);
@@ -179,7 +179,7 @@ function Admin() {
         for (let [key, value] of formData.entries()) {
           console.log(`${key}: ${value}`);
         }
-        const frameResponse = await axios.post('http://localhost:8000/frames/', formData, {
+        const frameResponse = await axios.post('http://82.180.146.4:8000/frames/', formData, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
@@ -205,7 +205,7 @@ function Admin() {
         for (let [key, value] of formData.entries()) {
           console.log(`${key}: ${value}`);
         }
-        const frameResponse = await axios.put(`http://localhost:8000/frames/${frameId}/`, formData, {
+        const frameResponse = await axios.put(`http://82.180.146.4:8000/frames/${frameId}/`, formData, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
@@ -268,7 +268,7 @@ function Admin() {
         }
 
         const variantResponse = await axios.post(
-          `http://localhost:8000/frames/${frameId}/variants/`,
+          `http://82.180.146.4:8000/frames/${frameId}/variants/`,
           variantFormData,
           {
             headers: {
@@ -318,7 +318,7 @@ function Admin() {
                   formData.append(key, frameData[key]);
                 }
               }
-              frameResponse = await axios.post('http://localhost:8000/frames/', formData, {
+              frameResponse = await axios.post('http://82.180.146.4:8000/frames/', formData, {
                 headers: {
                   Authorization: `Bearer ${newToken}`,
                   'Content-Type': 'multipart/form-data',
@@ -334,7 +334,7 @@ function Admin() {
                   formData.append(key, frameData[key]);
                 }
               }
-              frameResponse = await axios.put(`http://localhost:8000/frames/${frameId}/`, formData, {
+              frameResponse = await axios.put(`http://82.180.146.4:8000/frames/${frameId}/`, formData, {
                 headers: {
                   Authorization: `Bearer ${newToken}`,
                   'Content-Type': 'multipart/form-data',
@@ -381,7 +381,7 @@ function Admin() {
               });
 
               await axios.post(
-                `http://localhost:8000/frames/${frameId}/variants/`,
+                `http://82.180.146.4:8000/frames/${frameId}/variants/`,
                 variantFormData,
                 {
                   headers: {
@@ -442,7 +442,7 @@ function Admin() {
   const handleEditFrame = async (frameId) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`http://localhost:8000/frames/${frameId}/`, {
+      const response = await axios.get(`http://82.180.146.4:8000/frames/${frameId}/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setFrameData({
