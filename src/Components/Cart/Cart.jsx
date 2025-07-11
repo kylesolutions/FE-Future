@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
-const BASE_URL = 'http://82.180.146.4:8000';
+const BASE_URL = 'http://82.180.146.4:8001';
 
 function Cart() {
   const [cartItems, setCartItems] = useState([]);

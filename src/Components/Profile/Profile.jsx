@@ -55,7 +55,7 @@ function Profile() {
 
     try {
       // Placeholder for password reset API call
-      // await axios.post('http://82.180.146.4:8000/api/reset-password/', resetPassword, {
+      // await axios.post('http://82.180.146.4:8001/api/reset-password/', resetPassword, {
       //   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       // });
       setSuccess('Password updated successfully!');
