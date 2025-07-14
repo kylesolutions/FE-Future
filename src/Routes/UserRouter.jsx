@@ -14,7 +14,7 @@ import PaymentPage from '../Pages/PaymentPage';
 
 function ProtectedAdminRoute({ children }) {
   const user = useSelector(state => state.user);
-  return user.type === 'admin' ? children : <Navigate to="/login" />;
+  return user.type === 'admin' ? children : <Navigate to="/login"/>;
 }
 
 function UserRouter() {

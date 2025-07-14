@@ -47,6 +47,28 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       )
     );
   };
+  useEffect(() => {
+    const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
+    if (selectedImage && !isPrintOnly && selectedImage.frame && originalImage) {
+      const borderDepth = parseInt(selectedImage.printOptions.borderDepth) || 0;
+      const frameDepth = parseInt(selectedImage.printOptions.frameDepth) || 0;
+      const innerWidth = (selectedImage.variants?.size?.inner_width || selectedImage.frame.inner_width || DEFAULT_INNER_WIDTH) - 2 * frameDepth;
+      const innerHeight = (selectedImage.variants?.size?.inner_height || selectedImage.frame.inner_height || DEFAULT_INNER_HEIGHT) - 2 * frameDepth;
+      const effectiveInnerWidth = innerWidth - 2 * borderDepth;
+      const effectiveInnerHeight = innerHeight - 2 * borderDepth;
+      if (effectiveInnerWidth > 0 && effectiveInnerHeight > 0) {
+        const scale = Math.min(effectiveInnerWidth / originalImage.width, effectiveInnerHeight / originalImage.height);
+        const currentTransform = selectedImage.transform;
+        const newTransform = { ...currentTransform, scale };
+        if (currentTransform.scale !== scale) {
+          setImageTransform(newTransform);
+          setUploadedImages((prev) =>
+            prev.map((img) => (img.id === selectedImageId ? { ...img, transform: newTransform } : img))
+          );
+        }
+      }
+    }
+  }, [selectedImageId, uploadedImages, originalImage, isPrintOnly]);
 
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -127,16 +149,11 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         const borderDepth = parseInt(selectedImage.printOptions.borderDepth) || 0;
         const borderColor = selectedImage.printOptions.borderColor || '#ffffff';
         
-        // Draw border
         if (borderDepth > 0) {
           ctx.fillStyle = borderColor;
-          // Top border
           ctx.fillRect(0, 0, canvasWidth, borderDepth);
-          // Bottom border
           ctx.fillRect(0, canvasHeight - borderDepth, canvasWidth, borderDepth);
-          // Left border
           ctx.fillRect(0, borderDepth, borderDepth, canvasHeight - 2 * borderDepth);
-          // Right border
           ctx.fillRect(canvasWidth - borderDepth, borderDepth, borderDepth, canvasHeight - 2 * borderDepth);
         }
         
@@ -146,36 +163,29 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           const scale = Math.min(imageWidth / originalImage.width, imageHeight / originalImage.height);
           const scaledWidth = originalImage.width * scale;
           const scaledHeight = originalImage.height * scale;
-          const x = (canvasWidth - scaledWidth) / 2;
-          const y = (canvasHeight - scaledHeight) / 2;
+          const x = borderDepth + (imageWidth - scaledWidth) / 2;
+          const y = borderDepth + (imageHeight - scaledHeight) / 2;
           ctx.drawImage(originalImage, x, y, scaledWidth, scaledHeight);
         }
       }
     } else {
-      const frameDepth = selectedImage?.printOptions?.frameDepth ? parseInt(selectedImage.printOptions.frameDepth) : 0;
-      const borderDepth = selectedImage?.printOptions?.borderDepth ? parseInt(selectedImage.printOptions.borderDepth) : 0;
-      const borderColor = selectedImage?.printOptions?.borderColor || '#ffffff';
+       const frameDepth = selectedImage?.printOptions?.frameDepth ? parseInt(selectedImage.printOptions.frameDepth) : 0;
+  const borderDepth = selectedImage?.printOptions?.borderDepth ? parseInt(selectedImage.printOptions.borderDepth) : 0;
+  const borderColor = selectedImage?.printOptions?.borderColor || '#ffffff';
       
       if (hasFrame) {
-        // Adjust inner dimensions for frame and border
         innerX = (canvasWidth - innerWidth) / 2 + frameDepth;
         innerY = (canvasHeight - innerHeight) / 2 + frameDepth;
         innerWidth -= 2 * frameDepth;
         innerHeight -= 2 * frameDepth;
 
-        // Draw border if specified
         if (borderDepth > 0) {
           ctx.fillStyle = borderColor;
-          // Top border
           ctx.fillRect(innerX, innerY, innerWidth, borderDepth);
-          // Bottom border
           ctx.fillRect(innerX, innerY + innerHeight - borderDepth, innerWidth, borderDepth);
-          // Left border
           ctx.fillRect(innerX, innerY + borderDepth, borderDepth, innerHeight - 2 * borderDepth);
-          // Right border
           ctx.fillRect(innerX + innerWidth - borderDepth, innerY + borderDepth, borderDepth, innerHeight - 2 * borderDepth);
           
-          // Adjust inner dimensions for image
           innerX += borderDepth;
           innerY += borderDepth;
           innerWidth -= 2 * borderDepth;
@@ -212,7 +222,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           const hex = selectedImage.customFrameColor.replace('#', '');
           const r = parseInt(hex.substring(0, 2), 16);
           const g = parseInt(hex.substring(2, 4), 16);
-          const b = parseInt(hex.substring(4, 6), 16);
+          const b = parseInt(hex.substring(4 , 16));
 
           for (let i = 0; i < data.length; i += 4) {
             const alpha = data[i + 3];
