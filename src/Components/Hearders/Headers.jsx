@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './Headers.css';
 
-const BASE_URL = 'http://82.180.146.4:8001';
+const BASE_URL = 'http://localhost:8000';
 const FALLBACK_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAABYSURBVHhe7cExAQAwDMCg7f8/8A2BFXgJAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACA+yU/AJSsIW0W2i4AAAAASUVORK5CYII=';
 const DEFAULT_CANVAS_WIDTH = 400;
 const DEFAULT_CANVAS_HEIGHT = 400;
@@ -28,6 +28,9 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   const [frameImage, setFrameImage] = useState(null);
   const [variantImages, setVariantImages] = useState({});
   const [customSize, setCustomSize] = useState({ width: '', height: '', applied: false });
+  const [cropWidth, setCropWidth] = useState('');
+  const [cropHeight, setCropHeight] = useState('');
+  const [cropUnit, setCropUnit] = useState('inches');
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
@@ -47,6 +50,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       )
     );
   };
+
   useEffect(() => {
     const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
     if (selectedImage && !isPrintOnly && selectedImage.frame && originalImage) {
@@ -80,28 +84,13 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
     const hasFrame = !isPrintOnly && selectedImage && selectedImage.frame && frameImage;
 
-    let canvasWidth = DEFAULT_CANVAS_WIDTH;
-    let canvasHeight = DEFAULT_CANVAS_HEIGHT;
-    let innerWidth = selectedImage?.variants?.size?.inner_width || selectedImage?.frame?.inner_width || DEFAULT_INNER_WIDTH;
-    let innerHeight = selectedImage?.variants?.size?.inner_height || selectedImage?.frame?.inner_height || DEFAULT_INNER_HEIGHT;
-
-    if (isPrintOnly && selectedImage?.printOptions?.size?.width && selectedImage?.printOptions?.size?.height && !cropping) {
-      const widthInInches = selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.width / 2.54 : selectedImage.printOptions.size.width;
-      const heightInInches = selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.height / 2.54 : selectedImage.printOptions.size.height;
-      canvasWidth = widthInInches * DPI;
-      canvasHeight = heightInInches * DPI;
-    } else if (!isPrintOnly && hasFrame) {
-      canvasWidth = DEFAULT_CANVAS_WIDTH;
-      canvasHeight = DEFAULT_CANVAS_HEIGHT;
-    }
-
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
-
+    // Always set canvas bitmap size to default (400x400)
+    canvas.width = DEFAULT_CANVAS_WIDTH;
+    canvas.height = DEFAULT_CANVAS_HEIGHT;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    let innerX = (canvasWidth - innerWidth) / 2;
-    let innerY = (canvasHeight - innerHeight) / 2;
+    let innerWidth = selectedImage?.variants?.size?.inner_width || selectedImage?.frame?.inner_width || DEFAULT_INNER_WIDTH;
+    let innerHeight = selectedImage?.variants?.size?.inner_height || selectedImage?.frame?.inner_height || DEFAULT_INNER_HEIGHT;
 
     if (cropping) {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
@@ -137,45 +126,68 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       handles.forEach((handle) => {
         ctx.fillRect(handle.x - handleSize / 2, handle.y - handleSize / 2, handleSize, handleSize);
       });
-    } else if (isPrintOnly) {
+    } else if (isPrintOnly && selectedImage?.printOptions?.size?.width && selectedImage?.printOptions?.size?.height) {
+      const widthInInches = selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.width / 2.54 : selectedImage.printOptions.size.width;
+      const heightInInches = selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.height / 2.54 : selectedImage.printOptions.size.height;
+      const printWidth = widthInInches * DPI;
+      const printHeight = heightInInches * DPI;
+
+      let scale = 1;
+      if (printWidth > DEFAULT_CANVAS_WIDTH || printHeight > DEFAULT_CANVAS_HEIGHT) {
+        const scaleX = DEFAULT_CANVAS_WIDTH / printWidth;
+        const scaleY = DEFAULT_CANVAS_HEIGHT / printHeight;
+        scale = Math.min(scaleX, scaleY);
+      }
+
+      ctx.save();
+      ctx.translate(DEFAULT_CANVAS_WIDTH / 2, DEFAULT_CANVAS_HEIGHT / 2);
+      ctx.scale(scale, scale);
+      ctx.translate(-printWidth / 2, -printHeight / 2);
+
       if (selectedImage.printOptions.fit === 'borderless') {
-        const scale = Math.max(canvasWidth / originalImage.width, canvasHeight / originalImage.height);
-        const scaledWidth = originalImage.width * scale;
-        const scaledHeight = originalImage.height * scale;
-        const x = (canvasWidth - scaledWidth) / 2;
-        const y = (canvasHeight - scaledHeight) / 2;
-        ctx.drawImage(originalImage, x, y, scaledWidth, scaledHeight);
-      } else {
-        const borderDepth = parseInt(selectedImage.printOptions.borderDepth) || 0;
-        const borderColor = selectedImage.printOptions.borderColor || '#ffffff';
-        
-        if (borderDepth > 0) {
-          ctx.fillStyle = borderColor;
-          ctx.fillRect(0, 0, canvasWidth, borderDepth);
-          ctx.fillRect(0, canvasHeight - borderDepth, canvasWidth, borderDepth);
-          ctx.fillRect(0, borderDepth, borderDepth, canvasHeight - 2 * borderDepth);
-          ctx.fillRect(canvasWidth - borderDepth, borderDepth, borderDepth, canvasHeight - 2 * borderDepth);
+        const imageAspectRatio = originalImage.width / originalImage.height;
+        const printAspectRatio = printWidth / printHeight;
+        let drawWidth, drawHeight;
+        if (imageAspectRatio > printAspectRatio) {
+          drawHeight = printHeight;
+          drawWidth = originalImage.width * (printHeight / originalImage.height);
+        } else {
+          drawWidth = printWidth;
+          drawHeight = originalImage.height * (printWidth / originalImage.width);
         }
-        
-        const imageWidth = canvasWidth - 2 * borderDepth;
-        const imageHeight = canvasHeight - 2 * borderDepth;
+        const x = (printWidth - drawWidth) / 2;
+        const y = (printHeight - drawHeight) / 2;
+        ctx.drawImage(originalImage, x, y, drawWidth, drawHeight);
+      } else {
+        const borderColor = selectedImage.printOptions.borderColor || '#ffffff';
+        const borderDepth = parseInt(selectedImage.printOptions.borderDepth) || 0;
+
+        ctx.fillStyle = borderColor;
+        ctx.fillRect(0, 0, printWidth, printHeight);
+
+        const imageWidth = printWidth - 2 * borderDepth;
+        const imageHeight = printHeight - 2 * borderDepth;
         if (imageWidth > 0 && imageHeight > 0) {
-          const scale = Math.min(imageWidth / originalImage.width, imageHeight / originalImage.height);
-          const scaledWidth = originalImage.width * scale;
-          const scaledHeight = originalImage.height * scale;
+          const scaleImage = Math.min(imageWidth / originalImage.width, imageHeight / originalImage.height);
+          const scaledWidth = originalImage.width * scaleImage;
+          const scaledHeight = originalImage.height * scaleImage;
           const x = borderDepth + (imageWidth - scaledWidth) / 2;
           const y = borderDepth + (imageHeight - scaledHeight) / 2;
           ctx.drawImage(originalImage, x, y, scaledWidth, scaledHeight);
         }
       }
+      ctx.restore();
     } else {
-       const frameDepth = selectedImage?.printOptions?.frameDepth ? parseInt(selectedImage.printOptions.frameDepth) : 0;
-  const borderDepth = selectedImage?.printOptions?.borderDepth ? parseInt(selectedImage.printOptions.borderDepth) : 0;
-  const borderColor = selectedImage?.printOptions?.borderColor || '#ffffff';
-      
+      const frameDepth = selectedImage?.printOptions?.frameDepth ? parseInt(selectedImage.printOptions.frameDepth) : 0;
+      const borderDepth = selectedImage?.printOptions?.borderDepth ? parseInt(selectedImage.printOptions.borderDepth) : 0;
+      const borderColor = selectedImage?.printOptions?.borderColor || '#ffffff';
+
+      let innerX = (canvas.width - innerWidth) / 2;
+      let innerY = (canvas.height - innerHeight) / 2;
+
       if (hasFrame) {
-        innerX = (canvasWidth - innerWidth) / 2 + frameDepth;
-        innerY = (canvasHeight - innerHeight) / 2 + frameDepth;
+        innerX += frameDepth;
+        innerY += frameDepth;
         innerWidth -= 2 * frameDepth;
         innerHeight -= 2 * frameDepth;
 
@@ -185,7 +197,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           ctx.fillRect(innerX, innerY + innerHeight - borderDepth, innerWidth, borderDepth);
           ctx.fillRect(innerX, innerY + borderDepth, borderDepth, innerHeight - 2 * borderDepth);
           ctx.fillRect(innerX + innerWidth - borderDepth, innerY + borderDepth, borderDepth, innerHeight - 2 * borderDepth);
-          
+
           innerX += borderDepth;
           innerY += borderDepth;
           innerWidth -= 2 * borderDepth;
@@ -222,7 +234,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           const hex = selectedImage.customFrameColor.replace('#', '');
           const r = parseInt(hex.substring(0, 2), 16);
           const g = parseInt(hex.substring(2, 4), 16);
-          const b = parseInt(hex.substring(4 , 16));
+          const b = parseInt(hex.substring(4, 6), 16);
 
           for (let i = 0; i < data.length; i += 4) {
             const alpha = data[i + 3];
@@ -292,7 +304,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     };
     fetchCategories();
   }, [navigate]);
-
   useEffect(() => {
     setHasUploadedImages(uploadedImages.length > 0);
   }, [uploadedImages, setHasUploadedImages]);
@@ -380,8 +391,8 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           cartItemId: cartItem.id,
           printOptions: cartItem.printOptions || {
             size: { width: cartItem.print_width || '', height: cartItem.print_height || '', unit: cartItem.print_unit || 'inches' },
-            mediaType: cartItem.media_type || 'Photopaper',
-            paperType: cartItem.paper_type || 'Premium Luster',
+            mediaType: cartItem.media_type || null,
+            paperType: cartItem.paper_type || null,
             fit: cartItem.fit || 'borderless',
             borderDepth: cartItem.border_depth || '0',
             borderColor: cartItem.border_color || '#ffffff',
@@ -402,43 +413,47 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   }, [cartItem, nextId, onCategorySelect, getImageUrl]);
 
   useEffect(() => {
-    if (activeCategory === 'crop' && selectedImageId !== null && !cropping) {
-      const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
-      if (selectedImage) {
-        const img = new Image();
-        img.src = getImageUrl(selectedImage.cropped_url || selectedImage.original_url);
-        img.onload = () => {
-          const canvasWidth = DEFAULT_CANVAS_WIDTH;
-          const canvasHeight = DEFAULT_CANVAS_HEIGHT;
-          const innerWidth = selectedImage.variants?.size?.inner_width || selectedImage.frame?.inner_width || DEFAULT_INNER_WIDTH;
-          const innerHeight = selectedImage.variants?.size?.inner_height || selectedImage.frame?.inner_height || DEFAULT_INNER_HEIGHT;
-          const scale = Math.min(innerWidth / img.width, innerHeight / img.height);
-          const displayedWidth = img.width * scale;
-          const displayedHeight = img.height * scale;
-          const canvasX = (canvasWidth - displayedWidth) / 2;
-          const canvasY = (canvasHeight - displayedHeight) / 2;
-          setImageTransform({ x: 0, y: 0, scale, rotation: 0 });
-          setCropBox({
-            x: canvasX,
-            y: canvasY,
-            width: displayedWidth,
-            height: displayedHeight,
-            startX: 0,
-            startY: 0,
-            isResizing: false,
-            resizeHandle: '',
-          });
-          setCropping(true);
-        };
-      }
-    } else if (activeCategory === 'remove' && selectedImageId !== null) {
-      const updatedImages = uploadedImages.filter((img) => img.id !== selectedImageId);
-      setUploadedImages(updatedImages);
-      setSelectedImageId(updatedImages.length > 0 ? updatedImages[0].id : null);
-      setCustomSize({ width: '', height: '', applied: false });
-      onCategorySelect('frame');
+  if (activeCategory === 'crop' && selectedImageId !== null && !cropping) {
+    const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
+    if (selectedImage) {
+      const img = new Image();
+      img.src = getImageUrl(selectedImage.cropped_url || selectedImage.original_url);
+      img.onload = () => {
+        const canvasWidth = DEFAULT_CANVAS_WIDTH; // 400
+        const canvasHeight = DEFAULT_CANVAS_HEIGHT; // 400
+        const scale = Math.max(canvasWidth / img.width, canvasHeight / img.height);
+        setImageTransform({ x: 0, y: 0, scale, rotation: 0 });
+        setCropBox({
+          x: 0,
+          y: 0,
+          width: canvasWidth,
+          height: canvasHeight,
+          startX: 0,
+          startY: 0,
+          isResizing: false,
+          resizeHandle: '',
+        });
+        setCropping(true);
+        const currentSize = selectedImage.printOptions.size;
+        if (currentSize.width && currentSize.height) {
+          setCropWidth(currentSize.width);
+          setCropHeight(currentSize.height);
+          setCropUnit(currentSize.unit);
+        } else {
+          setCropWidth('');
+          setCropHeight('');
+          setCropUnit('inches');
+        }
+      };
     }
-  }, [activeCategory, selectedImageId, cropping, uploadedImages, onCategorySelect, getImageUrl]);
+  } else if (activeCategory === 'remove' && selectedImageId !== null) {
+    const updatedImages = uploadedImages.filter((img) => img.id !== selectedImageId);
+    setUploadedImages(updatedImages);
+    setSelectedImageId(updatedImages.length > 0 ? updatedImages[0].id : null);
+    setCustomSize({ width: '', height: '', applied: false });
+    onCategorySelect('frame');
+  }
+}, [activeCategory, selectedImageId, cropping, uploadedImages, onCategorySelect, getImageUrl]);
 
   const triggerUpload = () => fileInputRef.current.click();
 
@@ -465,8 +480,8 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           customSize: { width: '', height: '', applied: false },
           printOptions: {
             size: { width: '', height: '', unit: 'inches' },
-            mediaType: 'Photopaper',
-            paperType: 'Premium Luster',
+            mediaType: '',
+            paperType: '',
             fit: 'borderless',
             borderDepth: '0',
             borderColor: '#ffffff',
@@ -847,34 +862,27 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         img.crossOrigin = 'anonymous';
         img.src = getImageUrl(croppedUrl);
         img.onload = () => {
-          const innerWidth = selectedImage.variants?.size?.inner_width || selectedImage.frame?.inner_width || DEFAULT_INNER_WIDTH;
-          const innerHeight = selectedImage.variants?.size?.inner_height || selectedImage.frame?.inner_height || DEFAULT_INNER_HEIGHT;
-          const scale = Math.min(innerWidth / img.width, innerHeight / img.height);
-          const newTransform = { x: 0, y: 0, scale, rotation: 0 };
-
-          const croppedWidthInches = (cropBox.width / DPI).toFixed(2);
-          const croppedHeightInches = (cropBox.height / DPI).toFixed(2);
-
-          const currentPrintOptions = selectedImage.printOptions || {};
           const defaultSize = {
-            width: currentPrintOptions.size?.width || croppedWidthInches,
-            height: currentPrintOptions.size?.height || croppedHeightInches,
-            unit: currentPrintOptions.size?.unit || 'inches',
+            width: cropWidth || (cropBox.width / DPI).toFixed(2),
+            height: cropHeight || (cropBox.height / DPI).toFixed(2),
+            unit: cropUnit
           };
+          const scale = Math.min(DEFAULT_CANVAS_WIDTH / img.width, DEFAULT_CANVAS_HEIGHT / img.height);
+          const newTransform = { x: 0, y: 0, scale: scale > 1 ? 1 : scale, rotation: 0 };
 
           setUploadedImages((prev) =>
             prev.map((img) =>
               img.id === selectedImageId
                 ? {
-                    ...img,
-                    cropped_file: croppedFile,
-                    cropped_url: croppedUrl,
-                    transform: newTransform,
-                    printOptions: {
-                      ...currentPrintOptions,
-                      size: defaultSize,
-                    },
-                  }
+                  ...img,
+                  cropped_file: croppedFile,
+                  cropped_url: croppedUrl,
+                  transform: newTransform,
+                  printOptions: {
+                    ...img.printOptions,
+                    size: defaultSize,
+                  },
+                }
                 : img
             )
           );
@@ -885,7 +893,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         };
       }, 'image/png', 1.0);
     }
-  }, [cropping, cropBox, originalImage, selectedImageId, uploadedImages, imageTransform, onCategorySelect, navigate, getImageUrl, isPrintOnly]);
+  }, [cropping, cropBox, originalImage, imageTransform, selectedImageId, uploadedImages, cropWidth, cropHeight, cropUnit, onCategorySelect, navigate, getImageUrl]);
 
   const cancelCrop = useCallback(() => setCropping(false), []);
 
@@ -958,12 +966,12 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       prev.map((img) =>
         img.id === selectedImageId
           ? {
-              ...img,
-              variants: { ...img.variants, [type]: variant },
-              customFrameColor: type === 'color' ? null : img.customFrameColor,
-              customSize: type === 'size' ? { width: '', height: '', applied: false } : img.customSize,
-              cartItemId: img.cartItemId,
-            }
+            ...img,
+            variants: { ...img.variants, [type]: variant },
+            customFrameColor: type === 'color' ? null : img.customFrameColor,
+            customSize: type === 'size' ? { width: '', height: '', applied: false } : img.customSize,
+            cartItemId: img.cartItemId,
+          }
           : img
       )
     );
@@ -1072,12 +1080,12 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         prev.map((img) =>
           img.id === selectedImageId
             ? {
-                ...img,
-                printOptions: {
-                  ...img.printOptions,
-                  size: { width: printWidth, height: printHeight, unit: img.printOptions.size.unit || 'inches' },
-                },
-              }
+              ...img,
+              printOptions: {
+                ...img.printOptions,
+                size: { width: printWidth, height: printHeight, unit: img.printOptions.size.unit || 'inches' },
+              },
+            }
             : img
         )
       );
@@ -1190,127 +1198,155 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
 
   const renderPrintOptions = () => {
     if (!selectedImage || !selectedImage.printOptions) {
-      return <div className="print-options mt-3 p-3 bg-light rounded" style={{ border: '1px solid #ffc800' }}>
-        <p className="text-center text-muted">No image selected or print options unavailable</p>
-      </div>;
+      return (
+        <div className="print-options mt-3 p-3 bg-light rounded" style={{ border: '1px solid #ffc800' }}>
+          <p className="text-center text-muted">No image selected or print options unavailable</p>
+        </div>
+      );
     }
 
+    const isSizeReadOnly = selectedImage.cropped_url !== null;
+
     return (
-      <div className="print-options mt-3 p-3 bg-light rounded" style={{ border: '1px solid #ffc800' }}>
-        <h4>Print Options</h4>
-        <div className="mb-2">
-          <label>Size:</label>
-          <input
-            type="number"
-            placeholder="Width"
-            value={selectedImage.printOptions.size.width || ''}
-            onChange={(e) => updatePrintOptions('size', { ...selectedImage.printOptions.size, width: e.target.value })}
-            className="form-control d-inline-block w-auto mx-2"
-            min="1"
-          />
+      <div className="print-options mt-4 p-4 bg-white rounded-lg shadow border border-warning">
+  <h4 className="text-dark mb-4 fw-bold">Print Options</h4>
+  
+  {/* Size Section */}
+  <div className="mb-3">
+    <label className="form-label text-dark fw-medium">Size</label>
+    <div className="d-flex align-items-center gap-2">
+      <input
+        type="number"
+        placeholder="Width"
+        value={selectedImage.printOptions.size.width || ''}
+        onChange={(e) => updatePrintOptions('size', { ...selectedImage.printOptions.size, width: e.target.value })}
+        className="form-control w-auto"
+        min="1"
+        disabled={isSizeReadOnly}
+      />
+      <span className="text-dark">x</span>
+      <input
+        type="number"
+        placeholder="Height"
+        value={selectedImage.printOptions.size.height || ''}
+        onChange={(e) => updatePrintOptions('size', { ...selectedImage.printOptions.size, height: e.target.value })}
+        className="form-control w-auto"
+        min="1"
+        disabled={isSizeReadOnly}
+      />
+      <select
+        value={selectedImage.printOptions.size.unit || 'inches'}
+        onChange={(e) => updatePrintOptions('size', { ...selectedImage.printOptions.size, unit: e.target.value })}
+        className="form-select w-auto"
+        disabled={isSizeReadOnly}
+      >
+        <option value="inches">Inches</option>
+        <option value="cm">Cm</option>
+      </select>
+    </div>
+  </div>
 
-          <span>x</span>
-          <input
-            type="number"
-            placeholder="Height"
-            value={selectedImage.printOptions.size.height || ''}
-            onChange={(e) => updatePrintOptions('size', { ...selectedImage.printOptions.size, height: e.target.value })}
-            className="form-control d-inline-block w-auto mx-2"
-            min="1"
-          />
-          <select
-            value={selectedImage.printOptions.size.unit || 'inches'}
-            onChange={(e) => updatePrintOptions('size', { ...selectedImage.printOptions.size, unit: e.target.value })}
-            className="form-select d-inline-block w-auto"
-          >
-            <option value="inches">Inches</option>
-            <option value="cm">Cm</option>
-          </select>
-        </div>
-        <div className="mb-2">
-          <label>Media:</label>
-          <select
-            value={selectedImage.printOptions.mediaType || 'Photopaper'}
-            onChange={(e) => updatePrintOptions('mediaType', e.target.value)}
-            className="form-select w-auto d-inline-block mx-2"
-          >
-            <option value="Photopaper">Photopaper</option>
-            <option value="Fine Art Paper">Fine Art Paper</option>
-            <option value="Canvas">Canvas</option>
-          </select>
-          {selectedImage.printOptions.mediaType === 'Photopaper' && (
-            <select
-              value={selectedImage.printOptions.paperType || 'Premium Luster'}
-              onChange={(e) => updatePrintOptions('paperType', e.target.value)}
-              className="form-select w-auto d-inline-block mx-2"
-            >
-              <option value="Premium Luster">Premium Luster</option>
-              <option value="Premium Matte">Premium Matte</option>
-              <option value="Premium Glossy">Premium Glossy</option>
-              <option value="Metallic Glossy">Metallic Glossy</option>
-              <option value="Premium Satin">Premium Satin</option>
-            </select>
-          )}
-        </div>
-        <div className="mb-2">
-          <label>Fit:</label>
-          <div className="form-check form-check-inline mx-2">
-            <input
-              type="radio"
-              name="fit"
-              value="borderless"
-              checked={selectedImage.printOptions.fit === 'borderless'}
-              onChange={() => updatePrintOptions('fit', 'borderless')}
-              className="form-check-input"
-            />
-            <label className="form-check-label">Borderless</label>
-          </div>
-          <div className="form-check form-check-inline">
-            <input
-              type="radio"
-              name="fit"
-              value="bordered"
-              checked={selectedImage.printOptions.fit === 'bordered'}
-              onChange={() => updatePrintOptions('fit', 'bordered')}
-              className="form-check-input"
-            />
-            <label className="form-check-label">Bordered</label>
-          </div>
-        </div>
-        {selectedImage.printOptions.fit === 'bordered' && (
-          <div className="mb-2">
-            <label>Border Settings:</label>
-            <input
-              type="number"
-              placeholder="Depth (px)"
-              value={selectedImage.printOptions.borderDepth || '0'}
-              onChange={(e) => updatePrintOptions('borderDepth', e.target.value)}
-              className="form-control d-inline-block w-auto mx-2"
-              min="0"
-            />
-            <input
-              type="color"
-              value={selectedImage.printOptions.borderColor || '#ffffff'}
-              onChange={(e) => updatePrintOptions('borderColor', e.target.value)}
-              className="form-control-color d-inline-block mx-2"
-            />
-          </div>
-        )}
+  {/* Media Section */}
+  <div className="mb-3">
+    <label className="form-label text-dark fw-medium">Media</label>
+    <div className="d-flex align-items-center gap-2">
+      <select
+        value={selectedImage.printOptions.mediaType || ''}
+        onChange={(e) => updatePrintOptions('mediaType', e.target.value)}
+        className="form-select w-auto"
+      >
+        <option value="">-- Select Media --</option>
+        <option value="Photopaper">Photopaper</option>
+        <option value="Fine Art Paper">Fine Art Paper</option>
+        <option value="Canvas">Canvas</option>
+      </select>
 
-        {!isPrintOnly && selectedImage.frame && (
-          <div className="mb-2">
-            <label>Frame Depth:</label>
-            <input
-              type="number"
-              placeholder="Depth (px)"
-              value={selectedImage.printOptions.frameDepth || '0'}
-              onChange={(e) => updatePrintOptions('frameDepth', e.target.value)}
-              className="form-control d-inline-block w-auto mx-2"
-              min="0"
-            />
-          </div>
-        )}
+      {selectedImage.printOptions.mediaType === 'Photopaper' && (
+        <select
+          value={selectedImage.printOptions.paperType || ''}
+          onChange={(e) => updatePrintOptions('paperType', e.target.value)}
+          className="form-select w-auto"
+        >
+          <option value="">-- Select Paper Type --</option>
+          <option value="Premium Luster">Premium Luster</option>
+          <option value="Premium Matte">Premium Matte</option>
+          <option value="Premium Glossy">Premium Glossy</option>
+          <option value="Metallic Glossy">Metallic Glossy</option>
+          <option value="Premium Satin">Premium Satin</option>
+        </select>
+      )}
+    </div>
+  </div>
+
+  {/* Fit Section */}
+  <div className="mb-3">
+    <label className="form-label text-dark fw-medium">Fit</label>
+    <div className="d-flex gap-3">
+      <div className="form-check">
+        <input
+          type="radio"
+          name="fit"
+          value="borderless"
+          checked={selectedImage.printOptions.fit === 'borderless'}
+          onChange={() => updatePrintOptions('fit', 'borderless')}
+          className="form-check-input"
+          id="borderless"
+        />
+        <label className="form-check-label text-dark" htmlFor="borderless">Borderless</label>
       </div>
+      <div className="form-check">
+        <input
+          type="radio"
+          name="fit"
+          value="bordered"
+          checked={selectedImage.printOptions.fit === 'bordered'}
+          onChange={() => updatePrintOptions('fit', 'bordered')}
+          className="form-check-input"
+          id="bordered"
+        />
+        <label className="form-check-label text-dark" htmlFor="bordered">Bordered</label>
+      </div>
+    </div>
+  </div>
+
+  {/* Border Settings Section */}
+  {selectedImage.printOptions.fit === 'bordered' && (
+    <div className="mb-3">
+      <label className="form-label text-dark fw-medium">Border Settings</label>
+      <div className="d-flex align-items-center gap-2">
+        <input
+          type="number"
+          placeholder="Depth (px)"
+          value={selectedImage.printOptions.borderDepth || '0'}
+          onChange={(e) => updatePrintOptions('borderDepth', e.target.value)}
+          className="form-control w-auto"
+          min="0"
+        />
+        <input
+          type="color"
+          value={selectedImage.printOptions.borderColor || '#ffffff'}
+          onChange={(e) => updatePrintOptions('borderColor', e.target.value)}
+          className="form-control form-control-color"
+        />
+      </div>
+    </div>
+  )}
+
+  {/* Frame Depth Section */}
+  {!isPrintOnly && selectedImage.frame && (
+    <div className="mb-3">
+      <label className="form-label text-dark fw-medium">Frame Depth</label>
+      <input
+        type="number"
+        placeholder="Depth (px)"
+        value={selectedImage.printOptions.frameDepth || '0'}
+        onChange={(e) => updatePrintOptions('frameDepth', e.target.value)}
+        className="form-control w-auto"
+        min="0"
+      />
+    </div>
+  )}
+</div>
     );
   };
 
@@ -1341,6 +1377,32 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                   <i className="bi bi-x"></i>
                 </button>
               </div>
+              <div style={{ marginTop: '10px' }}>
+                <label>Print Size:</label>
+                <input
+                  type="number"
+                  value={cropWidth}
+                  onChange={(e) => setCropWidth(e.target.value)}
+                  placeholder="Width"
+                  style={{ width: '60px', margin: '0 5px' }}
+                />
+                <span>x</span>
+                <input
+                  type="number"
+                  value={cropHeight}
+                  onChange={(e) => setCropHeight(e.target.value)}
+                  placeholder="Height"
+                  style={{ width: '60px', margin: '0 5px' }}
+                />
+                <select
+                  value={cropUnit}
+                  onChange={(e) => setCropUnit(e.target.value)}
+                  style={{ margin: '0 5px' }}
+                >
+                  <option value="inches">Inches</option>
+                  <option value="cm">Cm</option>
+                </select>
+              </div>
               <p style={{ margin: 0 }}>
                 Crop Size: {(cropBox.width / DPI).toFixed(2)} x {(cropBox.height / DPI).toFixed(2)} inches | Aspect Ratio: {(cropBox.width / cropBox.height).toFixed(2)}
               </p>
@@ -1351,7 +1413,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             className="main-image mb-3 d-flex flex-column justify-content-center align-items-center"
             style={{ height: '500px', border: '1px solid #ddd' }}
           >
-
             <canvas
               ref={canvasRef}
               width={DEFAULT_CANVAS_WIDTH}
@@ -1424,7 +1485,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} accept="image/*" />
         </div>
       </div>
- 
+
       <div className="row">
         <div className="col-12">
           <div className="p-4 bg-light rounded shadow-sm" style={{ border: '1px solid #ffc800', minHeight: '200px', overflow: 'auto' }}>
@@ -1660,7 +1721,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                   <strong>Media:</strong>
                   <span>{selectedImage?.printOptions?.mediaType || 'None'}</span>
                 </div>
-                {selectedImage?.printOptions?.mediaType === 'Photopaper' && (
+                {selectedImage?.printOptions?.mediaType?.mediaType === 'Photopaper' || 'None' && (
                   <div className="d-flex justify-content-between mb-2">
                     <strong>Paper Type:</strong>
                     <span>{selectedImage?.printOptions?.paperType || 'None'}</span>
