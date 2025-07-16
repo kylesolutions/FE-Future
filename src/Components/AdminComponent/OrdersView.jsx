@@ -6,7 +6,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { format } from 'date-fns';
 
-const BASE_URL = 'http://82.180.146.4:8001';
+const BASE_URL = 'http://localhost:8000';
 
 function OrdersView() {
   const [savedOrders, setSavedOrders] = useState([]);
@@ -24,7 +24,7 @@ function OrdersView() {
       try {
         const token = localStorage.getItem('token');
         if (token) {
-          const response = await axios.get('http://82.180.146.4:8001/user/', {
+          const response = await axios.get('http://localhost:8000/user/', {
             headers: { Authorization: `Bearer ${token}` },
           });
           setIsAdmin(response.data.is_staff || false);
