@@ -35,7 +35,7 @@
 .design-canvas {
   border-radius: 12px;
   cursor: grab;
-  transition: all 0.2s ease;
+  /* transition: all 0.2s ease; */
 }
 
 .design-canvas:active {
@@ -78,7 +78,7 @@
   border: 1px solid rgba(102, 126, 234, 0.2);
   border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  /* transition: all 0.2s ease; */
   font-size: 12px;
   font-weight: 500;
   color: #4a5568;
@@ -131,7 +131,7 @@
   border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
-  transition: all 0.2s ease;
+  /* transition: all 0.2s ease; */
   border: 2px solid transparent;
   background: white;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -164,7 +164,7 @@
   border: 2px dashed #FFD700;
   border-radius: 12px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  /* transition: all 0.2s ease; */
   color: #FFD700;
   font-size: 12px;
   font-weight: 500;
@@ -234,7 +234,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   font-size: 14px;
-  transition: border-color 0.2s ease;
+  /* transition: border-color 0.2s ease; */
 }
 
 .size-input:focus {
@@ -255,7 +255,7 @@
   font-size: 14px;
   background: white;
   cursor: pointer;
-  transition: border-color 0.2s ease;
+  /* transition: border-color 0.2s ease; */
 }
 
 .unit-select:focus {
@@ -272,7 +272,7 @@
   font-size: 14px;
   background: white;
   cursor: pointer;
-  transition: border-color 0.2s ease;
+  /* transition: border-color 0.2s ease; */
 }
 
 .media-select:focus, .paper-select:focus {
@@ -316,7 +316,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   font-size: 14px;
-  transition: border-color 0.2s ease;
+  /* transition: border-color 0.2s ease; */
 }
 
 .border-input:focus {
@@ -331,7 +331,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   cursor: pointer;
-  transition: border-color 0.2s ease;
+  /* transition: border-color 0.2s ease; */
 }
 
 .color-input:focus {
@@ -346,7 +346,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   font-size: 14px;
-  transition: border-color 0.2s ease;
+  /* transition: border-color 0.2s ease; */
 }
 
 .frame-input:focus {
@@ -382,7 +382,7 @@
   font-size: 14px;
   background: white;
   cursor: pointer;
-  transition: border-color 0.2s ease;
+  /* transition: border-color 0.2s ease; */
 }
 
 .category-select:focus {
@@ -405,7 +405,7 @@
   border-radius: 12px;
   padding: 12px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  /* transition: all 0.2s ease; */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -453,12 +453,12 @@
 }
 
 .custom-color-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #FFD700 0%, #FFD700 100%);
   border: 2px solid transparent;
   border-radius: 12px;
   padding: 16px;
   text-align: center;
-  transition: all 0.2s ease;
+  /* transition: all 0.2s ease; */
   color: white;
 }
 
@@ -486,7 +486,7 @@
   border: 2px solid white;
   border-radius: 50%;
   cursor: pointer;
-  transition: transform 0.2s ease;
+  /* transition: transform 0.2s ease; */
 }
 
 .custom-color-input:hover {
@@ -522,7 +522,7 @@
   font-size: 12px;
   background: rgba(255, 255, 255, 0.1);
   color: white;
-  transition: border-color 0.2s ease;
+  /* transition: border-color 0.2s ease; */
 }
 
 .custom-size-input::placeholder {
@@ -544,7 +544,7 @@
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
-  transition: all 0.2s ease;
+  /* transition: all 0.2s ease; */
 }
 
 .custom-size-apply:hover {
@@ -626,7 +626,7 @@
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  /* transition: all 0.2s ease; */
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
@@ -689,7 +689,7 @@
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  /* transition: all 0.2s ease; */
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
@@ -742,7 +742,7 @@
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  transition: all 0.2s ease;
+  /* transition: all 0.2s ease; */
 }
 
 .crop-action-btn.apply {

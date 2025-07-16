@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { format } from 'date-fns';
@@ -14,6 +15,36 @@ function OrdersView() {
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const navigate = useNavigate();
+  const user = useSelector((state) => state.user); // Access user state from Redux
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          const response = await axios.get('http://82.180.146.4:8001/user/', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setIsAdmin(response.data.is_staff || false);
+        } else {
+          setIsAdmin(false);
+        }
+      } catch (error) {
+        console.error('Error checking admin status:', error.response?.data || error.message);
+        setIsAdmin(false);
+        // Handle token expiration or invalid token
+        if (error.response?.status === 401) {
+          localStorage.removeItem('token');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    checkAdmin();
+  }, []);
+
 
   // Fetch all saved orders on component mount
   useEffect(() => {
@@ -55,6 +86,58 @@ function OrdersView() {
     }
     setFilteredOrders(filtered);
   }, [startDate, endDate, savedOrders]);
+
+  // Update order status
+  const handleUpdateStatus = async (itemId, newStatus) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
+      await axios.put(`${BASE_URL}/save-items/${itemId}/`, { status: newStatus }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSavedOrders((prevOrders) =>
+        prevOrders.map((item) =>
+          item.id === itemId ? { ...item, status: newStatus } : item
+        )
+      );
+    } catch (error) {
+      console.error('Error updating status:', error);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+      } else if (error.response?.status === 403) {
+        alert('You do not have permission to update this order.');
+      } else if (error.response?.status === 404) {
+        alert('Order not found.');
+      } else {
+        alert('Failed to update order status.');
+      }
+    }
+  };
+
+  // Delete an order
+  const handleDeleteOrder = async (itemId) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
+      await axios.delete(`${BASE_URL}/save-items/${itemId}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSavedOrders((prevOrders) => prevOrders.filter((item) => item.id !== itemId));
+    } catch (error) {
+      console.error('Error deleting order:', error);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+      } else if (error.response?.status === 403) {
+        alert('You do not have permission to delete this order.');
+      } else if (error.response?.status === 404) {
+        alert('Order not found.');
+      } else {
+        alert('Failed to delete order.');
+      }
+    }
+  };
 
   // Construct image URLs
   const getImageUrl = (path) => {
@@ -153,39 +236,63 @@ function OrdersView() {
                   )}
                 </td>
                 <td>${item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00'}</td>
-                <td>{item.status || 'Pending'}</td>
+                <td>
+                  {isAdmin ? (
+                    <select
+                      value={item.status || 'pending'}
+                      onChange={(e) => handleUpdateStatus(item.id, e.target.value)}
+                      className="form-select form-select-sm"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  ) : (
+                    item.status || 'Pending'
+                  )}
+                </td>
                 <td>{format(new Date(item.created_at), 'MM/dd/yyyy HH:mm:ss')}</td>
                 <td>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => navigate('/', { state: { cartItem: {
-                      id: item.id,
-                      original_image: item.original_image ? getImageUrl(item.original_image) : null,
-                      cropped_image: item.cropped_image ? getImageUrl(item.cropped_image) : null,
-                      adjusted_image: item.adjusted_image ? getImageUrl(item.adjusted_image) : null,
-                      frame: item.frame || null,
-                      color_variant: item.color_variant || null,
-                      size_variant: item.size_variant || null,
-                      finish_variant: item.finish_variant || null,
-                      hanging_variant: item.hanging_variant || null,
-                      transform_x: item.transform_x || 0,
-                      transform_y: item.transform_y || 0,
-                      scale: item.scale || 1,
-                      rotation: item.rotation || 0,
-                      frame_rotation: item.frame_rotation || 0,
-                      print_width: item.print_width || null,
-                      print_height: item.print_height || null,
-                      print_unit: item.print_unit || 'inches',
-                      media_type: item.media_type || 'Photopaper',
-                      paper_type: item.paper_type || null,
-                      fit: item.fit || 'borderless',
-                      border_depth: item.border_depth || 0,
-                      border_color: item.border_color || '#ffffff',
-                      status: item.status || 'pending',
-                    } } })}
-                  >
-                    <i className="bi bi-pencil-square"></i> Edit
-                  </button>
+                  <div className="d-flex gap-2">
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => navigate('/', { state: { cartItem: {
+                        id: item.id,
+                        original_image: item.original_image ? getImageUrl(item.original_image) : null,
+                        cropped_image: item.cropped_image ? getImageUrl(item.cropped_image) : null,
+                        adjusted_image: item.adjusted_image ? getImageUrl(item.adjusted_image) : null,
+                        frame: item.frame || null,
+                        color_variant: item.color_variant || null,
+                        size_variant: item.size_variant || null,
+                        finish_variant: item.finish_variant || null,
+                        hanging_variant: item.hanging_variant || null,
+                        transform_x: item.transform_x || 0,
+                        transform_y: item.transform_y || 0,
+                        scale: item.scale || 1,
+                        rotation: item.rotation || 0,
+                        frame_rotation: item.frame_rotation || 0,
+                        print_width: item.print_width || null,
+                        print_height: item.print_height || null,
+                        print_unit: item.print_unit || 'inches',
+                        media_type: item.media_type || 'Photopaper',
+                        paper_type: item.paper_type || null,
+                        fit: item.fit || 'borderless',
+                        border_depth: item.border_depth || 0,
+                        border_color: item.border_color || '#ffffff',
+                        status: item.status || 'pending',
+                      } } })}
+                    >
+                      <i className="bi bi-pencil-square"></i> Edit
+                    </button>
+                    {isAdmin && (
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => handleDeleteOrder(item.id)}
+                      >
+                        <i className="bi bi-trash"></i> Delete
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
