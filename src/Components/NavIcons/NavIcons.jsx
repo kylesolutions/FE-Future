@@ -1,32 +1,50 @@
+import React from 'react';
+import { Hash, Palette, Maximize2, Sparkles, Bookmark, Trash2 } from 'lucide-react';
 import './NavIcons.css';
 
-function NavIcons({ onCategorySelect }) {
+const iconMap = {
+  frame: Hash,
+  color: Palette,
+  size: Maximize2,
+  finish: Sparkles,
+  hanging: Bookmark,
+  remove: Trash2,
+};
+
+const categoryNames = {
+  frame: 'Frame',
+  color: 'Color',
+  size: 'Size',
+  finish: 'Finish',
+  hanging: 'Hang',
+  remove: 'Remove',
+};
+
+function NavIcons({ activeCategory, onCategorySelect }) {
+  const categories = ['frame', 'color', 'size', 'finish', 'hanging', 'remove'];
+
   return (
-    <div className='container nav-icon'>
-      <div className='icons-div' onClick={() => onCategorySelect('frame')}>
-        <i className="bi bi-hash"></i>
-        <p>FRAME</p>
-      </div>
-      <div className='icons-div' onClick={() => onCategorySelect('color')}>
-        <i className="bi bi-palette-fill"></i>
-        <p>COLOR</p>
-      </div>
-      <div className='icons-div' onClick={() => onCategorySelect('size')}>
-        <i className="bi bi-box-arrow-up-right"></i>
-        <p>SIZE</p>
-      </div>
-      <div className='icons-div' onClick={() => onCategorySelect('finish')}>
-        <i className="bi bi-stars"></i>
-        <p>FINISH</p>
-      </div>
-      <div className='icons-div' onClick={() => onCategorySelect('hanging')}>
-        <i className="bi bi-bounding-box-circles"></i>
-        <p>HANG</p>
-      </div>
-      <div className='icons-div' onClick={() => onCategorySelect('remove')}>
-        <i className="bi bi-trash3-fill"></i>
-        <p>REMOVE</p>
-      </div>
+    <div className="modern-nav-icons">
+      {categories.map((category) => {
+        const Icon = iconMap[category];
+        const isActive = activeCategory === category;
+        
+        return (
+          <button
+            key={category}
+            className={`nav-icon-button ${isActive ? 'active' : ''}`}
+            onClick={() => onCategorySelect(category)}
+            title={categoryNames[category]}
+          >
+            <div className="icon-wrapper">
+              <Icon size={24} />
+            </div>
+            <span className="icon-label">
+              {categoryNames[category]}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

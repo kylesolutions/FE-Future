@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import Navbar from '../Components/Nav/Navbar';
-import NavIcons from '../Components/NavIcons/NavIcons';
-import Headers from '../Components/Hearders/Headers';
 import Login from '../Components/SignupLogin/Login';
 import Signup from '../Components/SignupLogin/Signup';
-import './modal.css';
+import './DesignPage.css';
+import NavIcons from '../Components/NavIcons/NavIcons';
+import Headers from '../Components/Hearders/Headers';
 
 function DesignPage() {
   const [activeCategory, setActiveCategory] = useState('frame');
@@ -35,19 +35,22 @@ function DesignPage() {
 
   return (
     <>
-      <div className="container-fluid">
-        <div className="row">
-          <div className="col-12">
-            <Navbar onLoginClick={() => setShowLogin(true)} />
-          </div>
+      <div className="design-workspace">
+        <div className="workspace-header">
+          <Navbar onLoginClick={() => setShowLogin(true)} />
         </div>
-        <div className="row">
+        
+        <div className="workspace-content">
           {hasUploadedImages && !isPrintOnly && (
-            <div className="col-lg-1">
-              <NavIcons onCategorySelect={setActiveCategory} />
+            <div className="sidebar-navigation">
+              <NavIcons 
+                activeCategory={activeCategory}
+                onCategorySelect={setActiveCategory} 
+              />
             </div>
           )}
-          <div className={hasUploadedImages && !isPrintOnly ? "col-lg-11" : "col-lg-12"}>
+          
+          <div className={`main-workspace ${hasUploadedImages && !isPrintOnly ? 'with-sidebar' : 'full-width'}`}>
             <Headers
               activeCategory={activeCategory}
               onCategorySelect={setActiveCategory}
@@ -61,37 +64,43 @@ function DesignPage() {
       </div>
 
       {showLogin && (
-        <div className="modal fade show" style={{ display: 'block' }} onClick={handleLoginClose}>
-          <div className="modal-dialog" onClick={e => e.stopPropagation()}>
-            <div className="modal-content custom-modal">
-              <div className="modal-header">
-                <h5 className="modal-title">Login</h5>
-                <button type="button" className="btn-close" onClick={handleLoginClose}></button>
-              </div>
-              <div className="modal-body">
-                <Login onLoginSuccess={handleLoginClose} />
-              </div>
-              <div className="modal-footer">
-                <p className="footer-message">
-                  Not registered? <a onClick={switchToSignup}>Signup here</a>
-                </p>
-              </div>
+        <div className="modal-overlay" onClick={handleLoginClose}>
+          <div className="modal-container" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Welcome Back</h2>
+              <button className="modal-close" onClick={handleLoginClose}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  <path d="M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+            <div className="modal-body">
+              <Login onLoginSuccess={handleLoginClose} />
+            </div>
+            <div className="modal-footer">
+              <p>
+                Don't have an account? <button className="link-button" onClick={switchToSignup}>Sign up here</button>
+              </p>
             </div>
           </div>
         </div>
       )}
 
       {showSignup && (
-        <div className="modal fade show" style={{ display: 'block' }} onClick={handleSignupClose}>
-          <div className="modal-dialog" onClick={e => e.stopPropagation()}>
-            <div className="modal-content custom-modal">
-              <div className="modal-header">
-                <h5 className="modal-title">Signup</h5>
-                <button type="button" className="btn-close" onClick={handleSignupClose}></button>
-              </div>
-              <div className="modal-body">
-                <Signup onSignupSuccess={handleSignupClose} />
-              </div>
+        <div className="modal-overlay" onClick={handleSignupClose}>
+          <div className="modal-container" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Create Account</h2>
+              <button className="modal-close" onClick={handleSignupClose}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  <path d="M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+            <div className="modal-body">
+              <Signup onSignupSuccess={handleSignupClose} />
             </div>
           </div>
         </div>

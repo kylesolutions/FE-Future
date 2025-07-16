@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { Upload, ZoomIn, ZoomOut, RotateCw, RotateCcw, Crop, RotateCw as RotateClockwise, MousePointerClick as RotateCounterClockwise, RefreshCw, Rewind, Plus, Check, X, Save } from 'lucide-react';
 import './Headers.css';
 
 const BASE_URL = 'http://82.180.146.4:8001';
@@ -84,7 +85,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
     const hasFrame = !isPrintOnly && selectedImage && selectedImage.frame && frameImage;
 
-    // Always set canvas bitmap size to default (400x400)
     canvas.width = DEFAULT_CANVAS_WIDTH;
     canvas.height = DEFAULT_CANVAS_HEIGHT;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -304,6 +304,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     };
     fetchCategories();
   }, [navigate]);
+
   useEffect(() => {
     setHasUploadedImages(uploadedImages.length > 0);
   }, [uploadedImages, setHasUploadedImages]);
@@ -413,47 +414,47 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   }, [cartItem, nextId, onCategorySelect, getImageUrl]);
 
   useEffect(() => {
-  if (activeCategory === 'crop' && selectedImageId !== null && !cropping) {
-    const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
-    if (selectedImage) {
-      const img = new Image();
-      img.src = getImageUrl(selectedImage.cropped_url || selectedImage.original_url);
-      img.onload = () => {
-        const canvasWidth = DEFAULT_CANVAS_WIDTH; // 400
-        const canvasHeight = DEFAULT_CANVAS_HEIGHT; // 400
-        const scale = Math.max(canvasWidth / img.width, canvasHeight / img.height);
-        setImageTransform({ x: 0, y: 0, scale, rotation: 0 });
-        setCropBox({
-          x: 0,
-          y: 0,
-          width: canvasWidth,
-          height: canvasHeight,
-          startX: 0,
-          startY: 0,
-          isResizing: false,
-          resizeHandle: '',
-        });
-        setCropping(true);
-        const currentSize = selectedImage.printOptions.size;
-        if (currentSize.width && currentSize.height) {
-          setCropWidth(currentSize.width);
-          setCropHeight(currentSize.height);
-          setCropUnit(currentSize.unit);
-        } else {
-          setCropWidth('');
-          setCropHeight('');
-          setCropUnit('inches');
-        }
-      };
+    if (activeCategory === 'crop' && selectedImageId !== null && !cropping) {
+      const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
+      if (selectedImage) {
+        const img = new Image();
+        img.src = getImageUrl(selectedImage.cropped_url || selectedImage.original_url);
+        img.onload = () => {
+          const canvasWidth = DEFAULT_CANVAS_WIDTH;
+          const canvasHeight = DEFAULT_CANVAS_HEIGHT;
+          const scale = Math.max(canvasWidth / img.width, canvasHeight / img.height);
+          setImageTransform({ x: 0, y: 0, scale, rotation: 0 });
+          setCropBox({
+            x: 0,
+            y: 0,
+            width: canvasWidth,
+            height: canvasHeight,
+            startX: 0,
+            startY: 0,
+            isResizing: false,
+            resizeHandle: '',
+          });
+          setCropping(true);
+          const currentSize = selectedImage.printOptions.size;
+          if (currentSize.width && currentSize.height) {
+            setCropWidth(currentSize.width);
+            setCropHeight(currentSize.height);
+            setCropUnit(currentSize.unit);
+          } else {
+            setCropWidth('');
+            setCropHeight('');
+            setCropUnit('inches');
+          }
+        };
+      }
+    } else if (activeCategory === 'remove' && selectedImageId !== null) {
+      const updatedImages = uploadedImages.filter((img) => img.id !== selectedImageId);
+      setUploadedImages(updatedImages);
+      setSelectedImageId(updatedImages.length > 0 ? updatedImages[0].id : null);
+      setCustomSize({ width: '', height: '', applied: false });
+      onCategorySelect('frame');
     }
-  } else if (activeCategory === 'remove' && selectedImageId !== null) {
-    const updatedImages = uploadedImages.filter((img) => img.id !== selectedImageId);
-    setUploadedImages(updatedImages);
-    setSelectedImageId(updatedImages.length > 0 ? updatedImages[0].id : null);
-    setCustomSize({ width: '', height: '', applied: false });
-    onCategorySelect('frame');
-  }
-}, [activeCategory, selectedImageId, cropping, uploadedImages, onCategorySelect, getImageUrl]);
+  }, [activeCategory, selectedImageId, cropping, uploadedImages, onCategorySelect, getImageUrl]);
 
   const triggerUpload = () => fileInputRef.current.click();
 
@@ -1185,22 +1186,93 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
 
   if (uploadedImages.length === 0) {
     return (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: '500px', border: '2px dashed #ccc' }}>
-        <button className="btn btn-primary" onClick={triggerUpload}>
-          Upload Image
-        </button>
-        <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} accept="image/*" />
+      <div className="upload-area">
+        <div className="upload-content">
+          <Upload size={48} className="upload-icon" />
+          <h3>Upload Your Images</h3>
+          <p>Drag and drop or click to select images</p>
+          <button className="upload-button" onClick={triggerUpload}>
+            Choose Files
+          </button>
+          <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} accept="image/*" />
+        </div>
       </div>
     );
   }
 
   const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
 
+  if (cropping && selectedImage) {
+    return (
+      <div className="modern-headers">
+        <div className="canvas-section">
+          <div className="crop-container">
+            <div className="crop-canvas-wrapper">
+              <canvas
+                ref={canvasRef}
+                width={DEFAULT_CANVAS_WIDTH}
+                height={DEFAULT_CANVAS_HEIGHT}
+                className="design-canvas crop-mode"
+                onMouseDown={handleCanvasMouseDown}
+                onMouseMove={handleCanvasMouseMove}
+                onMouseUp={handleCanvasMouseUp}
+                onMouseLeave={handleCanvasMouseLeave}
+              />
+            </div>
+            <div className="crop-controls">
+              <div className="crop-actions">
+                <button className="crop-action-btn apply" onClick={applyCrop}>
+                  <Check size={16} />
+                  Apply Crop
+                </button>
+                <button className="crop-action-btn cancel" onClick={cancelCrop}>
+                  <X size={16} />
+                  Cancel
+                </button>
+              </div>
+              <div className="crop-settings">
+                <div className="crop-size-inputs">
+                  <input
+                    type="number"
+                    value={cropWidth}
+                    onChange={(e) => setCropWidth(e.target.value)}
+                    placeholder="Width"
+                    className="crop-size-input"
+                  />
+                  <span>×</span>
+                  <input
+                    type="number"
+                    value={cropHeight}
+                    onChange={(e) => setCropHeight(e.target.value)}
+                    placeholder="Height"
+                    className="crop-size-input"
+                  />
+                  <select
+                    value={cropUnit}
+                    onChange={(e) => setCropUnit(e.target.value)}
+                    className="crop-unit-select"
+                  >
+                    <option value="inches">Inches</option>
+                    <option value="cm">Cm</option>
+                  </select>
+                </div>
+                <div className="crop-info">
+                  <p>Crop Size: {(cropBox.width / DPI).toFixed(2)} × {(cropBox.height / DPI).toFixed(2)} inches</p>
+                  <p>Aspect Ratio: {(cropBox.width / cropBox.height).toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const renderPrintOptions = () => {
     if (!selectedImage || !selectedImage.printOptions) {
       return (
-        <div className="print-options mt-3 p-3 bg-light rounded" style={{ border: '1px solid #ffc800' }}>
-          <p className="text-center text-muted">No image selected or print options unavailable</p>
+        <div className="print-options-empty">
+          <p>No image selected or print options unavailable</p>
         </div>
       );
     }
@@ -1208,592 +1280,551 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     const isSizeReadOnly = selectedImage.cropped_url !== null;
 
     return (
-      <div className="print-options mt-4 p-4 bg-white rounded-lg shadow border border-warning">
-  <h4 className="text-dark mb-4 fw-bold">Print Options</h4>
-  
-  {/* Size Section */}
-  <div className="mb-3">
-    <label className="form-label text-dark fw-medium">Size</label>
-    <div className="d-flex align-items-center gap-2">
-      <input
-        type="number"
-        placeholder="Width"
-        value={selectedImage.printOptions.size.width || ''}
-        onChange={(e) => updatePrintOptions('size', { ...selectedImage.printOptions.size, width: e.target.value })}
-        className="form-control w-auto"
-        min="1"
-        disabled={isSizeReadOnly}
-      />
-      <span className="text-dark">x</span>
-      <input
-        type="number"
-        placeholder="Height"
-        value={selectedImage.printOptions.size.height || ''}
-        onChange={(e) => updatePrintOptions('size', { ...selectedImage.printOptions.size, height: e.target.value })}
-        className="form-control w-auto"
-        min="1"
-        disabled={isSizeReadOnly}
-      />
-      <select
-        value={selectedImage.printOptions.size.unit || 'inches'}
-        onChange={(e) => updatePrintOptions('size', { ...selectedImage.printOptions.size, unit: e.target.value })}
-        className="form-select w-auto"
-        disabled={isSizeReadOnly}
-      >
-        <option value="inches">Inches</option>
-        <option value="cm">Cm</option>
-      </select>
-    </div>
-  </div>
+      <div className="print-options-panel">
+        <h3>Print Options</h3>
+        
+        <div className="option-group">
+          <label>Size</label>
+          <div className="size-controls">
+            <input
+              type="number"
+              placeholder="Width"
+              value={selectedImage.printOptions.size.width || ''}
+              onChange={(e) => updatePrintOptions('size', { ...selectedImage.printOptions.size, width: e.target.value })}
+              className="size-input"
+              min="1"
+              disabled={isSizeReadOnly}
+            />
+            <span className="size-separator">×</span>
+            <input
+              type="number"
+              placeholder="Height"
+              value={selectedImage.printOptions.size.height || ''}
+              onChange={(e) => updatePrintOptions('size', { ...selectedImage.printOptions.size, height: e.target.value })}
+              className="size-input"
+              min="1"
+              disabled={isSizeReadOnly}
+            />
+            <select
+              value={selectedImage.printOptions.size.unit || 'inches'}
+              onChange={(e) => updatePrintOptions('size', { ...selectedImage.printOptions.size, unit: e.target.value })}
+              className="unit-select"
+              disabled={isSizeReadOnly}
+            >
+              <option value="inches">Inches</option>
+              <option value="cm">Cm</option>
+            </select>
+          </div>
+        </div>
 
-  {/* Media Section */}
-  <div className="mb-3">
-    <label className="form-label text-dark fw-medium">Media</label>
-    <div className="d-flex align-items-center gap-2">
-      <select
-        value={selectedImage.printOptions.mediaType || ''}
-        onChange={(e) => updatePrintOptions('mediaType', e.target.value)}
-        className="form-select w-auto"
-      >
-        <option value="">-- Select Media --</option>
-        <option value="Photopaper">Photopaper</option>
-        <option value="Fine Art Paper">Fine Art Paper</option>
-        <option value="Canvas">Canvas</option>
-      </select>
+        <div className="option-group">
+          <label>Media</label>
+          <select
+            value={selectedImage.printOptions.mediaType || ''}
+            onChange={(e) => updatePrintOptions('mediaType', e.target.value)}
+            className="media-select"
+          >
+            <option value="">-- Select Media --</option>
+            <option value="Photopaper">Photopaper</option>
+            <option value="Fine Art Paper">Fine Art Paper</option>
+            <option value="Canvas">Canvas</option>
+          </select>
 
-      {selectedImage.printOptions.mediaType === 'Photopaper' && (
-        <select
-          value={selectedImage.printOptions.paperType || ''}
-          onChange={(e) => updatePrintOptions('paperType', e.target.value)}
-          className="form-select w-auto"
-        >
-          <option value="">-- Select Paper Type --</option>
-          <option value="Premium Luster">Premium Luster</option>
-          <option value="Premium Matte">Premium Matte</option>
-          <option value="Premium Glossy">Premium Glossy</option>
-          <option value="Metallic Glossy">Metallic Glossy</option>
-          <option value="Premium Satin">Premium Satin</option>
-        </select>
-      )}
-    </div>
-  </div>
+          {selectedImage.printOptions.mediaType === 'Photopaper' && (
+            <select
+              value={selectedImage.printOptions.paperType || ''}
+              onChange={(e) => updatePrintOptions('paperType', e.target.value)}
+              className="paper-select"
+            >
+              <option value="">-- Select Paper Type --</option>
+              <option value="Premium Luster">Premium Luster</option>
+              <option value="Premium Matte">Premium Matte</option>
+              <option value="Premium Glossy">Premium Glossy</option>
+              <option value="Metallic Glossy">Metallic Glossy</option>
+              <option value="Premium Satin">Premium Satin</option>
+            </select>
+          )}
+        </div>
 
-  {/* Fit Section */}
-  <div className="mb-3">
-    <label className="form-label text-dark fw-medium">Fit</label>
-    <div className="d-flex gap-3">
-      <div className="form-check">
-        <input
-          type="radio"
-          name="fit"
-          value="borderless"
-          checked={selectedImage.printOptions.fit === 'borderless'}
-          onChange={() => updatePrintOptions('fit', 'borderless')}
-          className="form-check-input"
-          id="borderless"
-        />
-        <label className="form-check-label text-dark" htmlFor="borderless">Borderless</label>
+        <div className="option-group">
+          <label>Fit</label>
+          <div className="fit-controls">
+            <label className="radio-label">
+              <input
+                type="radio"
+                name="fit"
+                value="borderless"
+                checked={selectedImage.printOptions.fit === 'borderless'}
+                onChange={() => updatePrintOptions('fit', 'borderless')}
+              />
+              Borderless
+            </label>
+            <label className="radio-label">
+              <input
+                type="radio"
+                name="fit"
+                value="bordered"
+                checked={selectedImage.printOptions.fit === 'bordered'}
+                onChange={() => updatePrintOptions('fit', 'bordered')}
+              />
+              Bordered
+            </label>
+          </div>
+        </div>
+
+        {selectedImage.printOptions.fit === 'bordered' && (
+          <div className="option-group">
+            <label>Border Settings</label>
+            <div className="border-controls">
+              <input
+                type="number"
+                placeholder="Depth (px)"
+                value={selectedImage.printOptions.borderDepth || '0'}
+                onChange={(e) => updatePrintOptions('borderDepth', e.target.value)}
+                className="border-input"
+                min="0"
+              />
+              <input
+                type="color"
+                value={selectedImage.printOptions.borderColor || '#ffffff'}
+                onChange={(e) => updatePrintOptions('borderColor', e.target.value)}
+                className="color-input"
+              />
+            </div>
+          </div>
+        )}
+
+        {!isPrintOnly && selectedImage.frame && (
+          <div className="option-group">
+            <label>Frame Depth</label>
+            <input
+              type="number"
+              placeholder="Depth (px)"
+              value={selectedImage.printOptions.frameDepth || '0'}
+              onChange={(e) => updatePrintOptions('frameDepth', e.target.value)}
+              className="frame-input"
+              min="0"
+            />
+          </div>
+        )}
       </div>
-      <div className="form-check">
-        <input
-          type="radio"
-          name="fit"
-          value="bordered"
-          checked={selectedImage.printOptions.fit === 'bordered'}
-          onChange={() => updatePrintOptions('fit', 'bordered')}
-          className="form-check-input"
-          id="bordered"
-        />
-        <label className="form-check-label text-dark" htmlFor="bordered">Bordered</label>
-      </div>
-    </div>
-  </div>
-
-  {/* Border Settings Section */}
-  {selectedImage.printOptions.fit === 'bordered' && (
-    <div className="mb-3">
-      <label className="form-label text-dark fw-medium">Border Settings</label>
-      <div className="d-flex align-items-center gap-2">
-        <input
-          type="number"
-          placeholder="Depth (px)"
-          value={selectedImage.printOptions.borderDepth || '0'}
-          onChange={(e) => updatePrintOptions('borderDepth', e.target.value)}
-          className="form-control w-auto"
-          min="0"
-        />
-        <input
-          type="color"
-          value={selectedImage.printOptions.borderColor || '#ffffff'}
-          onChange={(e) => updatePrintOptions('borderColor', e.target.value)}
-          className="form-control form-control-color"
-        />
-      </div>
-    </div>
-  )}
-
-  {/* Frame Depth Section */}
-  {!isPrintOnly && selectedImage.frame && (
-    <div className="mb-3">
-      <label className="form-label text-dark fw-medium">Frame Depth</label>
-      <input
-        type="number"
-        placeholder="Depth (px)"
-        value={selectedImage.printOptions.frameDepth || '0'}
-        onChange={(e) => updatePrintOptions('frameDepth', e.target.value)}
-        className="form-control w-auto"
-        min="0"
-      />
-    </div>
-  )}
-</div>
     );
   };
 
-  return (
-    <div className="row">
-      <div className="col-lg-12">
-        {cropping && selectedImage ? (
-          <div
-            className="main-image mb-3 d-flex flex-column justify-content-center align-items-center"
-            style={{ height: '500px', position: 'relative', backgroundColor: '#f8f9fa' }}
-          >
-            <canvas
-              ref={canvasRef}
-              width={DEFAULT_CANVAS_WIDTH}
-              height={DEFAULT_CANVAS_HEIGHT}
-              className="border border-gray-300 rounded"
-              onMouseDown={handleCanvasMouseDown}
-              onMouseMove={handleCanvasMouseMove}
-              onMouseUp={handleCanvasMouseUp}
-              onMouseLeave={handleCanvasMouseLeave}
-            />
-            <div className="controls" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button className="btn btn-success crop-btn" onClick={applyCrop} title="Apply Crop">
-                  <i className="bi bi-check"></i>
-                </button>
-                <button className="btn btn-danger crop-btn" onClick={cancelCrop} title="Cancel">
-                  <i className="bi bi-x"></i>
-                </button>
-              </div>
-              <div style={{ marginTop: '10px' }}>
-                <label>Print Size:</label>
-                <input
-                  type="number"
-                  value={cropWidth}
-                  onChange={(e) => setCropWidth(e.target.value)}
-                  placeholder="Width"
-                  style={{ width: '60px', margin: '0 5px' }}
-                />
-                <span>x</span>
-                <input
-                  type="number"
-                  value={cropHeight}
-                  onChange={(e) => setCropHeight(e.target.value)}
-                  placeholder="Height"
-                  style={{ width: '60px', margin: '0 5px' }}
-                />
-                <select
-                  value={cropUnit}
-                  onChange={(e) => setCropUnit(e.target.value)}
-                  style={{ margin: '0 5px' }}
-                >
-                  <option value="inches">Inches</option>
-                  <option value="cm">Cm</option>
-                </select>
-              </div>
-              <p style={{ margin: 0 }}>
-                Crop Size: {(cropBox.width / DPI).toFixed(2)} x {(cropBox.height / DPI).toFixed(2)} inches | Aspect Ratio: {(cropBox.width / cropBox.height).toFixed(2)}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div
-            className="main-image mb-3 d-flex flex-column justify-content-center align-items-center"
-            style={{ height: '500px', border: '1px solid #ddd' }}
-          >
-            <canvas
-              ref={canvasRef}
-              width={DEFAULT_CANVAS_WIDTH}
-              height={DEFAULT_CANVAS_HEIGHT}
-              className="border border-gray-300 rounded"
-              onMouseDown={handleCanvasMouseDown}
-              onMouseMove={handleCanvasMouseMove}
-              onMouseUp={handleCanvasMouseUp}
-              onMouseLeave={handleCanvasMouseLeave}
-            />
-            {selectedImage && (
-              <div className="image-controls mt-3">
-                <button className="btn btn-outline" onClick={() => adjustScale(0.1)} title="Zoom In">
-                  <i className="bi bi-zoom-in"></i>
-                </button>
-                <button className="btn btn-outline" onClick={() => adjustScale(-0.1)} title="Zoom Out">
-                  <i className="bi bi-zoom-out"></i>
-                </button>
-                <button className="btn btn-outline" onClick={() => adjustImageRotation(90)} title="Rotate Image Right">
-                  <i className="bi bi-arrow-clockwise"></i>Image
-                </button>
-                <button className="btn btn-outline" onClick={() => adjustImageRotation(-90)} title="Rotate Image Left">
-                  <i className="bi bi-arrow-counterclockwise"></i>Image
-                </button>
-                {selectedImage.frame && (
-                  <>
-                    <button className="btn btn-outline" onClick={() => adjustFrameRotation(90)} title="Rotate Frame Right">
-                      <i className="bi bi-arrow-clockwise"></i> Frame
-                    </button>
-                    <button className="btn btn-outline" onClick={() => adjustFrameRotation(-90)} title="Rotate Frame Left">
-                      <i className="bi bi-arrow-counterclockwise"></i> Frame
-                    </button>
-                  </>
-                )}
-                <button className="btn btn-outline" onClick={toggleCropMode} title="Crop">
-                  <i className="bi bi-crop"></i>
-                </button>
-                <button className="btn btn-outline" onClick={resetToOriginal} title="Reset Position">
-                  <i className="bi bi-arrow-repeat"></i>
-                </button>
-                <button className="btn btn-outline" onClick={resetTransform} title="Reset Image">
-                  <i className="bi bi-bootstrap-reboot"></i>
-                </button>
-                {!isPrintOnly && <button className="btn btn-outline" onClick={resetVariants}>None Frame</button>}
-              </div>
-            )}
-          </div>
-        )}
-        <div className="thumbnails d-flex flex-wrap align-items-center">
-          {uploadedImages.map((img) => (
-            <div
-              key={img.id}
-              className={`thumbnail m-2 ${img.id === selectedImageId ? 'border border-primary' : ''}`}
-              onClick={() => selectImage(img.id)}
-              style={{ cursor: 'pointer' }}
-            >
-              <img
-                src={getImageUrl(img.cropped_url || img.original_url)}
-                alt="Thumbnail"
-                style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                onError={handleImageError}
-              />
-            </div>
-          ))}
-          <div className="add-more m-2">
-            <button className="btn btn-outline-secondary" onClick={triggerUpload}>
-              <i className="bi bi-plus-lg"></i> Add More
-            </button>
-          </div>
-          <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} accept="image/*" />
-        </div>
-      </div>
+  const renderCategoryContent = () => {
+    if (!selectedImage) return null;
 
-      <div className="row">
-        <div className="col-12">
-          <div className="p-4 bg-light rounded shadow-sm" style={{ border: '1px solid #ffc800', minHeight: '200px', overflow: 'auto' }}>
-            {!cropping && selectedImage && renderPrintOptions()}
-            {!isPrintOnly && !cropping && (
-              <>
-                {activeCategory === 'frame' && (
-                  <div>
-                    <h3 className="mb-3 text-center">Select Frame Category</h3>
-                    <select
-                      value={selectedCategory || ''}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="form-select mb-3 mx-auto"
-                      style={{ maxWidth: '300px' }}
+    switch (activeCategory) {
+      case 'frame':
+        return (
+          <div className="category-panel">
+            <h3>Select Frame</h3>
+            <div className="category-selector">
+              <select
+                value={selectedCategory || ''}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="category-select"
+              >
+                <option value="">All Categories</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.frameCategory}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="items-grid">
+              {frames.length > 0 ? (
+                frames.map((frame) => (
+                  <div
+                    key={frame.id}
+                    className={`item-card ${selectedImage?.frame?.id === frame.id ? 'selected' : ''}`}
+                    onClick={() => handleSelectFrame(frame)}
+                  >
+                    <div className="item-image">
+                      <img
+                        src={getImageUrl(frame.corner_image)}
+                        alt={frame.name}
+                        onError={handleImageError}
+                      />
+                    </div>
+                    <div className="item-info">
+                      <p className="item-price">${frame.price}</p>
+                      <p className="item-name">{frame.name}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="no-items">No frames available</div>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'color':
+        return (
+          <div className="category-panel">
+            <h3>Select Color</h3>
+            <div className="items-grid">
+              {selectedImage?.frame ? (
+                <>
+                  {selectedImage.frame.color_variants.length > 0 ? (
+                    selectedImage.frame.color_variants.map((variant) => (
+                      <div
+                        key={variant.id}
+                        className={`item-card ${selectedImage.variants.color?.id === variant.id ? 'selected' : ''}`}
+                        onClick={() => handleVariantSelect(variant, 'color')}
+                      >
+                        <div className="item-image">
+                          <img
+                            src={getImageUrl(variant.corner_image)}
+                            alt={variant.color_name}
+                            onError={handleImageError}
+                          />
+                        </div>
+                        <div className="item-info">
+                          <p className="item-name">{variant.color_name || 'No name'}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="no-items">No color variants available</div>
+                  )}
+                  <div className="custom-color-card">
+                    <div className="custom-color-content">
+                      <h4>Custom Color</h4>
+                      <input
+                        type="color"
+                        value={selectedImage.customFrameColor || '#000000'}
+                        onChange={(e) => {
+                          setUploadedImages((prev) =>
+                            prev.map((img) =>
+                              img.id === selectedImageId ? { ...img, customFrameColor: e.target.value, variants: { ...img.variants, color: null } } : img
+                            )
+                          );
+                        }}
+                        className="custom-color-input"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="no-items">Please select a frame first</div>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'size':
+        return (
+          <div className="category-panel">
+            <h3>Select Size</h3>
+            <div className="items-grid">
+              {selectedImage?.frame ? (
+                <>
+                  <div className="custom-size-card">
+                    <div className="custom-size-content">
+                      <h4>Custom Size</h4>
+                      <form className="custom-size-form" onSubmit={handleCustomSizeSubmit}>
+                        <input
+                          type="number"
+                          step="0.1"
+                          placeholder="Width (inches)"
+                          value={customSize.width}
+                          onChange={(e) => setCustomSize({ ...customSize, width: e.target.value })}
+                          className="custom-size-input"
+                        />
+                        <input
+                          type="number"
+                          step="0.1"
+                          placeholder="Height (inches)"
+                          value={customSize.height}
+                          onChange={(e) => setCustomSize({ ...customSize, height: e.target.value })}
+                          className="custom-size-input"
+                        />
+                        <button
+                          type="submit"
+                          className="custom-size-apply"
+                          disabled={!customSize.width || !customSize.height}
+                        >
+                          Apply Custom Size
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                  {selectedImage.frame.size_variants.length > 0 ? (
+                    selectedImage.frame.size_variants.map((variant) => (
+                      <div
+                        key={variant.id}
+                        className={`item-card ${selectedImage.variants.size?.id === variant.id ? 'selected' : ''}`}
+                        onClick={() => handleVariantSelect(variant, 'size')}
+                      >
+                        <div className="item-image">
+                          <img
+                            src={getImageUrl(variant.corner_image)}
+                            alt={variant.size_name}
+                            onError={handleImageError}
+                          />
+                        </div>
+                        <div className="item-info">
+                          <p className="item-name">{variant.size_name || 'No name'}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="no-items">No predefined size variants available</div>
+                  )}
+                </>
+              ) : (
+                <div className="no-items">Please select a frame first</div>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'finish':
+        return (
+          <div className="category-panel">
+            <h3>Select Finish</h3>
+            <div className="items-grid">
+              {selectedImage?.frame ? (
+                selectedImage.frame.finishing_variants.length > 0 ? (
+                  selectedImage.frame.finishing_variants.map((variant) => (
+                    <div
+                      key={variant.id}
+                      className={`item-card ${selectedImage.variants.finish?.id === variant.id ? 'selected' : ''}`}
+                      onClick={() => handleVariantSelect(variant, 'finish')}
                     >
-                      <option value="">All Categories</option>
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.frameCategory}
-                        </option>
-                      ))}
-                    </select>
-                    <h3 className="mb-3 text-center">Select Frame</h3>
-                    <div className="frame-list d-flex flex-wrap justify-content-center gap-3">
-                      {frames.length > 0 ? (
-                        frames.map((frame) => (
-                          <div
-                            key={frame.id}
-                            className={`frame-item p-3 bg-white rounded shadow-sm ${selectedImage?.frame?.id === frame.id ? 'border border-primary' : 'border border-light'}`}
-                            onClick={() => handleSelectFrame(frame)}
-                            style={{ cursor: 'pointer', width: '150px', textAlign: 'center' }}
-                          >
-                            <img
-                              src={getImageUrl(frame.corner_image)}
-                              alt={frame.name}
-                              style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }}
-                              onError={handleImageError}
-                            />
-                            <p className="mt-2 mb-0">${frame.price}</p>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-center text-muted">No frames available</p>
-                      )}
+                      <div className="item-image">
+                        <img
+                          src={getImageUrl(variant.corner_image)}
+                          alt={variant.finish_name}
+                          onError={handleImageError}
+                        />
+                      </div>
+                      <div className="item-info">
+                        <p className="item-name">{variant.finish_name || 'No name'}</p>
+                      </div>
                     </div>
-                  </div>
-                )}
-                {activeCategory === 'color' && (
-                  <div>
-                    <h3 className="mb-3 text-center">Select Color</h3>
-                    <div className="frame-list d-flex flex-wrap justify-content-center gap-3">
-                      {selectedImage?.frame ? (
-                        <>
-                          {selectedImage.frame.color_variants.length > 0 ? (
-                            selectedImage.frame.color_variants.map((variant) => (
-                              <div
-                                key={variant.id}
-                                className={`frame-item p-3 bg-white rounded shadow-sm ${selectedImage.variants.color?.id === variant.id ? 'border border-primary' : 'border border-light'}`}
-                                onClick={() => handleVariantSelect(variant, 'color')}
-                                style={{ cursor: 'pointer', width: '150px', textAlign: 'center' }}
-                              >
-                                <img
-                                  src={getImageUrl(variant.corner_image)}
-                                  alt={variant.color_name}
-                                  style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }}
-                                  onError={handleImageError}
-                                />
-                                <p className="mt-2 mb-0">{variant.color_name || 'No name'}</p>
-                              </div>
-                            ))
-                          ) : (
-                            <p className="text-center text-muted">No color variants available</p>
-                          )}
-                          <div className="custom-color p-3 bg-white rounded shadow-sm" style={{ width: '150px', textAlign: 'center' }}>
-                            <h4>Custom Color</h4>
-                            <input
-                              type="color"
-                              value={selectedImage.customFrameColor || '#000000'}
-                              onChange={(e) => {
-                                setUploadedImages((prev) =>
-                                  prev.map((img) =>
-                                    img.id === selectedImageId ? { ...img, customFrameColor: e.target.value, variants: { ...img.variants, color: null } } : img
-                                  )
-                                );
-                              }}
-                              className="form-control-color"
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        <p className="text-center text-muted">Please select a frame first</p>
-                      )}
+                  ))
+                ) : (
+                  <div className="no-items">No finishing variants available</div>
+                )
+              ) : (
+                <div className="no-items">Please select a frame first</div>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'hanging':
+        return (
+          <div className="category-panel">
+            <h3>Select Hanging</h3>
+            <div className="items-grid">
+              {selectedImage?.frame ? (
+                selectedImage.frame.frameHanging_variant?.length > 0 ? (
+                  selectedImage.frame.frameHanging_variant.map((variant) => (
+                    <div
+                      key={variant.id}
+                      className={`item-card ${selectedImage.variants.hanging?.id === variant.id ? 'selected' : ''}`}
+                      onClick={() => handleVariantSelect(variant, 'hanging')}
+                    >
+                      <div className="item-image">
+                        <img
+                          src={getImageUrl(variant.image)}
+                          alt={variant.hanging_name}
+                          onError={handleImageError}
+                        />
+                      </div>
+                      <div className="item-info">
+                        <p className="item-name">{variant.hanging_name || 'No name'}</p>
+                      </div>
                     </div>
-                  </div>
-                )}
-                {activeCategory === 'size' && (
-                  <div>
-                    <h3 className="mb-3 text-center">Select Size</h3>
-                    <div className="frame-list d-flex flex-wrap justify-content-center gap-3">
-                      {selectedImage?.frame ? (
-                        <>
-                          <div className="custom-size p-3 bg-white rounded shadow-sm" style={{ width: '200px', textAlign: 'center' }}>
-                            <h4>Custom Size</h4>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                              <input
-                                type="number"
-                                step="0.1"
-                                placeholder="Width (inches)"
-                                value={customSize.width}
-                                onChange={(e) => setCustomSize({ ...customSize, width: e.target.value })}
-                                style={{ padding: '5px', borderRadius: '4px', border: '1px solid #ddd' }}
-                              />
-                              <input
-                                type="number"
-                                step="0.1"
-                                placeholder="Height (inches)"
-                                value={customSize.height}
-                                onChange={(e) => setCustomSize({ ...customSize, height: e.target.value })}
-                                style={{ padding: '5px', borderRadius: '4px', border: '1px solid #ddd' }}
-                              />
-                              <button
-                                className="btn btn-primary"
-                                onClick={handleCustomSizeSubmit}
-                                disabled={!customSize.width || !customSize.height}
-                              >
-                                Apply Custom Size
-                              </button>
-                            </div>
-                          </div>
-                          {selectedImage.frame.size_variants.length > 0 ? (
-                            selectedImage.frame.size_variants.map((variant) => (
-                              <div
-                                key={variant.id}
-                                className={`frame-item p-3 bg-white rounded shadow-sm ${selectedImage.variants.size?.id === variant.id ? 'border border-primary' : 'border border-light'}`}
-                                onClick={() => handleVariantSelect(variant, 'size')}
-                                style={{ cursor: 'pointer', width: '150px', textAlign: 'center' }}
-                              >
-                                <img
-                                  src={getImageUrl(variant.corner_image)}
-                                  alt={variant.size_name}
-                                  style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }}
-                                  onError={handleImageError}
-                                />
-                                <p className="mt-2 mb-0">{variant.size_name || 'No name'}</p>
-                              </div>
-                            ))
-                          ) : (
-                            <p className="text-center text-muted">No predefined size variants available</p>
-                          )}
-                        </>
-                      ) : (
-                        <p className="text-center text-muted">Please select a frame first</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {activeCategory === 'finish' && (
-                  <div>
-                    <h3 className="mb-3 text-center">Select Finish</h3>
-                    <div className="frame-list d-flex flex-wrap justify-content-center gap-3">
-                      {selectedImage?.frame ? (
-                        selectedImage.frame.finishing_variants.length > 0 ? (
-                          selectedImage.frame.finishing_variants.map((variant) => (
-                            <div
-                              key={variant.id}
-                              className={`frame-item p-3 bg-white rounded shadow-sm ${selectedImage.variants.finish?.id === variant.id ? 'border border-primary' : 'border border-light'}`}
-                              onClick={() => handleVariantSelect(variant, 'finish')}
-                              style={{ cursor: 'pointer', width: '150px', textAlign: 'center' }}
-                            >
-                              <img
-                                src={getImageUrl(variant.corner_image)}
-                                alt={variant.finish_name}
-                                style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }}
-                                onError={handleImageError}
-                              />
-                              <p className="mt-2 mb-0">{variant.finish_name || 'No name'}</p>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-center text-muted">No finishing variants available</p>
-                        )
-                      ) : (
-                        <p className="text-center text-muted">Please select a frame first</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {activeCategory === 'hanging' && (
-                  <div>
-                    <h3 className="mb-3 text-center">Select Hanging</h3>
-                    <div className="frame-list d-flex flex-wrap justify-content-center gap-3">
-                      {selectedImage?.frame ? (
-                        selectedImage.frame.frameHanging_variant?.length > 0 ? (
-                          selectedImage.frame.frameHanging_variant.map((variant) => (
-                            <div
-                              key={variant.id}
-                              className={`frame-item p-3 bg-white rounded shadow-sm ${selectedImage.variants.hanging?.id === variant.id ? 'border border-primary' : 'border border-light'}`}
-                              onClick={() => handleVariantSelect(variant, 'hanging')}
-                              style={{ cursor: 'pointer', width: '150px', textAlign: 'center' }}
-                            >
-                              <img
-                                src={getImageUrl(variant.image)}
-                                alt={variant.hanging_name}
-                                style={{ width: '100px', height: '100px', objectFit: 'contain', margin: '0 auto' }}
-                                onError={handleImageError}
-                              />
-                              <p className="mt-2 mb-0">{variant.hanging_name || 'No name'}</p>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-center text-muted">No hanging variants available</p>
-                        )
-                      ) : (
-                        <p className="text-center text-muted">Please select a frame first</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-            <div className="mt-4">
-              <h3 className="mb-3 text-center">Selected Options</h3>
-              <div className="options-list bg-white p-3 rounded shadow-sm">
-                <div className="d-flex justify-content-between mb-2">
-                  <strong>Size:</strong>
-                  <span>
-                    {(selectedImage?.customSize?.width && selectedImage?.customSize?.height)
-                      ? `${selectedImage.customSize.width}x${selectedImage.customSize.height} inches (Custom)`
-                      : `${selectedImage?.printOptions?.size?.width || 'N/A'}x${selectedImage?.printOptions?.size?.height || 'N/A'} ${selectedImage?.printOptions?.size?.unit || 'inches'}`}
-                  </span>
-                </div>
-                <div className="d-flex justify-content-between mb-2">
-                  <strong>Media:</strong>
-                  <span>{selectedImage?.printOptions?.mediaType || 'None'}</span>
-                </div>
-                {selectedImage?.printOptions?.mediaType?.mediaType === 'Photopaper' || 'None' && (
-                  <div className="d-flex justify-content-between mb-2">
-                    <strong>Paper Type:</strong>
-                    <span>{selectedImage?.printOptions?.paperType || 'None'}</span>
-                  </div>
-                )}
-                <div className="d-flex justify-content-between mb-2">
-                  <strong>Fit:</strong>
-                  <span>{selectedImage?.printOptions?.fit || 'None'}</span>
-                </div>
-                {selectedImage?.printOptions?.fit === 'bordered' && (
-                  <>
-                    <div className="d-flex justify-content-between mb-2">
-                      <strong>Border Depth:</strong>
-                      <span>{selectedImage?.printOptions?.borderDepth || '0'} px</span>
-                    </div>
-                    <div className="d-flex justify-content-between mb-2">
-                      <strong>Border Color:</strong>
-                      <span>{selectedImage?.printOptions?.borderColor || '#ffffff'}</span>
-                    </div>
-                  </>
-                )}
-                {!isPrintOnly && (
-                  <>
-                    <div className="d-flex justify-content-between mb-2">
-                      <strong>Frame:</strong>
-                      <span>{selectedImage?.frame?.name || 'None'}</span>
-                    </div>
-                    <div className="d-flex justify-content-between mb-2">
-                      <strong>Frame Color:</strong>
-                      <span>{selectedImage?.customFrameColor ? `Custom (${selectedImage.customFrameColor})` : selectedImage?.variants?.color?.color_name || 'None'}</span>
-                    </div>
-                    <div className="d-flex justify-content-between mb-2">
-                      <strong>Size:</strong>
-                      <span>{selectedImage?.variants?.size?.size_name || 'None'}</span>
-                    </div>
-                    <div className="d-flex justify-content-between mb-2">
-                      <strong>Finish:</strong>
-                      <span>{selectedImage?.variants?.finish?.finish_name || 'None'}</span>
-                    </div>
-                    <div className="d-flex justify-content-between mb-2">
-                      <strong>Hanging:</strong>
-                      <span>{selectedImage?.variants?.hanging?.hanging_name || 'None'}</span>
-                    </div>
-                    <div className="d-flex justify-content-between mb-2">
-                      <strong>Image Rotation:</strong>
-                      <span>{selectedImage?.transform?.rotation || 0}°</span>
-                    </div>
-                    <div className="d-flex justify-content-between mb-2">
-                      <strong>Frame Rotation:</strong>
-                      <span>{selectedImage?.frameTransform?.rotation || 0}°</span>
-                    </div>
-                    <div className="d-flex justify-content-between mb-2">
-                      <strong>Frame Depth:</strong>
-                      <span>{selectedImage?.printOptions?.frameDepth || 0} px</span>
-                    </div>
-                  </>
-                )}
-                {(isPrintOnly ? (selectedImage?.printOptions?.size?.width && selectedImage?.printOptions?.size?.height) : selectedImage?.frame) && (
-                  <div className="d-flex justify-content-between mb-2">
-                    <strong>Price:</strong>
-                    <span>${calculatePrice(selectedImage).toFixed(2)}</span>
-                  </div>
-                )}
+                  ))
+                ) : (
+                  <div className="no-items">No hanging variants available</div>
+                )
+              ) : (
+                <div className="no-items">Please select a frame first</div>
+              )}
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="modern-headers">
+      <div className="canvas-section">
+        <div className="canvas-container">
+          <div className="canvas-wrapper">
+            <canvas
+              ref={canvasRef}
+              width={DEFAULT_CANVAS_WIDTH}
+              height={DEFAULT_CANVAS_HEIGHT}
+              className="design-canvas"
+              onMouseDown={handleCanvasMouseDown}
+              onMouseMove={handleCanvasMouseMove}
+              onMouseUp={handleCanvasMouseUp}
+              onMouseLeave={handleCanvasMouseLeave}
+            />
+          </div>
+
+          {selectedImage && (
+            <div className="canvas-controls">
+              <div className="control-group">
+                <button className="control-btn" onClick={() => adjustScale(0.1)} title="Zoom In">
+                  <ZoomIn size={16} />
+                  Zoom In
+                </button>
+                <button className="control-btn" onClick={() => adjustScale(-0.1)} title="Zoom Out">
+                  <ZoomOut size={16} />
+                  Zoom Out
+                </button>
               </div>
-              {selectedImage && (selectedImage.frame || isPrintOnly) && (
-                <div className="d-flex justify-content-end mt-3">
-                  <button className="btn btn-primary" onClick={handleSave}>
-                    {selectedImage.cartItemId ? 'Update' : 'Save'}
+
+              <div className="control-group">
+                <button className="control-btn" onClick={() => adjustImageRotation(90)} title="Rotate Image Right">
+                  <RotateCw size={16} />
+                  Image
+                </button>
+                <button className="control-btn" onClick={() => adjustImageRotation(-90)} title="Rotate Image Left">
+                  <RotateCounterClockwise size={16} />
+                  Image
+                </button>
+              </div>
+
+              {selectedImage.frame && (
+                <div className="control-group">
+                  <button className="control-btn" onClick={() => adjustFrameRotation(90)} title="Rotate Frame Right">
+                    <RotateClockwise size={16} />
+                    Frame
+                  </button>
+                  <button className="control-btn" onClick={() => adjustFrameRotation(-90)} title="Rotate Frame Left">
+                    <RotateCounterClockwise size={16} />
+                    Frame
+                  </button>
+                </div>
+              )}
+
+              <div className="control-group">
+                <button className="control-btn" onClick={toggleCropMode} title="Crop">
+                  <Crop size={16} />
+                  Crop
+                </button>
+                <button className="control-btn" onClick={resetToOriginal} title="Reset Position">
+                  <RefreshCw size={16} />
+                  Reset
+                </button>
+                <button className="control-btn" onClick={resetTransform} title="Reset Image">
+                  <Rewind size={16} />
+                  Original
+                </button>
+              </div>
+
+              {!isPrintOnly && (
+                <div className="control-group">
+                  <button className="control-btn remove-frame" onClick={resetVariants}>
+                    Remove Frame
                   </button>
                 </div>
               )}
             </div>
+          )}
+
+          <div className="thumbnails-section">
+            <div className="thumbnails-container">
+              {uploadedImages.map((img) => (
+                <div
+                  key={img.id}
+                  className={`thumbnail ${img.id === selectedImageId ? 'selected' : ''}`}
+                  onClick={() => selectImage(img.id)}
+                >
+                  <img
+                    src={getImageUrl(img.cropped_url || img.original_url)}
+                    alt="Thumbnail"
+                    onError={handleImageError}
+                  />
+                </div>
+              ))}
+              <div className="add-thumbnail" onClick={triggerUpload}>
+                <Plus size={20} />
+                <span>Add</span>
+              </div>
+              <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} accept="image/*" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="options-section">
+        <div className="options-container">
+          {renderPrintOptions()}
+          
+          {!isPrintOnly && renderCategoryContent()}
+
+          <div className="summary-section">
+            <h3>Summary</h3>
+            <div className="summary-content">
+              <div className="summary-item">
+                <span>Size:</span>
+                <span>
+                  {(selectedImage?.customSize?.width && selectedImage?.customSize?.height)
+                    ? `${selectedImage.customSize.width}×${selectedImage.customSize.height} inches (Custom)`
+                    : `${selectedImage?.printOptions?.size?.width || 'N/A'}×${selectedImage?.printOptions?.size?.height || 'N/A'} ${selectedImage?.printOptions?.size?.unit || 'inches'}`}
+                </span>
+              </div>
+              <div className="summary-item">
+                <span>Media:</span>
+                <span>{selectedImage?.printOptions?.mediaType || 'None'}</span>
+              </div>
+              {selectedImage?.printOptions?.mediaType === 'Photopaper' && (
+                <div className="summary-item">
+                  <span>Paper Type:</span>
+                  <span>{selectedImage?.printOptions?.paperType || 'None'}</span>
+                </div>
+              )}
+              <div className="summary-item">
+                <span>Fit:</span>
+                <span>{selectedImage?.printOptions?.fit || 'None'}</span>
+              </div>
+              {!isPrintOnly && (
+                <>
+                  <div className="summary-item">
+                    <span>Frame:</span>
+                    <span>{selectedImage?.frame?.name || 'None'}</span>
+                  </div>
+                  <div className="summary-item">
+                    <span>Frame Color:</span>
+                    <span>{selectedImage?.customFrameColor ? `Custom (${selectedImage.customFrameColor})` : selectedImage?.variants?.color?.color_name || 'None'}</span>
+                  </div>
+                  <div className="summary-item">
+                    <span>Finish:</span>
+                    <span>{selectedImage?.variants?.finish?.finish_name || 'None'}</span>
+                  </div>
+                  <div className="summary-item">
+                    <span>Hanging:</span>
+                    <span>{selectedImage?.variants?.hanging?.hanging_name || 'None'}</span>
+                  </div>
+                </>
+              )}
+              {(isPrintOnly ? (selectedImage?.printOptions?.size?.width && selectedImage?.printOptions?.size?.height) : selectedImage?.frame) && (
+                <div className="summary-item price">
+                  <span>Total Price:</span>
+                  <span>${calculatePrice(selectedImage).toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+            {selectedImage && (selectedImage.frame || isPrintOnly) && (
+              <button className="save-button" onClick={handleSave}>
+                <Save size={20} />
+                {selectedImage.cartItemId ? 'Update Item' : 'Save Item'}
+              </button>
+            )}
           </div>
         </div>
       </div>
