@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { Upload, ZoomIn, ZoomOut, RotateCw, RotateCcw, Crop, RotateCw as RotateClockwise, MousePointerClick as RotateCounterClockwise, RefreshCw, Rewind, Plus, Check, X, Save } from 'lucide-react';
+import { Upload, ZoomIn, ZoomOut, RotateCw, RotateCcw, Crop, RotateCw as RotateClockwise, MousePointerClick as RotateCounterClockwise, RefreshCw, Rewind, Plus, Check, X, Save, Search, Plus as PlusIcon, Minus } from 'lucide-react';
 import './Headers.css';
 
 const BASE_URL = 'http://82.180.146.4:8001';
@@ -32,8 +32,14 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   const [cropWidth, setCropWidth] = useState('');
   const [cropHeight, setCropHeight] = useState('');
   const [cropUnit, setCropUnit] = useState('inches');
+  const [isMagnified, setIsMagnified] = useState(false);
+  const [isMagnifierActive, setIsMagnifierActive] = useState(false);
+  const [magnificationFactor, setMagnificationFactor] = useState(5);
+  const [magnifierPosition, setMagnifierPosition] = useState({ x: 0, y: 0 });
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
+  const borderColorInputRef = useRef(null);
+  const magnifierCanvasRef = useRef(null);
   const navigate = useNavigate();
 
   const getImageUrl = useCallback((path) => {
@@ -52,10 +58,21 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     );
   };
 
+  const getBorderDepthInPixels = (borderDepth, borderUnit) => {
+    if (borderUnit === 'px') {
+      return parseInt(borderDepth) || 0;
+    } else if (borderUnit === 'inches') {
+      return (parseFloat(borderDepth) || 0) * DPI;
+    } else if (borderUnit === 'cm') {
+      return (parseFloat(borderDepth) / 2.54 || 0) * DPI;
+    }
+    return 0;
+  };
+
   useEffect(() => {
     const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
     if (selectedImage && !isPrintOnly && selectedImage.frame && originalImage) {
-      const borderDepth = parseInt(selectedImage.printOptions.borderDepth) || 0;
+      const borderDepth = getBorderDepthInPixels(selectedImage.printOptions.borderDepth, selectedImage.printOptions.borderUnit);
       const frameDepth = parseInt(selectedImage.printOptions.frameDepth) || 0;
       const innerWidth = (selectedImage.variants?.size?.inner_width || selectedImage.frame.inner_width || DEFAULT_INNER_WIDTH) - 2 * frameDepth;
       const innerHeight = (selectedImage.variants?.size?.inner_height || selectedImage.frame.inner_height || DEFAULT_INNER_HEIGHT) - 2 * frameDepth;
@@ -76,195 +93,194 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   }, [selectedImageId, uploadedImages, originalImage, isPrintOnly]);
 
   const drawCanvas = useCallback(() => {
-  const canvas = canvasRef.current;
-  if (!canvas || !originalImage) return;
+    const canvas = canvasRef.current;
+    if (!canvas || !originalImage) return;
 
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-  const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
-  const hasFrame = !isPrintOnly && selectedImage && selectedImage.frame && frameImage;
+    const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
+    const hasFrame = !isPrintOnly && selectedImage && selectedImage.frame && frameImage;
 
-  canvas.width = DEFAULT_CANVAS_WIDTH;
-  canvas.height = DEFAULT_CANVAS_HEIGHT;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+    canvas.width = DEFAULT_CANVAS_WIDTH;
+    canvas.height = DEFAULT_CANVAS_HEIGHT;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  let innerWidth = selectedImage?.variants?.size?.inner_width || selectedImage?.frame?.inner_width || DEFAULT_INNER_WIDTH;
-  let innerHeight = selectedImage?.variants?.size?.inner_height || selectedImage?.frame?.inner_height || DEFAULT_INNER_HEIGHT;
+    let innerWidth = selectedImage?.variants?.size?.inner_width || selectedImage?.frame?.inner_width || DEFAULT_INNER_WIDTH;
+    let innerHeight = selectedImage?.variants?.size?.inner_height || selectedImage?.frame?.inner_height || DEFAULT_INNER_HEIGHT;
 
-  if (cropping) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.clearRect(cropBox.x, cropBox.y, cropBox.width, cropBox.height);
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(cropBox.x, cropBox.y, cropBox.width, cropBox.height);
-    ctx.clip();
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate((imageTransform.rotation * Math.PI) / 180);
-    ctx.scale(imageTransform.scale, imageTransform.scale);
-    ctx.translate(imageTransform.x, imageTransform.y);
-    ctx.drawImage(originalImage, -originalImage.width / 2, -originalImage.height / 2);
-    ctx.restore();
-    ctx.strokeStyle = 'white';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(cropBox.x, cropBox.y, cropBox.width, cropBox.height);
-
-    const handleSize = 8;
-    const handles = [
-      { x: cropBox.x, y: cropBox.y },
-      { x: cropBox.x + cropBox.width, y: cropBox.y },
-      { x: cropBox.x, y: cropBox.y + cropBox.height },
-      { x: cropBox.x + cropBox.width, y: cropBox.y + cropBox.height },
-      { x: cropBox.x + cropBox.width / 2, y: cropBox.y },
-      { x: cropBox.x + cropBox.width / 2, y: cropBox.y + cropBox.height },
-      { x: cropBox.x, y: cropBox.y + cropBox.height / 2 },
-      { x: cropBox.x + cropBox.width, y: cropBox.y + cropBox.height / 2 },
-    ];
-
-    ctx.fillStyle = 'white';
-    handles.forEach((handle) => {
-      ctx.fillRect(handle.x - handleSize / 2, handle.y - handleSize / 2, handleSize, handleSize);
-    });
-  } else if (isPrintOnly && selectedImage?.printOptions?.size?.width && selectedImage?.printOptions?.size?.height) {
-    const widthInInches = selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.width / 2.54 : selectedImage.printOptions.size.width;
-    const heightInInches = selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.height / 2.54 : selectedImage.printOptions.size.height;
-    const printWidth = widthInInches * DPI;
-    const printHeight = heightInInches * DPI;
-
-    let scale = 1;
-    if (printWidth > DEFAULT_CANVAS_WIDTH || printHeight > DEFAULT_CANVAS_HEIGHT) {
-      const scaleX = DEFAULT_CANVAS_WIDTH / printWidth;
-      const scaleY = DEFAULT_CANVAS_HEIGHT / printHeight;
-      scale = Math.min(scaleX, scaleY);
-    }
-
-    ctx.save();
-    ctx.translate(DEFAULT_CANVAS_WIDTH / 2, DEFAULT_CANVAS_HEIGHT / 2);
-    ctx.scale(scale, scale);
-    ctx.translate(-printWidth / 2, -printHeight / 2);
-
-    if (selectedImage.printOptions.fit === 'borderless') {
+    if (cropping) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(cropBox.x, cropBox.y, cropBox.width, cropBox.height);
       ctx.save();
       ctx.beginPath();
-      ctx.rect(0, 0, printWidth, printHeight);
+      ctx.rect(cropBox.x, cropBox.y, cropBox.width, cropBox.height);
       ctx.clip();
-
-      ctx.translate(printWidth / 2, printHeight / 2);
+      ctx.translate(canvas.width / 2, canvas.height / 2);
       ctx.rotate((imageTransform.rotation * Math.PI) / 180);
       ctx.scale(imageTransform.scale, imageTransform.scale);
       ctx.translate(imageTransform.x, imageTransform.y);
       ctx.drawImage(originalImage, -originalImage.width / 2, -originalImage.height / 2);
-
       ctx.restore();
-    } else {
-      const borderColor = selectedImage.printOptions.borderColor || '#ffffff';
-      const borderDepth = parseInt(selectedImage.printOptions.borderDepth) || 0;
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(cropBox.x, cropBox.y, cropBox.width, cropBox.height);
 
-      ctx.fillStyle = borderColor;
-      ctx.fillRect(0, 0, printWidth, printHeight);
+      const handleSize = 8;
+      const handles = [
+        { x: cropBox.x, y: cropBox.y },
+        { x: cropBox.x + cropBox.width, y: cropBox.y },
+        { x: cropBox.x, y: cropBox.y + cropBox.height },
+        { x: cropBox.x + cropBox.width, y: cropBox.y + cropBox.height },
+        { x: cropBox.x + cropBox.width / 2, y: cropBox.y },
+        { x: cropBox.x + cropBox.width / 2, y: cropBox.y + cropBox.height },
+        { x: cropBox.x, y: cropBox.y + cropBox.height / 2 },
+        { x: cropBox.x + cropBox.width, y: cropBox.y + cropBox.height / 2 },
+      ];
 
-      const imageWidth = printWidth - 2 * borderDepth;
-      const imageHeight = printHeight - 2 * borderDepth;
-      if (imageWidth > 0 && imageHeight > 0) {
+      ctx.fillStyle = '#333';
+      handles.forEach((handle) => {
+        ctx.fillRect(handle.x - handleSize / 2, handle.y - handleSize / 2, handleSize, handleSize);
+      });
+    } else if (isPrintOnly && selectedImage?.printOptions?.size?.width && selectedImage?.printOptions?.size?.height) {
+      const widthInInches = selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.width / 2.54 : selectedImage.printOptions.size.width;
+      const heightInInches = selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.height / 2.54 : selectedImage.printOptions.size.height;
+      let printWidth = widthInInches * DPI;
+      let printHeight = heightInInches * DPI;
+      const borderDepth = getBorderDepthInPixels(selectedImage.printOptions.borderDepth, selectedImage.printOptions.borderUnit);
+
+      if (selectedImage.printOptions.fit === 'bordered') {
+        printWidth += 2 * borderDepth;
+        printHeight += 2 * borderDepth;
+      }
+
+      let scale = 1;
+      if (printWidth > DEFAULT_CANVAS_WIDTH || printHeight > DEFAULT_CANVAS_HEIGHT) {
+        const scaleX = DEFAULT_CANVAS_WIDTH / printWidth;
+        const scaleY = DEFAULT_CANVAS_HEIGHT / printHeight;
+        scale = Math.min(scaleX, scaleY);
+      }
+
+      ctx.save();
+      ctx.translate(DEFAULT_CANVAS_WIDTH / 2, DEFAULT_CANVAS_HEIGHT / 2);
+      ctx.scale(scale, scale);
+      ctx.translate(-printWidth / 2, -printHeight / 2);
+
+      if (selectedImage.printOptions.fit === 'borderless') {
         ctx.save();
         ctx.beginPath();
-        ctx.rect(borderDepth, borderDepth, imageWidth, imageHeight);
+        ctx.rect(0, 0, printWidth, printHeight);
         ctx.clip();
-
-        ctx.translate(borderDepth + imageWidth / 2, borderDepth + imageHeight / 2);
+        ctx.translate(printWidth / 2, printHeight / 2);
         ctx.rotate((imageTransform.rotation * Math.PI) / 180);
         ctx.scale(imageTransform.scale, imageTransform.scale);
         ctx.translate(imageTransform.x, imageTransform.y);
         ctx.drawImage(originalImage, -originalImage.width / 2, -originalImage.height / 2);
+        ctx.restore();
+      } else {
+        const borderColor = selectedImage.printOptions.borderColor || '#ffffff';
+        ctx.fillStyle = borderColor;
+        ctx.fillRect(0, 0, printWidth, printHeight);
 
+        const imageWidth = printWidth - 2 * borderDepth;
+        const imageHeight = printHeight - 2 * borderDepth;
+        if (imageWidth > 0 && imageHeight > 0) {
+          ctx.save();
+          ctx.translate(borderDepth, borderDepth);
+          ctx.beginPath();
+          ctx.rect(0, 0, imageWidth, imageHeight);
+          ctx.clip();
+          ctx.translate(imageWidth / 2, imageHeight / 2);
+          ctx.rotate((imageTransform.rotation * Math.PI) / 180);
+          ctx.scale(imageTransform.scale, imageTransform.scale);
+          ctx.translate(imageTransform.x, imageTransform.y);
+          ctx.drawImage(originalImage, -originalImage.width / 2, -originalImage.height / 2);
+          ctx.restore();
+        }
+      }
+      ctx.restore();
+    } else {
+      const frameDepth = selectedImage?.printOptions?.frameDepth ? parseInt(selectedImage.printOptions.frameDepth) : 0;
+      const borderDepth = getBorderDepthInPixels(selectedImage?.printOptions?.borderDepth, selectedImage?.printOptions?.borderUnit);
+      const borderColor = selectedImage?.printOptions?.borderColor || '#ffffff';
+
+      let innerX = (canvas.width - innerWidth) / 2;
+      let innerY = (canvas.height - innerHeight) / 2;
+
+      if (hasFrame) {
+        innerX += frameDepth;
+        innerY += frameDepth;
+        innerWidth -= 2 * frameDepth;
+        innerHeight -= 2 * frameDepth;
+
+        if (borderDepth > 0) {
+          ctx.fillStyle = borderColor;
+          ctx.fillRect(innerX, innerY, innerWidth, borderDepth);
+          ctx.fillRect(innerX, innerY + innerHeight - borderDepth, innerWidth, borderDepth);
+          ctx.fillRect(innerX, innerY + borderDepth, borderDepth, innerHeight - 2 * borderDepth);
+          ctx.fillRect(innerX + innerWidth - borderDepth, innerY + borderDepth, borderDepth, innerHeight - 2 * borderDepth);
+
+          innerX += borderDepth;
+          innerY += borderDepth;
+          innerWidth -= 2 * borderDepth;
+          innerHeight -= 2 * borderDepth;
+        }
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(innerX, innerY, innerWidth, innerHeight);
+        ctx.clip();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate((imageTransform.rotation * Math.PI) / 180);
+        ctx.scale(imageTransform.scale, imageTransform.scale);
+        ctx.translate(imageTransform.x, imageTransform.y);
+        ctx.drawImage(originalImage, -originalImage.width / 2, -originalImage.height / 2);
+        ctx.restore();
+
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        if (!tempCtx) return;
+
+        tempCtx.save();
+        tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+        tempCtx.rotate((frameTransform.rotation * Math.PI) / 180);
+        tempCtx.drawImage(frameImage, -tempCanvas.width / 2, -tempCanvas.height / 2, tempCanvas.width, tempCanvas.height);
+        tempCtx.restore();
+
+        if (selectedImage.customFrameColor) {
+          const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+          const data = imageData.data;
+          const hex = selectedImage.customFrameColor.replace('#', '');
+          const r = parseInt(hex.substring(0, 2), 16);
+          const g = parseInt(hex.substring(2, 4), 16);
+          const b = parseInt(hex.substring(4, 6), 16);
+
+          for (let i = 0; i < data.length; i += 4) {
+            const alpha = data[i + 3];
+            if (alpha > 0) {
+              data[i] = r;
+              data[i + 1] = g;
+              data[i + 2] = b;
+            }
+          }
+          tempCtx.putImageData(imageData, 0, 0);
+        }
+
+        ctx.drawImage(tempCanvas, 0, 0);
+      } else {
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate((imageTransform.rotation * Math.PI) / 180);
+        ctx.scale(imageTransform.scale, imageTransform.scale);
+        ctx.translate(imageTransform.x, imageTransform.y);
+        ctx.drawImage(originalImage, -originalImage.width / 2, -originalImage.height / 2);
         ctx.restore();
       }
     }
-    ctx.restore();
-  } else {
-    const frameDepth = selectedImage?.printOptions?.frameDepth ? parseInt(selectedImage.printOptions.frameDepth) : 0;
-    const borderDepth = selectedImage?.printOptions?.borderDepth ? parseInt(selectedImage.printOptions.borderDepth) : 0;
-    const borderColor = selectedImage?.printOptions?.borderColor || '#ffffff';
-
-    let innerX = (canvas.width - innerWidth) / 2;
-    let innerY = (canvas.height - innerHeight) / 2;
-
-    if (hasFrame) {
-      innerX += frameDepth;
-      innerY += frameDepth;
-      innerWidth -= 2 * frameDepth;
-      innerHeight -= 2 * frameDepth;
-
-      if (borderDepth > 0) {
-        ctx.fillStyle = borderColor;
-        ctx.fillRect(innerX, innerY, innerWidth, borderDepth);
-        ctx.fillRect(innerX, innerY + innerHeight - borderDepth, innerWidth, borderDepth);
-        ctx.fillRect(innerX, innerY + borderDepth, borderDepth, innerHeight - 2 * borderDepth);
-        ctx.fillRect(innerX + innerWidth - borderDepth, innerY + borderDepth, borderDepth, innerHeight - 2 * borderDepth);
-
-        innerX += borderDepth;
-        innerY += borderDepth;
-        innerWidth -= 2 * borderDepth;
-        innerHeight -= 2 * borderDepth;
-      }
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(innerX, innerY, innerWidth, innerHeight);
-      ctx.clip();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate((imageTransform.rotation * Math.PI) / 180);
-      ctx.scale(imageTransform.scale, imageTransform.scale);
-      ctx.translate(imageTransform.x, imageTransform.y);
-      ctx.drawImage(originalImage, -originalImage.width / 2, -originalImage.height / 2);
-      ctx.restore();
-
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = canvas.width;
-      tempCanvas.height = canvas.height;
-      const tempCtx = tempCanvas.getContext('2d');
-      if (!tempCtx) return;
-
-      tempCtx.save();
-      tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
-      tempCtx.rotate((frameTransform.rotation * Math.PI) / 180);
-      tempCtx.drawImage(frameImage, -tempCanvas.width / 2, -tempCanvas.height / 2, tempCanvas.width, tempCanvas.height);
-      tempCtx.restore();
-
-      if (selectedImage.customFrameColor) {
-        const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-        const data = imageData.data;
-
-        const hex = selectedImage.customFrameColor.replace('#', '');
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-
-        for (let i = 0; i < data.length; i += 4) {
-          const alpha = data[i + 3];
-          if (alpha > 0) {
-            data[i] = r;
-            data[i + 1] = g;
-            data[i + 2] = b;
-          }
-        }
-
-        tempCtx.putImageData(imageData, 0, 0);
-      }
-
-      ctx.drawImage(tempCanvas, 0, 0);
-    } else {
-      ctx.save(); // Fix: Added to balance ctx.restore()
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate((imageTransform.rotation * Math.PI) / 180);
-      ctx.scale(imageTransform.scale, imageTransform.scale);
-      ctx.translate(imageTransform.x, imageTransform.y);
-      ctx.drawImage(originalImage, -originalImage.width / 2, -originalImage.height / 2);
-      ctx.restore();
-    }
-  }
-}, [cropping, cropBox, originalImage, imageTransform, frameTransform, frameImage, selectedImageId, uploadedImages, isPrintOnly]);
+  }, [cropping, cropBox, originalImage, imageTransform, frameTransform, frameImage, selectedImageId, uploadedImages, isPrintOnly]);
 
   useEffect(() => {
     drawCanvas();
@@ -404,6 +420,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             borderDepth: cartItem.border_depth || '0',
             borderColor: cartItem.border_color || '#ffffff',
             frameDepth: cartItem.frame_depth || '0',
+            borderUnit: cartItem.border_unit || 'px',
           },
           customFrameColor: cartItem.custom_frame_color || null,
         };
@@ -493,6 +510,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             borderDepth: '0',
             borderColor: '#ffffff',
             frameDepth: '0',
+            borderUnit: 'px',
           },
           customFrameColor: null,
         };
@@ -529,6 +547,19 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
 
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
+
+    if (!cropping && selectedImage?.printOptions.fit === 'bordered') {
+      const borderDepth = getBorderDepthInPixels(selectedImage.printOptions.borderDepth, selectedImage.printOptions.borderUnit);
+      if (
+        mouseY < borderDepth ||
+        mouseY > canvas.height - borderDepth ||
+        mouseX < borderDepth ||
+        mouseX > canvas.width - borderDepth
+      ) {
+        borderColorInputRef.current.click();
+        return;
+      }
+    }
 
     if (cropping) {
       const handleSize = 8;
@@ -693,12 +724,37 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       );
       setDragStart({ x: mouseX, y: mouseY });
     }
-  }, [cropping, cropBox, isDragging, dragStart, selectedImageId, uploadedImages, imageTransform]);
 
-  const handleCanvasMouseUp = useCallback(() => {
+    if (isMagnifierActive && magnifierCanvasRef.current) {
+      const magnifierCtx = magnifierCanvasRef.current.getContext('2d');
+      const magnifierSize = 100;
+      const sSize = magnifierSize / magnificationFactor;
+      const sx = Math.max(0, Math.min(canvasWidth - sSize, mouseX - sSize / 2));
+      const sy = Math.max(0, Math.min(canvasHeight - sSize, mouseY - sSize / 2));
+      magnifierCtx.clearRect(0, 0, magnifierSize, magnifierSize);
+      magnifierCtx.drawImage(
+        canvasRef.current,
+        sx, sy, sSize, sSize,
+        0, 0, magnifierSize, magnifierSize
+      );
+      magnifierCtx.fillStyle = 'white';
+      magnifierCtx.font = '12px Arial';
+      magnifierCtx.fillText(`${magnificationFactor}x`, 5, 15);
+      setMagnifierPosition({ x: e.clientX + 10, y: e.clientY + 10 });
+    }
+  }, [cropping, cropBox, isDragging, dragStart, selectedImageId, uploadedImages, imageTransform, isMagnifierActive, magnificationFactor]);
+
+  const handleCanvasMouseUp = useCallback((e) => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const distance = Math.sqrt((mouseX - dragStart.x) ** 2 + (mouseY - dragStart.y) ** 2);
+    if (distance < 5 && !cropping) {
+      setIsMagnified(true);
+    }
     setIsDragging(false);
     setCropBox((prev) => ({ ...prev, isResizing: false, resizeHandle: '' }));
-  }, []);
+  }, [dragStart, cropping]);
 
   const handleCanvasMouseLeave = useCallback(() => {
     setIsDragging(false);
@@ -763,8 +819,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
         const canvasWidth = DEFAULT_CANVAS_WIDTH;
         const canvasHeight = DEFAULT_CANVAS_HEIGHT;
-        const innerWidth = selectedImage?.variants?.size?.inner_width || selectedImage?.frame?.inner_width || DEFAULT_INNER_WIDTH;
-        const innerHeight = selectedImage?.variants?.size?.inner_height || selectedImage?.frame?.inner_height || DEFAULT_INNER_HEIGHT;
         const displayedWidth = originalImage.width * imageTransform.scale;
         const displayedHeight = originalImage.height * imageTransform.scale;
         const canvasX = (canvasWidth - displayedWidth) / 2;
@@ -1121,6 +1175,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     formData.append('fit', selectedImage.printOptions.fit);
     formData.append('border_depth', selectedImage.printOptions.borderDepth);
     formData.append('border_color', selectedImage.printOptions.borderColor);
+    formData.append('border_unit', selectedImage.printOptions.borderUnit);
     formData.append('frame_depth', selectedImage.printOptions.frameDepth || '0');
     formData.append('custom_frame_color', selectedImage.customFrameColor || '');
 
@@ -1384,14 +1439,24 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             <div className="border-controls">
               <input
                 type="number"
-                placeholder="Depth (px)"
+                placeholder="Depth"
                 value={selectedImage.printOptions.borderDepth || '0'}
                 onChange={(e) => updatePrintOptions('borderDepth', e.target.value)}
                 className="border-input"
                 min="0"
               />
+              <select
+                value={selectedImage.printOptions.borderUnit || 'px'}
+                onChange={(e) => updatePrintOptions('borderUnit', e.target.value)}
+                className="unit-select"
+              >
+                <option value="px">px</option>
+                <option value="inches">inches</option>
+                <option value="cm">cm</option>
+              </select>
               <input
                 type="color"
+                ref={borderColorInputRef}
                 value={selectedImage.printOptions.borderColor || '#ffffff'}
                 onChange={(e) => updatePrintOptions('borderColor', e.target.value)}
                 className="color-input"
@@ -1679,6 +1744,38 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
               onMouseLeave={handleCanvasMouseLeave}
             />
           </div>
+          {isMagnified && (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100vw',
+                height: '100vh',
+                background: 'rgba(0, 0, 0, 0.8)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+              }}
+              onClick={() => setIsMagnified(false)}
+            >
+              <img
+                src={getImageUrl(selectedImage.cropped_url || selectedImage.original_url)}
+                alt="Magnified"
+                style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain' }}
+              />
+            </div>
+          )}
+
+          {isMagnifierActive && (
+            <div
+              className="magnifier"
+              style={{ position: 'fixed', left: magnifierPosition.x, top: magnifierPosition.y }}
+            >
+              <canvas ref={magnifierCanvasRef} width={100} height={100} />
+            </div>
+          )}
 
           {selectedImage && (
             <div className="canvas-controls">
@@ -1729,6 +1826,36 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                 <button className="control-btn" onClick={resetTransform} title="Reset Image">
                   <Rewind size={16} />
                   Original
+                </button>
+              </div>
+
+              <div className="control-group">
+                <button
+                  className="control-btn"
+                  onClick={() => setIsMagnifierActive(!isMagnifierActive)}
+                  title="Toggle Magnifier"
+                >
+                  <Search size={16} />
+                  Magnifier
+                </button>
+              </div>
+
+              <div className="control-group">
+                <button
+                  className="control-btn"
+                  onClick={() => setMagnificationFactor(prev => Math.min(10, prev + 1))}
+                  title="Increase Magnification"
+                >
+                  <PlusIcon size={16} />
+                  Zoom+
+                </button>
+                <button
+                  className="control-btn"
+                  onClick={() => setMagnificationFactor(prev => Math.max(1, prev - 1))}
+                  title="Decrease Magnification"
+                >
+                  <Minus size={16} />
+                  Zoom-
                 </button>
               </div>
 

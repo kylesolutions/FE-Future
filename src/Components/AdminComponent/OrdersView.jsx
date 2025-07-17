@@ -19,12 +19,13 @@ function OrdersView() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Check if the user is an admin
   useEffect(() => {
     const checkAdmin = async () => {
       try {
         const token = localStorage.getItem('token');
         if (token) {
-          const response = await axios.get('http://82.180.146.4:8001/user/', {
+          const response = await axios.get(`${BASE_URL}/user/`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           setIsAdmin(response.data.is_staff || false);
@@ -34,7 +35,6 @@ function OrdersView() {
       } catch (error) {
         console.error('Error checking admin status:', error.response?.data || error.message);
         setIsAdmin(false);
-        // Handle token expiration or invalid token
         if (error.response?.status === 401) {
           localStorage.removeItem('token');
         }
@@ -45,8 +45,7 @@ function OrdersView() {
     checkAdmin();
   }, []);
 
-
-  // Fetch all saved orders on component mount
+  // Fetch all saved orders
   useEffect(() => {
     const fetchSavedOrders = async () => {
       try {
@@ -56,7 +55,7 @@ function OrdersView() {
           headers: { Authorization: `Bearer ${token}` },
         });
         setSavedOrders(response.data);
-        setFilteredOrders(response.data); // Initialize filtered orders
+        setFilteredOrders(response.data);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching saved orders:', error);
@@ -70,7 +69,7 @@ function OrdersView() {
     fetchSavedOrders();
   }, [navigate]);
 
-  // Filter orders based on date range
+  // Filter orders by date range
   useEffect(() => {
     let filtered = savedOrders;
     if (startDate || endDate) {
@@ -78,10 +77,7 @@ function OrdersView() {
         const orderDate = new Date(item.created_at);
         const start = startDate ? new Date(startDate.setHours(0, 0, 0, 0)) : null;
         const end = endDate ? new Date(endDate.setHours(23, 59, 59, 999)) : null;
-        return (
-          (!start || orderDate >= start) &&
-          (!end || orderDate <= end)
-        );
+        return (!start || orderDate >= start) && (!end || orderDate <= end);
       });
     }
     setFilteredOrders(filtered);
@@ -92,9 +88,13 @@ function OrdersView() {
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Not authenticated');
-      await axios.put(`${BASE_URL}/save-items/${itemId}/`, { status: newStatus }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.put(
+        `${BASE_URL}/save-items/${itemId}/`,
+        { status: newStatus },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       setSavedOrders((prevOrders) =>
         prevOrders.map((item) =>
           item.id === itemId ? { ...item, status: newStatus } : item
@@ -139,6 +139,32 @@ function OrdersView() {
     }
   };
 
+  // Download the original image
+  const handleDownloadImage = async (imagePath) => {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error('Not authenticated');
+        const fullUrl = getImageUrl(imagePath); // Get the correct full URL
+        console.log('Downloading image from:', fullUrl); // Debug log
+        const response = await axios.get(fullUrl, {
+            headers: { Authorization: `Bearer ${token}` },
+            responseType: 'blob', // Handle binary data
+        });
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        const filename = imagePath.split('/').pop() || 'original_image.jpg'; // Extract filename
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error('Error downloading image:', error, 'imagePath:', imagePath);
+        alert('Failed to download image. Please try again.');
+    }
+};
+
   // Construct image URLs
   const getImageUrl = (path) => {
     if (!path) return 'https://via.placeholder.com/50x50?text=Image+Not+Found';
@@ -146,14 +172,15 @@ function OrdersView() {
     return `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
   };
 
-  // Calculate total cost for filtered orders
-  const totalCost = filteredOrders.reduce((sum, item) => sum + (item.total_price ? parseFloat(item.total_price) : 0), 0);
+  // Calculate total cost
+  const totalCost = filteredOrders.reduce(
+    (sum, item) => sum + (item.total_price ? parseFloat(item.total_price) : 0),
+    0
+  );
 
-  // Loading state
   if (loading) return <div className="text-center mt-5">Loading...</div>;
-
-  // Empty state
-  if (filteredOrders.length === 0) return <div className="text-center mt-5">No orders found for the selected date range</div>;
+  if (filteredOrders.length === 0)
+    return <div className="text-center mt-5">No orders found for the selected date range</div>;
 
   return (
     <div className="container mt-5">
@@ -215,7 +242,9 @@ function OrdersView() {
                     src={getImageUrl(item.adjusted_image || item.cropped_image || item.original_image)}
                     alt="Item"
                     style={{ height: '50px', width: '50px', objectFit: 'cover' }}
-                    onError={(e) => { e.target.src = 'https://via.placeholder.com/50x50?text=Image+Not+Found'; }}
+                    onError={(e) => {
+                      e.target.src = 'https://via.placeholder.com/50x50?text=Image+Not+Found';
+                    }}
                   />
                 </td>
                 <td>{item.user?.username || item.user || 'Unknown'}</td>
@@ -231,59 +260,25 @@ function OrdersView() {
                   {item.fit || 'None'}
                   {item.fit === 'bordered' && (
                     <div>
-                      <small>Border: {item.border_depth || 0}px, {item.border_color || '#ffffff'}</small>
+                      <small>
+                        Border: {item.border_depth || 0}px, {item.border_color || '#ffffff'}
+                      </small>
                     </div>
                   )}
                 </td>
                 <td>${item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00'}</td>
-                <td>
-                  {isAdmin ? (
-                    <select
-                      value={item.status || 'pending'}
-                      onChange={(e) => handleUpdateStatus(item.id, e.target.value)}
-                      className="form-select form-select-sm"
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                  ) : (
-                    item.status || 'Pending'
-                  )}
-                </td>
+                <td>{item.status}</td>
                 <td>{format(new Date(item.created_at), 'MM/dd/yyyy HH:mm:ss')}</td>
                 <td>
                   <div className="d-flex gap-2">
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => navigate('/', { state: { cartItem: {
-                        id: item.id,
-                        original_image: item.original_image ? getImageUrl(item.original_image) : null,
-                        cropped_image: item.cropped_image ? getImageUrl(item.cropped_image) : null,
-                        adjusted_image: item.adjusted_image ? getImageUrl(item.adjusted_image) : null,
-                        frame: item.frame || null,
-                        color_variant: item.color_variant || null,
-                        size_variant: item.size_variant || null,
-                        finish_variant: item.finish_variant || null,
-                        hanging_variant: item.hanging_variant || null,
-                        transform_x: item.transform_x || 0,
-                        transform_y: item.transform_y || 0,
-                        scale: item.scale || 1,
-                        rotation: item.rotation || 0,
-                        frame_rotation: item.frame_rotation || 0,
-                        print_width: item.print_width || null,
-                        print_height: item.print_height || null,
-                        print_unit: item.print_unit || 'inches',
-                        media_type: item.media_type || 'Photopaper',
-                        paper_type: item.paper_type || null,
-                        fit: item.fit || 'borderless',
-                        border_depth: item.border_depth || 0,
-                        border_color: item.border_color || '#ffffff',
-                        status: item.status || 'pending',
-                      } } })}
-                    >
-                      <i className="bi bi-pencil-square"></i> Edit
-                    </button>
+                    {(isAdmin || item.user?.id === user?.id) && item.original_image && (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleDownloadImage(item.original_image)}
+                      >
+                        <i className="bi bi-download"></i> Download
+                      </button>
+                    )}
                     {isAdmin && (
                       <button
                         className="btn btn-danger btn-sm"
@@ -300,7 +295,9 @@ function OrdersView() {
         </table>
       </div>
       <div className="mt-3">
-        <p><strong>Total Cost (Filtered Orders):</strong> ${totalCost.toFixed(2)}</p>
+        <p>
+          <strong>Total Cost (Filtered Orders):</strong> ${totalCost.toFixed(2)}
+        </p>
       </div>
     </div>
   );

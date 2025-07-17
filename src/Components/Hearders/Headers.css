@@ -924,3 +924,23 @@
     width: 70px;
   }
 }
+
+.crop-size-input {
+  width: 80px; /* Increased from 60px */
+  padding: 8px 10px; /* Slightly increased padding */
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 14px; /* Increased from 12px */
+  text-align: center;
+}
+.magnifier {
+  position: fixed;
+  width: 100px;
+  height: 100px;
+  border: 2px solid #000;
+  /* border-radius: 50%; */
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1001;
+}
