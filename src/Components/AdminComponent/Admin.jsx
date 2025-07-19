@@ -46,7 +46,7 @@ function Admin() {
         const [framesResponse, categoriesResponse, mackBoardsResponse] = await Promise.all([
           axios.get('http://82.180.146.4:8001/frames/'),
           axios.get('http://82.180.146.4:8001/categories/'),
-          axios.get('http://82.180.146.4:8001/mackboards/'),
+          axios.get('http://82.180.146.4:8001/mack_boards/'),
         ]);
         setFrames(framesResponse.data);
         setCategories(categoriesResponse.data);
@@ -178,7 +178,7 @@ function Admin() {
       if (mackBoardData.image) {
         formData.append('image', mackBoardData.image);
       }
-      const response = await axios.post('http://82.180.146.4:8001/mackboards/', formData, {
+      const response = await axios.post('http://82.180.146.4:8001/mack_boards/', formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
@@ -198,7 +198,7 @@ function Admin() {
             if (mackBoardData.image) {
               formData.append('image', mackBoardData.image);
             }
-            const response = await axios.post('http://82.180.146.4:8001/mackboards/', formData, {
+            const response = await axios.post('http://82.180.146.4:8001/mack_boards/', formData, {
               headers: {
                 Authorization: `Bearer ${newToken}`,
                 'Content-Type': 'multipart/form-data',

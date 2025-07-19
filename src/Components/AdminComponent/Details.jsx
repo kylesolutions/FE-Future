@@ -90,7 +90,7 @@ function Details() {
           axios.get('http://82.180.146.4:8001/categories/', {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get('http://82.180.146.4:8001/mackboards/', {
+          axios.get('http://82.180.146.4:8001/mack_boards/', {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -113,7 +113,7 @@ function Details() {
                 axios.get('http://82.180.146.4:8001/categories/', {
                   headers: { Authorization: `Bearer ${newToken}` },
                 }),
-                axios.get('http://82.180.146.4:8001/mackboards/', {
+                axios.get('http://82.180.146.4:8001/mack_boards/', {
                   headers: { Authorization: `Bearer ${newToken}` },
                 }),
               ]);
@@ -220,7 +220,7 @@ function Details() {
         formData.append('board_name', data.get('board_name'));
         const mackBoardImage = data.get('image');
         if (mackBoardImage && mackBoardImage.size > 0) formData.append('image', mackBoardImage);
-        url = `http://82.180.146.4:8001/mackboards/${id}/`;
+        url = `http://82.180.146.4:8001/mack_boards/${id}/`;
         break;
       default:
         return;
@@ -329,7 +329,7 @@ function Details() {
         url = `http://82.180.146.4:8001/categories/${id}/`;
         break;
       case 'mackboard':
-        url = `http://82.180.146.4:8001/mackboards/${id}/`;
+        url = `http://82.180.146.4:8001/mack_boards/${id}/`;
         break;
       default:
         return;
