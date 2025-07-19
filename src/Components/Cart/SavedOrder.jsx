@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = 'http://82.180.146.4:8001';
 
 function SavedOrder() {
   const [savedOrders, setSavedOrders] = useState([]);

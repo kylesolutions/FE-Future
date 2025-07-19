@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Upload, ZoomIn, ZoomOut, RotateCw, RotateCcw, Crop, RotateCw as RotateClockwise, MousePointerClick as RotateCounterClockwise, RefreshCw, Rewind, Plus, Check, X, Save, Search, Plus as PlusIcon, Minus } from 'lucide-react';
 import './Headers.css';
 
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = 'http://82.180.146.4:8001';
 const FALLBACK_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAABYSURBVHhe7cExAQAwDMCg7f8/8A2BFXgJAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACA+yU/AJSsIW0W2i4AAAAASUVORK5CYII=';
 const DEFAULT_CANVAS_WIDTH = 400;
 const DEFAULT_CANVAS_HEIGHT = 400;
