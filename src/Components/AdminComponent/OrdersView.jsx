@@ -220,7 +220,7 @@ function OrdersView() {
       </div>
       <div className="table-responsive">
         <table className="table table-striped table-bordered">
-          <thead className="table-dark">
+          <thead className="table">
             <tr>
               <th>Image</th>
               <th>User</th>
@@ -234,6 +234,7 @@ function OrdersView() {
               <th>Actions</th>
             </tr>
           </thead>
+          
           <tbody>
             {filteredOrders.map((item) => (
               <tr key={item.id}>

@@ -146,64 +146,54 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     } else if (isPrintOnly && selectedImage?.printOptions?.size?.width && selectedImage?.printOptions?.size?.height) {
       const widthInInches = selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.width / 2.54 : selectedImage.printOptions.size.width;
       const heightInInches = selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.height / 2.54 : selectedImage.printOptions.size.height;
-      const printWidth = widthInInches * DPI;
-      const printHeight = heightInInches * DPI;
-      const printAspect = widthInInches / heightInInches;
+      let printWidth = widthInInches * DPI;
+      let printHeight = heightInInches * DPI;
+      const borderDepth = getBorderDepthInPixels(selectedImage.printOptions.borderDepth, selectedImage.printOptions.borderUnit);
 
-      const margin = 40;
-      const maxPreviewWidth = canvas.width - 2 * margin;
-      const maxPreviewHeight = canvas.height - 2 * margin;
-
-      let previewWidth, previewHeight;
-      if (printAspect > maxPreviewWidth / maxPreviewHeight) {
-        previewWidth = maxPreviewWidth;
-        previewHeight = maxPreviewWidth / printAspect;
-      } else {
-        previewHeight = maxPreviewHeight;
-        previewWidth = maxPreviewHeight * printAspect;
+      if (selectedImage.printOptions.fit === 'bordered') {
+        printWidth += 2 * borderDepth;
+        printHeight += 2 * borderDepth;
       }
 
-      const previewX = (canvas.width - previewWidth) / 2;
-      const previewY = (canvas.height - previewHeight) / 2;
+      let scale = 1;
+      if (printWidth > DEFAULT_CANVAS_WIDTH || printHeight > DEFAULT_CANVAS_HEIGHT) {
+        const scaleX = DEFAULT_CANVAS_WIDTH / printWidth;
+        const scaleY = DEFAULT_CANVAS_HEIGHT / printHeight;
+        scale = Math.min(scaleX, scaleY);
+      }
 
       ctx.save();
-      ctx.beginPath();
-      ctx.rect(previewX, previewY, previewWidth, previewHeight);
-      ctx.clip();
-
-      const borderDepth = getBorderDepthInPixels(selectedImage.printOptions.borderDepth, selectedImage.printOptions.borderUnit);
-      const borderScale = previewWidth / printWidth;
+      ctx.translate(DEFAULT_CANVAS_WIDTH / 2, DEFAULT_CANVAS_HEIGHT / 2);
+      ctx.scale(scale, scale);
+      ctx.translate(-printWidth / 2, -printHeight / 2);
 
       if (selectedImage.printOptions.fit === 'borderless') {
-        const imageScale = Math.max(previewWidth / originalImage.width, previewHeight / originalImage.height);
-        const totalScale = imageScale * imageTransform.scale;
         ctx.save();
-        ctx.translate(previewX + previewWidth / 2, previewY + previewHeight / 2);
+        ctx.beginPath();
+        ctx.rect(0, 0, printWidth, printHeight);
+        ctx.clip();
+        ctx.translate(printWidth / 2, printHeight / 2);
         ctx.rotate((imageTransform.rotation * Math.PI) / 180);
-        ctx.scale(totalScale, totalScale);
+        ctx.scale(imageTransform.scale, imageTransform.scale);
         ctx.translate(imageTransform.x, imageTransform.y);
         ctx.drawImage(originalImage, -originalImage.width / 2, -originalImage.height / 2);
         ctx.restore();
       } else {
-        const borderDepthPreview = borderDepth * borderScale;
-        const imagePreviewWidth = previewWidth - 2 * borderDepthPreview;
-        const imagePreviewHeight = previewHeight - 2 * borderDepthPreview;
+        const borderColor = selectedImage.printOptions.borderColor || '#ffffff';
+        ctx.fillStyle = borderColor;
+        ctx.fillRect(0, 0, printWidth, printHeight);
 
-        if (imagePreviewWidth > 0 && imagePreviewHeight > 0) {
-          const borderColor = selectedImage.printOptions.borderColor || '#ffffff';
-          ctx.fillStyle = borderColor;
-          ctx.fillRect(previewX, previewY, previewWidth, previewHeight);
-
+        const imageWidth = printWidth - 2 * borderDepth;
+        const imageHeight = printHeight - 2 * borderDepth;
+        if (imageWidth > 0 && imageHeight > 0) {
           ctx.save();
-          ctx.translate(previewX + borderDepthPreview, previewY + borderDepthPreview);
+          ctx.translate(borderDepth, borderDepth);
           ctx.beginPath();
-          ctx.rect(0, 0, imagePreviewWidth, imagePreviewHeight);
+          ctx.rect(0, 0, imageWidth, imageHeight);
           ctx.clip();
-          const imageScale = Math.min(imagePreviewWidth / originalImage.width, imagePreviewHeight / originalImage.height);
-          const totalScale = imageScale * imageTransform.scale;
-          ctx.translate(imagePreviewWidth / 2, imagePreviewHeight / 2);
+          ctx.translate(imageWidth / 2, imageHeight / 2);
           ctx.rotate((imageTransform.rotation * Math.PI) / 180);
-          ctx.scale(totalScale, totalScale);
+          ctx.scale(imageTransform.scale, imageTransform.scale);
           ctx.translate(imageTransform.x, imageTransform.y);
           ctx.drawImage(originalImage, -originalImage.width / 2, -originalImage.height / 2);
           ctx.restore();
@@ -254,12 +244,10 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         const tempCtx = tempCanvas.getContext('2d');
         if (!tempCtx) return;
 
-        const scale = Math.min(tempCanvas.width / frameImage.width, tempCanvas.height / frameImage.height);
         tempCtx.save();
         tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
         tempCtx.rotate((frameTransform.rotation * Math.PI) / 180);
-        tempCtx.scale(scale, scale);
-        tempCtx.drawImage(frameImage, -frameImage.width / 2, -frameImage.height / 2);
+        tempCtx.drawImage(frameImage, -tempCanvas.width / 2, -tempCanvas.height / 2, tempCanvas.width, tempCanvas.height);
         tempCtx.restore();
 
         if (selectedImage.customFrameColor) {
@@ -1171,7 +1159,9 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     let adjustedFile;
     await new Promise((resolve) => {
       canvas.toBlob((blob) => {
-        adjustedFile = new File([blob], 'adjusted.png', { type: 'image/png' });
+        adjustedFile = new File([blob], `adjusted_${selectedImage.original_file?.name || 'image.png'}`, {
+          type: 'image/png',
+        });
         resolve();
       }, 'image/png', 1.0);
     });
@@ -1206,22 +1196,16 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       formData.append('frame_rotation', selectedImage.frameTransform.rotation);
     }
 
+    formData.append('adjusted_image', adjustedFile);
+
     if (!selectedImage.cartItemId) {
       if (selectedImage.original_file) {
-        const ext = selectedImage.original_file.name.split('.').pop();
-        const originalFile = new File([selectedImage.original_file], `original.${ext}`, {
-          type: selectedImage.original_file.type,
-        });
-        formData.append('original_image', originalFile);
+        formData.append('original_image', selectedImage.original_file);
       }
       if (selectedImage.cropped_file) {
-        const croppedFile = new File([selectedImage.cropped_file], 'cropped.png', {
-          type: 'image/png',
-        });
-        formData.append('cropped_image', croppedFile);
+        formData.append('cropped_image', selectedImage.cropped_file);
       }
     }
-    formData.append('adjusted_image', adjustedFile);
 
     const price = calculatePrice(selectedImage);
     formData.append('total_price', price.toFixed(2));
@@ -1538,7 +1522,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                     <div className="item-info">
                       <p className="item-price">${frame.price}</p>
                       <p className="item-name">{frame.name}</p>
-                    |</div>
+                    </div>
                   </div>
                 ))
               ) : (
