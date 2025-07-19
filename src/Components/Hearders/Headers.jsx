@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Upload, ZoomIn, ZoomOut, RotateCw, RotateCcw, Crop, RotateCw as RotateClockwise, MousePointerClick as RotateCounterClockwise, RefreshCw, Rewind, Plus, Check, X, Save, Search, Plus as PlusIcon, Minus } from 'lucide-react';
 import './Headers.css';
 
-const BASE_URL = 'http://82.180.146.4:8001';
+const BASE_URL = 'http://localhost:8000';
 const FALLBACK_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAABYSURBVHhe7cExAQAwDMCg7f8/8A2BFXgJAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACA+yU/AJSsIW0W2i4AAAAASUVORK5CYII=';
 const DEFAULT_CANVAS_WIDTH = 400;
 const DEFAULT_CANVAS_HEIGHT = 400;
@@ -15,6 +15,8 @@ const DPI = 96;
 function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedImages, isPrintOnly }) {
   const [frames, setFrames] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [mackBoards, setMackBoards] = useState([]);
+  const [mackBoardImage, setMackBoardImage] = React.useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [selectedImageId, setSelectedImageId] = useState(null);
@@ -47,6 +49,8 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     if (path.startsWith('blob:') || path.startsWith('data:') || path.startsWith('http')) return path;
     return `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
   }, []);
+
+
 
   const updatePrintOptions = (key, value) => {
     setUploadedImages((prev) =>
@@ -219,10 +223,47 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       let innerY = (canvas.height - innerHeight) / 2;
 
       if (hasFrame) {
+        const frameDepth = selectedImage?.printOptions?.frameDepth ? parseInt(selectedImage.printOptions.frameDepth) : 0;
+        const borderDepth = getBorderDepthInPixels(selectedImage?.printOptions?.borderDepth, selectedImage?.printOptions?.borderUnit);
+        const borderColor = selectedImage?.printOptions?.borderColor || '#ffffff';
+
+        let innerX = (canvas.width - innerWidth) / 2;
+        let innerY = (canvas.height - innerHeight) / 2;
+
         innerX += frameDepth;
         innerY += frameDepth;
         innerWidth -= 2 * frameDepth;
         innerHeight -= 2 * frameDepth;
+
+        let matDepth = 0;
+        if (selectedImage.mackBoard) {
+          matDepth = frameDepth || 20; // Fallback to 20px if frameDepth is 0
+          console.log('Drawing MackBoard with matDepth:', matDepth, 'MackBoard:', selectedImage.mackBoard.board_name);
+        }
+
+        if (matDepth > 0) {
+  if (mackBoardImage) {
+    const pattern = ctx.createPattern(mackBoardImage, 'repeat');
+    ctx.fillStyle = pattern;
+    console.log('Drawing MackBoard pattern at:', { innerX, innerY, innerWidth, innerHeight, matDepth });
+    ctx.fillRect(innerX, innerY, innerWidth, matDepth); // Top
+    ctx.fillRect(innerX, innerY + innerHeight - matDepth, innerWidth, matDepth); // Bottom
+    ctx.fillRect(innerX, innerY + matDepth, matDepth, innerHeight - 2 * matDepth); // Left
+    ctx.fillRect(innerX + innerWidth - matDepth, innerY + matDepth, matDepth, innerHeight - 2 * matDepth); // Right
+  } else {
+    ctx.fillStyle = '#f0f0f0';
+    console.warn('MackBoard image not loaded, using fallback color');
+    ctx.fillRect(innerX, innerY, innerWidth, matDepth); // Top
+    ctx.fillRect(innerX, innerY + innerHeight - matDepth, innerWidth, matDepth); // Bottom
+    ctx.fillRect(innerX, innerY + matDepth, matDepth, innerHeight - 2 * matDepth); // Left
+    ctx.fillRect(innerX + innerWidth - matDepth, innerY + matDepth, matDepth, innerHeight - 2 * matDepth); // Right
+  }
+
+  innerX += matDepth;
+  innerY += matDepth;
+  innerWidth -= 2 * matDepth;
+  innerHeight -= 2 * matDepth;
+}
 
         if (borderDepth > 0) {
           ctx.fillStyle = borderColor;
@@ -292,51 +333,54 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         ctx.restore();
       }
     }
-  }, [cropping, cropBox, originalImage, imageTransform, frameTransform, frameImage, selectedImageId, uploadedImages, isPrintOnly]);
+  }, [cropping, cropBox, originalImage, imageTransform, frameTransform, frameImage, selectedImageId, uploadedImages, isPrintOnly, mackBoardImage]);
 
   useEffect(() => {
     drawCanvas();
   }, [drawCanvas]);
 
-  const fetchFrames = async (categoryId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-      let url = `${BASE_URL}/frames/`;
-      if (categoryId) {
-        url += `?category_id=${categoryId}`;
-      }
-      const response = await axios.get(url, config);
-      setFrames(response.data);
-    } catch (error) {
-      console.error('Error fetching frames:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        localStorage.removeItem('token');
-        navigate('/');
-      }
-    }
-  };
-
   useEffect(() => {
-    fetchFrames(selectedCategory);
-  }, [selectedCategory, navigate]);
-
-  useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchFrames = async () => {
       try {
         const token = localStorage.getItem('token');
         const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-        const response = await axios.get(`${BASE_URL}/categories/`, config);
-        setCategories(response.data);
+        let url = `${BASE_URL}/frames/`;
+        if (selectedCategory) {
+          url += `?category_id=${selectedCategory}`;
+        }
+        const response = await axios.get(url, config);
+        setFrames(response.data);
       } catch (error) {
-        console.error('Error fetching categories:', error.response?.data || error.message);
+        console.error('Error fetching frames:', error.response?.data || error.message);
         if (error.response?.status === 401) {
           localStorage.removeItem('token');
           navigate('/');
         }
       }
     };
-    fetchCategories();
+    fetchFrames();
+  }, [selectedCategory, navigate]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+        const [categoriesResponse, mackBoardsResponse] = await Promise.all([
+          axios.get(`${BASE_URL}/categories/`, config),
+          axios.get(`${BASE_URL}/mackboards/`, config),
+        ]);
+        setCategories(categoriesResponse.data);
+        setMackBoards(mackBoardsResponse.data);
+      } catch (error) {
+        console.error('Error fetching data:', error.response?.data || error.message);
+        if (error.response?.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/');
+        }
+      }
+    };
+    fetchData();
   }, [navigate]);
 
   useEffect(() => {
@@ -409,6 +453,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           cropped_file: null,
           adjusted_file: null,
           frame: cartItem.frame,
+          mackBoard: cartItem.mackBoard || null,
           variants: {
             color: cartItem.color_variant || null,
             size: cartItem.size_variant || null,
@@ -510,6 +555,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           adjusted_file: null,
           adjusted_url: null,
           frame: null,
+          mackBoard: null,
           variants: { color: null, size: null, finish: null, hanging: null },
           transform: { x: 0, y: 0, scale, rotation: 0 },
           frameTransform: { rotation: 0 },
@@ -552,57 +598,63 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   };
 
   const handleCanvasMouseDown = useCallback((e) => {
-    if (!uploadedImages.find((img) => img.id === selectedImageId)) return;
+  if (!canvasRef.current) {
+    console.error('Canvas reference is not defined');
+    return;
+  }
+  if (!uploadedImages.find((img) => img.id === selectedImageId)) return;
 
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
+  const rect = canvasRef.current.getBoundingClientRect();
+  if (!rect) return;
 
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
 
-    if (!cropping && selectedImage?.printOptions.fit === 'bordered') {
-      const borderDepth = getBorderDepthInPixels(selectedImage.printOptions.borderDepth, selectedImage.printOptions.borderUnit);
-      if (
-        mouseY < borderDepth ||
-        mouseY > canvas.height - borderDepth ||
-        mouseX < borderDepth ||
-        mouseX > canvas.width - borderDepth
-      ) {
-        borderColorInputRef.current.click();
+  const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
+
+  if (!cropping && selectedImage?.printOptions.fit === 'bordered') {
+    const borderDepth = getBorderDepthInPixels(selectedImage.printOptions.borderDepth, selectedImage.printOptions.borderUnit);
+    if (
+      mouseY < borderDepth ||
+      mouseY > canvasRef.current.height - borderDepth ||
+      mouseX < borderDepth ||
+      mouseX > canvasRef.current.width - borderDepth
+    ) {
+      borderColorInputRef.current.click();
+      return;
+    }
+  }
+
+  if (cropping) {
+    const handleSize = 8;
+    const items = [
+      { x: cropBox.x - handleSize / 2, y: cropBox.y - handleSize / 2, type: 'nw' },
+      { x: cropBox.x + cropBox.width - handleSize / 2, y: cropBox.y - handleSize / 2, type: 'ne' },
+      { x: cropBox.x - handleSize / 2, y: cropBox.y + cropBox.height - handleSize / 2, type: 'sw' },
+      { x: cropBox.x + cropBox.width - handleSize / 2, y: cropBox.y + cropBox.height - handleSize / 2, type: 'se' },
+      { x: cropBox.x + cropBox.width / 2 - handleSize / 2, y: cropBox.y - handleSize / 2, type: 'n' },
+      { x: cropBox.x + cropBox.width / 2 - handleSize / 2, y: cropBox.y + cropBox.height - handleSize / 2, type: 's' },
+      { x: cropBox.x - handleSize / 2, y: cropBox.y + cropBox.height / 2 - handleSize / 2, type: 'w' },
+      { x: cropBox.x + cropBox.width - handleSize / 2, y: cropBox.y + cropBox.height / 2 - handleSize / 2, type: 'e' },
+    ];
+
+    for (const handle of items) {
+      if (mouseX >= handle.x && mouseX <= handle.x + handleSize && mouseY >= handle.y && mouseY <= handle.y + handleSize) {
+        setCropBox((prev) => ({ ...prev, isResizing: true, resizeHandle: handle.type, startX: mouseX, startY: mouseY }));
         return;
       }
     }
 
-    if (cropping) {
-      const handleSize = 8;
-      const items = [
-        { x: cropBox.x - handleSize / 2, y: cropBox.y - handleSize / 2, type: 'nw' },
-        { x: cropBox.x + cropBox.width - handleSize / 2, y: cropBox.y - handleSize / 2, type: 'ne' },
-        { x: cropBox.x - handleSize / 2, y: cropBox.y + cropBox.height - handleSize / 2, type: 'sw' },
-        { x: cropBox.x + cropBox.width - handleSize / 2, y: cropBox.y + cropBox.height - handleSize / 2, type: 'se' },
-        { x: cropBox.x + cropBox.width / 2 - handleSize / 2, y: cropBox.y - handleSize / 2, type: 'n' },
-        { x: cropBox.x + cropBox.width / 2 - handleSize / 2, y: cropBox.y + cropBox.height - handleSize / 2, type: 's' },
-        { x: cropBox.x - handleSize / 2, y: cropBox.y + cropBox.height / 2 - handleSize / 2, type: 'w' },
-        { x: cropBox.x + cropBox.width - handleSize / 2, y: cropBox.y + cropBox.height / 2 - handleSize / 2, type: 'e' },
-      ];
-
-      for (const handle of items) {
-        if (mouseX >= handle.x && mouseX <= handle.x + handleSize && mouseY >= handle.y && mouseY <= handle.y + handleSize) {
-          setCropBox((prev) => ({ ...prev, isResizing: true, resizeHandle: handle.type, startX: mouseX, startY: mouseY }));
-          return;
-        }
-      }
-
-      if (mouseX >= cropBox.x && mouseX <= cropBox.x + cropBox.width && mouseY >= cropBox.y && mouseY <= cropBox.y + cropBox.height) {
-        setCropBox((prev) => ({ ...prev, startX: mouseX - cropBox.x, startY: mouseY - cropBox.y }));
-        setIsDragging(true);
-        return;
-      }
-    } else {
+    if (mouseX >= cropBox.x && mouseX <= cropBox.x + cropBox.width && mouseY >= cropBox.y && mouseY <= cropBox.y + cropBox.height) {
+      setCropBox((prev) => ({ ...prev, startX: mouseX - cropBox.x, startY: mouseY - cropBox.y }));
       setIsDragging(true);
-      setDragStart({ x: mouseX, y: mouseY });
+      return;
     }
-  }, [cropping, cropBox, selectedImageId, uploadedImages]);
+  } else {
+    setIsDragging(true);
+    setDragStart({ x: mouseX, y: mouseY });
+  }
+}, [cropping, cropBox, selectedImageId, uploadedImages]);
 
   const handleCanvasMouseMove = useCallback((e) => {
     if (!uploadedImages.find((img) => img.id === selectedImageId)) return;
@@ -815,7 +867,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         const newTransform = { x: 0, y: 0, scale, rotation: 0 };
         const newFrameTransform = { rotation: 0 };
         setUploadedImages((prev) =>
-          prev.map((img) => (img.id === selectedImageId ? { ...img, cropped_file: null, cropped_url: null, adjusted_file: null, adjusted_url: null, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false }, customFrameColor: null, printOptions: { ...img.printOptions, frameDepth: '0' } } : img))
+          prev.map((img) => (img.id === selectedImageId ? { ...img, cropped_file: null, cropped_url: null, adjusted_file: null, adjusted_url: null, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false }, customFrameColor: null, printOptions: { ...img.printOptions, frameDepth: '0' }, mackBoard: null } : img))
         );
         setImageTransform(newTransform);
         setFrameTransform(newFrameTransform);
@@ -985,7 +1037,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         const newTransform = { x: 0, y: 0, scale, rotation: 0 };
         const newFrameTransform = { rotation: 0 };
         setUploadedImages((prev) =>
-          prev.map((img) => (img.id === selectedImageId ? { ...img, cropped_file: null, cropped_url: null, adjusted_file: null, adjusted_url: null, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false }, customFrameColor: null, printOptions: { ...img.printOptions, frameDepth: '0' } } : img))
+          prev.map((img) => (img.id === selectedImageId ? { ...img, cropped_file: null, cropped_url: null, adjusted_file: null, adjusted_url: null, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false }, customFrameColor: null, printOptions: { ...img.printOptions, frameDepth: '0' }, mackBoard: null } : img))
         );
         setImageTransform(newTransform);
         setFrameTransform(newFrameTransform);
@@ -1022,7 +1074,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         setUploadedImages((prev) =>
           prev.map((img) =>
             img.id === selectedImageId
-              ? { ...img, frame, variants: { color: null, size: null, finish: null, hanging: null }, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false }, customFrameColor: null, cartItemId: img.cartItemId, printOptions: { ...img.printOptions, frameDepth: '0' } }
+              ? { ...img, frame, variants: { color: null, size: null, finish: null, hanging: null }, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false }, customFrameColor: null, cartItemId: img.cartItemId, printOptions: { ...img.printOptions, frameDepth: '0' }, mackBoard: null }
               : img
           )
         );
@@ -1107,7 +1159,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     setUploadedImages((prev) =>
       prev.map((img) =>
         img.id === selectedImageId
-          ? { ...img, frame: null, variants: { color: null, size: null, finish: null, hanging: null }, frameTransform: { rotation: 0 }, customSize: { width: '', height: '', applied: false }, customFrameColor: null, printOptions: { ...img.printOptions, frameDepth: '0' } }
+          ? { ...img, frame: null, mackBoard: null, variants: { color: null, size: null, finish: null, hanging: null }, frameTransform: { rotation: 0 }, customSize: { width: '', height: '', applied: false }, customFrameColor: null, printOptions: { ...img.printOptions, frameDepth: '0' } }
           : img
       )
     );
@@ -1188,6 +1240,9 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     formData.append('border_unit', selectedImage.printOptions.borderUnit);
     formData.append('frame_depth', selectedImage.printOptions.frameDepth || '0');
     formData.append('custom_frame_color', selectedImage.customFrameColor || '');
+    if (selectedImage.mackBoard) {
+      formData.append('mack_board', selectedImage.mackBoard.id);
+    }
 
     if (!isPrintOnly) {
       formData.append('frame', selectedImage.frame.id);
@@ -1260,6 +1315,27 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       }
     }
   };
+
+ useEffect(() => {
+  const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
+  if (selectedImage?.mackBoard?.image) {
+    const url = getImageUrl(selectedImage.mackBoard.image);
+    console.log('Attempting to load MackBoard image from:', url);
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.src = url;
+    img.onload = () => {
+      console.log('MackBoard image loaded successfully from:', url);
+      setMackBoardImage(img);
+    };
+    img.onerror = () => {
+      console.error('Failed to load MackBoard image from:', url);
+      setMackBoardImage(null);
+    };
+  } else {
+    setMackBoardImage(null);
+  }
+}, [selectedImageId, uploadedImages, getImageUrl]);
 
   if (uploadedImages.length === 0) {
     return (
@@ -1359,7 +1435,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     return (
       <div className="print-options-panel">
         <h3>Print Options</h3>
-        
+
         <div className="option-group">
           <label>Size</label>
           <div className="size-controls">
@@ -1538,7 +1614,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                     <div className="item-info">
                       <p className="item-price">${frame.price}</p>
                       <p className="item-name">{frame.name}</p>
-                    |</div>
+                    </div>
                   </div>
                 ))
               ) : (
@@ -1739,6 +1815,54 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           </div>
         );
 
+      case 'mackboard':
+        return (
+          <div className="category-panel">
+            <h3>Select MackBoard</h3>
+            <div className="items-grid">
+              {selectedImage?.frame ? (
+                <>
+                  <div
+                    className={`item-card ${selectedImage.mackBoard === null ? 'selected' : ''}`}
+                    onClick={() => setUploadedImages(prev => prev.map(img => img.id === selectedImageId ? { ...img, mackBoard: null } : img))}
+                  >
+                    <div className="item-image">
+                      <img src={FALLBACK_IMAGE} alt="No MackBoard" />
+                    </div>
+                    <div className="item-info">
+                      <p className="item-name">No MackBoard</p>
+                    </div>
+                  </div>
+                  {mackBoards.length > 0 ? (
+                    mackBoards.map((mackBoard) => (
+                      <div
+                        key={mackBoard.id}
+                        className={`item-card ${selectedImage.mackBoard?.id === mackBoard.id ? 'selected' : ''}`}
+                        onClick={() => setUploadedImages(prev => prev.map(img => img.id === selectedImageId ? { ...img, mackBoard } : img))}
+                      >
+                        <div className="item-image">
+                          <img
+                            src={getImageUrl(mackBoard.image)}
+                            alt={mackBoard.board_name}
+                            onError={handleImageError}
+                          />
+                        </div>
+                        <div className="item-info">
+                          <p className="item-name">{mackBoard.board_name}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="no-items">No MackBoards available</div>
+                  )}
+                </>
+              ) : (
+                <div className="no-items">Please select a frame first</div>
+              )}
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -1913,7 +2037,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       <div className="options-section">
         <div className="options-container">
           {renderPrintOptions()}
-          
+
           {!isPrintOnly && renderCategoryContent()}
 
           <div className="summary-section">
@@ -1946,6 +2070,10 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                   <div className="summary-item">
                     <span>Frame:</span>
                     <span>{selectedImage?.frame?.name || 'None'}</span>
+                  </div>
+                  <div className="summary-item">
+                    <span>MackBoard:</span>
+                    <span>{selectedImage?.mackBoard?.board_name || 'None'}</span>
                   </div>
                   <div className="summary-item">
                     <span>Frame Color:</span>

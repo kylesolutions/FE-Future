@@ -9,6 +9,7 @@ function Admin() {
   const [mode, setMode] = useState('create'); // 'create', 'add_variants', or 'edit'
   const [frames, setFrames] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [mackBoards, setMackBoards] = useState([]); // State for MackBoards
   const [selectedFrameId, setSelectedFrameId] = useState('');
   const [frameData, setFrameData] = useState({
     name: '',
@@ -17,9 +18,10 @@ function Admin() {
     inner_height: '',
     image: null,
     corner_image: null,
-    category_id: '', // Add category_id
+    category_id: '',
   });
-  const [categoryData, setCategoryData] = useState({ frameCategory: '' }); // For creating new categories
+  const [categoryData, setCategoryData] = useState({ frameCategory: '' });
+  const [mackBoardData, setMackBoardData] = useState({ board_name: '', image: null }); // State for MackBoard form
   const [variants, setVariants] = useState({
     color: [{ color_name: '', image: null, corner_image: null, image_key: `color_0_${Date.now()}`, price: '' }],
     size: [{ size_name: '', inner_width: '', inner_height: '', image: null, corner_image: null, image_key: `size_0_${Date.now()}`, price: '' }],
@@ -37,19 +39,21 @@ function Admin() {
     }
   }, [user, navigate]);
 
-  // Fetch frames and categories
+  // Fetch frames, categories, and MackBoards
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [framesResponse, categoriesResponse] = await Promise.all([
-          axios.get('http://82.180.146.4:8001/frames/'),
-          axios.get('http://82.180.146.4:8001/categories/')
+        const [framesResponse, categoriesResponse, mackBoardsResponse] = await Promise.all([
+          axios.get('http://localhost:8000/frames/'),
+          axios.get('http://localhost:8000/categories/'),
+          axios.get('http://localhost:8000/mackboards/'),
         ]);
         setFrames(framesResponse.data);
         setCategories(categoriesResponse.data);
+        setMackBoards(mackBoardsResponse.data);
       } catch (err) {
         console.error('Failed to fetch data:', err);
-        setError('Failed to load frames or categories.');
+        setError('Failed to load frames, categories, or MackBoards.');
       }
     };
     fetchData();
@@ -60,7 +64,7 @@ function Admin() {
     try {
       const refresh = localStorage.getItem('refresh_token');
       if (!refresh) throw new Error('No refresh token available');
-      const response = await axios.post('http://82.180.146.4:8001/api/token/refresh/', { refresh });
+      const response = await axios.post('http://localhost:8000/api/token/refresh/', { refresh });
       localStorage.setItem('token', response.data.access);
       return response.data.access;
     } catch (err) {
@@ -80,6 +84,11 @@ function Admin() {
   const handleCategoryChange = (e) => {
     const { name, value } = e.target;
     setCategoryData({ ...categoryData, [name]: value });
+  };
+
+  const handleMackBoardChange = (e) => {
+    const { name, value, files } = e.target;
+    setMackBoardData({ ...mackBoardData, [name]: files ? files[0] : value });
   };
 
   const handleVariantChange = (variantType, index, e) => {
@@ -120,7 +129,7 @@ function Admin() {
         navigate('/login');
         return;
       }
-      const response = await axios.post('http://82.180.146.4:8001/categories/', categoryData, {
+      const response = await axios.post('http://localhost:8000/categories/', categoryData, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setCategories([...categories, response.data]);
@@ -132,7 +141,7 @@ function Admin() {
         const newToken = await refreshToken();
         if (newToken) {
           try {
-            const response = await axios.post('http://82.180.146.4:8001/categories/', categoryData, {
+            const response = await axios.post('http://localhost:8000/categories/', categoryData, {
               headers: { Authorization: `Bearer ${newToken}` },
             });
             setCategories([...categories, response.data]);
@@ -154,6 +163,66 @@ function Admin() {
     }
   };
 
+  const handleMackBoardSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('board_name', mackBoardData.board_name);
+      if (mackBoardData.image) {
+        formData.append('image', mackBoardData.image);
+      }
+      const response = await axios.post('http://localhost:8000/mackboards/', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setMackBoards([...mackBoards, response.data]);
+      setMackBoardData({ board_name: '', image: null });
+      alert('MackBoard created successfully!');
+    } catch (error) {
+      console.error('MackBoard creation error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (newToken) {
+          try {
+            const formData = new FormData();
+            formData.append('board_name', mackBoardData.board_name);
+            if (mackBoardData.image) {
+              formData.append('image', mackBoardData.image);
+            }
+            const response = await axios.post('http://localhost:8000/mackboards/', formData, {
+              headers: {
+                Authorization: `Bearer ${newToken}`,
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+            setMackBoards([...mackBoards, response.data]);
+            setMackBoardData({ board_name: '', image: null });
+            alert('MackBoard created successfully!');
+          } catch (retryError) {
+            setError('Session expired. Please log in again.');
+            navigate('/login');
+          }
+        } else {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+        }
+      } else {
+        setError('Failed to create MackBoard: ' + (error.response?.data?.detail || error.message));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -168,7 +237,6 @@ function Admin() {
       }
 
       if (mode === 'create') {
-        // Create new frame
         const formData = new FormData();
         for (const key in frameData) {
           if (frameData[key] !== '' && frameData[key] !== null) {
@@ -179,7 +247,7 @@ function Admin() {
         for (let [key, value] of formData.entries()) {
           console.log(`${key}: ${value}`);
         }
-        const frameResponse = await axios.post('http://82.180.146.4:8001/frames/', formData, {
+        const frameResponse = await axios.post('http://localhost:8000/frames/', formData, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
@@ -187,9 +255,8 @@ function Admin() {
         });
         frameId = frameResponse.data.id;
         console.log('Frame created:', frameResponse.data);
-        setFrames([...frames, frameResponse.data]); // Update frames list
+        setFrames([...frames, frameResponse.data]);
       } else if (mode === 'edit') {
-        // Update existing frame
         frameId = selectedFrameId;
         if (!frameId) {
           setError('Please select a frame to edit.');
@@ -205,7 +272,7 @@ function Admin() {
         for (let [key, value] of formData.entries()) {
           console.log(`${key}: ${value}`);
         }
-        const frameResponse = await axios.put(`http://82.180.146.4:8001/frames/${frameId}/`, formData, {
+        const frameResponse = await axios.put(`http://localhost:8000/frames/${frameId}/`, formData, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
@@ -214,7 +281,6 @@ function Admin() {
         console.log('Frame updated:', frameResponse.data);
         setFrames(frames.map(f => f.id === Number(frameId) ? frameResponse.data : f));
       } else {
-        // Add variants to existing frame
         frameId = selectedFrameId;
         if (!frameId) {
           setError('Please select a frame to add variants.');
@@ -222,7 +288,6 @@ function Admin() {
         }
       }
 
-      // Prepare variants for bulk creation
       const variantsData = [];
       for (const variantType in variants) {
         variants[variantType].forEach((variant, index) => {
@@ -268,7 +333,7 @@ function Admin() {
         }
 
         const variantResponse = await axios.post(
-          `http://82.180.146.4:8001/frames/${frameId}/variants/`,
+          `http://localhost:8000/frames/${frameId}/variants/`,
           variantFormData,
           {
             headers: {
@@ -318,7 +383,7 @@ function Admin() {
                   formData.append(key, frameData[key]);
                 }
               }
-              frameResponse = await axios.post('http://82.180.146.4:8001/frames/', formData, {
+              frameResponse = await axios.post('http://localhost:8000/frames/', formData, {
                 headers: {
                   Authorization: `Bearer ${newToken}`,
                   'Content-Type': 'multipart/form-data',
@@ -334,7 +399,7 @@ function Admin() {
                   formData.append(key, frameData[key]);
                 }
               }
-              frameResponse = await axios.put(`http://82.180.146.4:8001/frames/${frameId}/`, formData, {
+              frameResponse = await axios.put(`http://localhost:8000/frames/${frameId}/`, formData, {
                 headers: {
                   Authorization: `Bearer ${newToken}`,
                   'Content-Type': 'multipart/form-data',
@@ -381,7 +446,7 @@ function Admin() {
               });
 
               await axios.post(
-                `http://82.180.146.4:8001/frames/${frameId}/variants/`,
+                `http://localhost:8000/frames/${frameId}/variants/`,
                 variantFormData,
                 {
                   headers: {
@@ -442,7 +507,7 @@ function Admin() {
   const handleEditFrame = async (frameId) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`http://82.180.146.4:8001/frames/${frameId}/`, {
+      const response = await axios.get(`http://localhost:8000/frames/${frameId}/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setFrameData({
@@ -450,7 +515,7 @@ function Admin() {
         price: response.data.price,
         inner_width: response.data.inner_width,
         inner_height: response.data.inner_height,
-        image: null, // File inputs are cleared; user must re-upload if updating
+        image: null,
         corner_image: null,
         category_id: response.data.category?.id || '',
       });
@@ -488,8 +553,35 @@ function Admin() {
         </button>
       </form>
 
+      <h3>Create MackBoard</h3>
+      <form onSubmit={handleMackBoardSubmit} className="mb-4">
+        <div className="mb-3">
+          <label className="form-label">Board Name</label>
+          <input
+            type="text"
+            name="board_name"
+            value={mackBoardData.board_name}
+            onChange={handleMackBoardChange}
+            className="form-control"
+            required
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Image (Optional)</label>
+          <input
+            type="file"
+            name="image"
+            onChange={handleMackBoardChange}
+            className="form-control"
+            accept="image/*"
+          />
+        </div>
+        <button type="submit" className="btn btn-primary" disabled={isLoading}>
+          {isLoading ? 'Creating...' : 'Create MackBoard'}
+        </button>
+      </form>
+
       <h2>{mode === 'create' ? 'Create Frame' : mode === 'edit' ? 'Edit Frame' : 'Add Variants to Frame'}</h2>
-      {/* Frame Form */}
       <div className="mb-3">
         <label className="form-label">Mode</label>
         <select
