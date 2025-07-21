@@ -368,7 +368,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
         const [categoriesResponse, mackBoardsResponse] = await Promise.all([
           axios.get(`${BASE_URL}/categories/`, config),
-          axios.get(`${BASE_URL}/mackboards/`, config),
+          axios.get(`${BASE_URL}/mack_boards/`, config),
         ]);
         setCategories(categoriesResponse.data);
         setMackBoards(mackBoardsResponse.data);
@@ -1241,7 +1241,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     formData.append('frame_depth', selectedImage.printOptions.frameDepth || '0');
     formData.append('custom_frame_color', selectedImage.customFrameColor || '');
     if (selectedImage.mackBoard) {
-      formData.append('mack_board', selectedImage.mackBoard.id);
+      formData.append('mack_boards', selectedImage.mackBoard.id);
     }
 
     if (!isPrintOnly) {
