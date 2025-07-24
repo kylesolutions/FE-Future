@@ -349,6 +349,18 @@
   /* transition: border-color 0.2s ease; */
 }
 
+.mac-input{
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-top: 10px;
+}
+.mackboard-width-control{
+  margin-top: 10px;
+}
+
 .frame-input:focus {
   outline: none;
   border-color:#FFD700;
@@ -935,10 +947,9 @@
 }
 .magnifier {
   position: fixed;
-  width: 100px;
-  height: 100px;
+  width: 200px;
+  height: 200px;
   border: 2px solid #000;
-  /* border-radius: 50%; */
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   pointer-events: none;

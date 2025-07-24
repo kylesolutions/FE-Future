@@ -16,7 +16,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   const [frames, setFrames] = useState([]);
   const [categories, setCategories] = useState([]);
   const [mackBoards, setMackBoards] = useState([]);
-  const [mackBoardImage, setMackBoardImage] = React.useState(null);
+  const [mackBoardImages, setMackBoardImages] = useState({});
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [selectedImageId, setSelectedImageId] = useState(null);
@@ -37,7 +37,12 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   const [isMagnified, setIsMagnified] = useState(false);
   const [isMagnifierActive, setIsMagnifierActive] = useState(false);
   const [magnificationFactor, setMagnificationFactor] = useState(5);
+  const [magnifiedCanvasUrl, setMagnifiedCanvasUrl] = useState(null);
   const [magnifierPosition, setMagnifierPosition] = useState({ x: 0, y: 0 });
+  const [isMackBoardEnabled, setIsMackBoardEnabled] = useState(false);
+  const [showMackBoardSelector, setShowMackBoardSelector] = useState(false);
+  const [addPosition, setAddPosition] = useState('top');
+  const [mackBoardColor, setMackBoardColor] = useState('#ffffff'); // New state for Mack board color
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const borderColorInputRef = useRef(null);
@@ -50,7 +55,19 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     return `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
   }, []);
 
-
+  const loadMackBoardImage = (mackBoard) => {
+    if (!mackBoardImages[mackBoard.id]) {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.src = getImageUrl(mackBoard.image);
+      img.onload = () => {
+        setMackBoardImages(prev => ({ ...prev, [mackBoard.id]: img }));
+      };
+      img.onerror = () => {
+        console.error(`Failed to load image for MackBoard ${mackBoard.id}`);
+      };
+    }
+  };
 
   const updatePrintOptions = (key, value) => {
     setUploadedImages((prev) =>
@@ -63,27 +80,42 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   };
 
   const getBorderDepthInPixels = (borderDepth, borderUnit) => {
-    if (borderUnit === 'px') {
-      return parseInt(borderDepth) || 0;
-    } else if (borderUnit === 'inches') {
-      return (parseFloat(borderDepth) || 0) * DPI;
-    } else if (borderUnit === 'cm') {
-      return (parseFloat(borderDepth) / 2.54 || 0) * DPI;
-    }
+    if (borderUnit === 'px') return parseInt(borderDepth) || 0;
+    if (borderUnit === 'inches') return (parseFloat(borderDepth) || 0) * DPI;
+    if (borderUnit === 'cm') return (parseFloat(borderDepth) / 2.54 || 0) * DPI;
     return 0;
   };
+
+  useEffect(() => {
+    const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
+    setIsMackBoardEnabled(selectedImage ? selectedImage.mackBoards.length > 0 : false);
+  }, [selectedImageId, uploadedImages]);
+
+  useEffect(() => {
+    if (!isMackBoardEnabled) {
+      setUploadedImages(prev => prev.map(img => img.id === selectedImageId ? { ...img, mackBoards: [] } : img));
+    }
+  }, [isMackBoardEnabled, selectedImageId]);
 
   useEffect(() => {
     const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
     if (selectedImage && !isPrintOnly && selectedImage.frame && originalImage) {
       const borderDepth = getBorderDepthInPixels(selectedImage.printOptions.borderDepth, selectedImage.printOptions.borderUnit);
       const frameDepth = parseInt(selectedImage.printOptions.frameDepth) || 0;
+      const totalMatDepth = selectedImage.mackBoards.reduce((sum, item) => sum + (item.width || 20), 0);
       const innerWidth = (selectedImage.variants?.size?.inner_width || selectedImage.frame.inner_width || DEFAULT_INNER_WIDTH) - 2 * frameDepth;
       const innerHeight = (selectedImage.variants?.size?.inner_height || selectedImage.frame.inner_height || DEFAULT_INNER_HEIGHT) - 2 * frameDepth;
-      const effectiveInnerWidth = innerWidth - 2 * borderDepth;
-      const effectiveInnerHeight = innerHeight - 2 * borderDepth;
+      const effectiveInnerWidth = innerWidth - 2 * totalMatDepth - 2 * borderDepth;
+      const effectiveInnerHeight = innerHeight - 2 * totalMatDepth - 2 * borderDepth;
       if (effectiveInnerWidth > 0 && effectiveInnerHeight > 0) {
-        const scale = Math.min(effectiveInnerWidth / originalImage.width, effectiveInnerHeight / originalImage.height);
+        const theta = (selectedImage.transform.rotation * Math.PI) / 180;
+        const cosTheta = Math.abs(Math.cos(theta));
+        const sinTheta = Math.abs(Math.sin(theta));
+        const widthAfterRotation = originalImage.width * cosTheta + originalImage.height * sinTheta;
+        const heightAfterRotation = originalImage.width * sinTheta + originalImage.height * cosTheta;
+        const scaleToFitWidth = effectiveInnerWidth / widthAfterRotation;
+        const scaleToFitHeight = effectiveInnerHeight / heightAfterRotation;
+        const scale = Math.min(scaleToFitWidth, scaleToFitHeight);
         const currentTransform = selectedImage.transform;
         const newTransform = { ...currentTransform, scale };
         if (currentTransform.scale !== scale) {
@@ -223,47 +255,34 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       let innerY = (canvas.height - innerHeight) / 2;
 
       if (hasFrame) {
-        const frameDepth = selectedImage?.printOptions?.frameDepth ? parseInt(selectedImage.printOptions.frameDepth) : 0;
-        const borderDepth = getBorderDepthInPixels(selectedImage?.printOptions?.borderDepth, selectedImage?.printOptions?.borderUnit);
-        const borderColor = selectedImage?.printOptions?.borderColor || '#ffffff';
-
-        let innerX = (canvas.width - innerWidth) / 2;
-        let innerY = (canvas.height - innerHeight) / 2;
-
         innerX += frameDepth;
         innerY += frameDepth;
         innerWidth -= 2 * frameDepth;
         innerHeight -= 2 * frameDepth;
 
-        let matDepth = 0;
-        if (selectedImage.mackBoard) {
-          matDepth = frameDepth || 20; // Fallback to 20px if frameDepth is 0
-          console.log('Drawing MackBoard with matDepth:', matDepth, 'MackBoard:', selectedImage.mackBoard.board_name);
+        if (selectedImage.mackBoards && selectedImage.mackBoards.length > 0) {
+          selectedImage.mackBoards.forEach((mackBoardItem) => {
+            const matDepth = mackBoardItem.width || 20;
+            if (matDepth > 0) {
+              const mackBoardImage = mackBoardImages[mackBoardItem.mackBoard.id];
+              if (mackBoardImage) {
+                const pattern = ctx.createPattern(mackBoardImage, 'repeat');
+                ctx.fillStyle = pattern;
+              } else {
+                ctx.fillStyle = mackBoardColor; // Use selected Mack board color
+              }
+              ctx.fillRect(innerX, innerY, innerWidth, matDepth); // Top
+              ctx.fillRect(innerX, innerY + innerHeight - matDepth, innerWidth, matDepth); // Bottom
+              ctx.fillRect(innerX, innerY + matDepth, matDepth, innerHeight - 2 * matDepth); // Left
+              ctx.fillRect(innerX + innerWidth - matDepth, innerY + matDepth, matDepth, innerHeight - 2 * matDepth); // Right
+
+              innerX += matDepth;
+              innerY += matDepth;
+              innerWidth -= 2 * matDepth;
+              innerHeight -= 2 * matDepth;
+            }
+          });
         }
-
-        if (matDepth > 0) {
-  if (mackBoardImage) {
-    const pattern = ctx.createPattern(mackBoardImage, 'repeat');
-    ctx.fillStyle = pattern;
-    console.log('Drawing MackBoard pattern at:', { innerX, innerY, innerWidth, innerHeight, matDepth });
-    ctx.fillRect(innerX, innerY, innerWidth, matDepth); // Top
-    ctx.fillRect(innerX, innerY + innerHeight - matDepth, innerWidth, matDepth); // Bottom
-    ctx.fillRect(innerX, innerY + matDepth, matDepth, innerHeight - 2 * matDepth); // Left
-    ctx.fillRect(innerX + innerWidth - matDepth, innerY + matDepth, matDepth, innerHeight - 2 * matDepth); // Right
-  } else {
-    ctx.fillStyle = '#f0f0f0';
-    console.warn('MackBoard image not loaded, using fallback color');
-    ctx.fillRect(innerX, innerY, innerWidth, matDepth); // Top
-    ctx.fillRect(innerX, innerY + innerHeight - matDepth, innerWidth, matDepth); // Bottom
-    ctx.fillRect(innerX, innerY + matDepth, matDepth, innerHeight - 2 * matDepth); // Left
-    ctx.fillRect(innerX + innerWidth - matDepth, innerY + matDepth, matDepth, innerHeight - 2 * matDepth); // Right
-  }
-
-  innerX += matDepth;
-  innerY += matDepth;
-  innerWidth -= 2 * matDepth;
-  innerHeight -= 2 * matDepth;
-}
 
         if (borderDepth > 0) {
           ctx.fillStyle = borderColor;
@@ -278,13 +297,23 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           innerHeight -= 2 * borderDepth;
         }
 
+        const theta = (imageTransform.rotation * Math.PI) / 180;
+        const cosTheta = Math.abs(Math.cos(theta));
+        const sinTheta = Math.abs(Math.sin(theta));
+        const widthAfterRotation = originalImage.width * cosTheta + originalImage.height * sinTheta;
+        const heightAfterRotation = originalImage.width * sinTheta + originalImage.height * cosTheta;
+        const scaleToFitWidth = innerWidth / widthAfterRotation;
+        const scaleToFitHeight = innerHeight / heightAfterRotation;
+        const scaleToFit = Math.min(scaleToFitWidth, scaleToFitHeight);
+        const effectiveScale = Math.min(imageTransform.scale, scaleToFit);
+
         ctx.save();
         ctx.beginPath();
         ctx.rect(innerX, innerY, innerWidth, innerHeight);
         ctx.clip();
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate((imageTransform.rotation * Math.PI) / 180);
-        ctx.scale(imageTransform.scale, imageTransform.scale);
+        ctx.translate(innerX + innerWidth / 2, innerY + innerHeight / 2);
+        ctx.rotate(theta);
+        ctx.scale(effectiveScale, effectiveScale);
         ctx.translate(imageTransform.x, imageTransform.y);
         ctx.drawImage(originalImage, -originalImage.width / 2, -originalImage.height / 2);
         ctx.restore();
@@ -333,7 +362,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         ctx.restore();
       }
     }
-  }, [cropping, cropBox, originalImage, imageTransform, frameTransform, frameImage, selectedImageId, uploadedImages, isPrintOnly, mackBoardImage]);
+  }, [cropping, cropBox, originalImage, imageTransform, frameTransform, frameImage, selectedImageId, uploadedImages, isPrintOnly, mackBoardImages, mackBoardColor]);
 
   useEffect(() => {
     drawCanvas();
@@ -345,9 +374,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         const token = localStorage.getItem('token');
         const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
         let url = `${BASE_URL}/frames/`;
-        if (selectedCategory) {
-          url += `?category_id=${selectedCategory}`;
-        }
+        if (selectedCategory) url += `?category_id=${selectedCategory}`;
         const response = await axios.get(url, config);
         setFrames(response.data);
       } catch (error) {
@@ -413,6 +440,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         setOriginalImage(img);
         setFrameTransform({ rotation: selectedImage.frameTransform?.rotation || 0 });
         setCustomSize(selectedImage.customSize || { width: '', height: '', applied: false });
+        setMackBoardColor(selectedImage.mackBoardColor || '#ffffff'); // Set initial Mack board color
       }
     };
   }, [selectedImageId, uploadedImages, getImageUrl]);
@@ -421,18 +449,13 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
     if (selectedImage && selectedImage.frame) {
       let frameSrc;
-      if (selectedImage.customFrameColor) {
-        frameSrc = selectedImage.frame.image;
-      } else {
-        frameSrc = selectedImage.variants?.finish?.image || selectedImage.variants?.color?.image || selectedImage.variants?.size?.image || selectedImage.variants?.hanging?.image || selectedImage.frame.image;
-      }
+      if (selectedImage.customFrameColor) frameSrc = selectedImage.frame.image;
+      else frameSrc = selectedImage.variants?.finish?.image || selectedImage.variants?.color?.image || selectedImage.variants?.size?.image || selectedImage.variants?.hanging?.image || selectedImage.frame.image;
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.src = getImageUrl(frameSrc);
       img.onload = () => {
-        if (selectedImageId === selectedImage.id) {
-          setFrameImage(img);
-        }
+        if (selectedImageId === selectedImage.id) setFrameImage(img);
       };
     } else {
       setFrameImage(null);
@@ -444,6 +467,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       const img = new Image();
       img.src = getImageUrl(cartItem.cropped_image || cartItem.original_image);
       img.onload = () => {
+        const mackBoards = cartItem.mackBoard ? [{ mackBoard: cartItem.mackBoard, width: cartItem.mack_board_width || 20 }] : [];
         const image = {
           id: nextId,
           original_url: cartItem.original_image,
@@ -453,7 +477,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           cropped_file: null,
           adjusted_file: null,
           frame: cartItem.frame,
-          mackBoard: cartItem.mackBoard || null,
+          mackBoards,
           variants: {
             color: cartItem.color_variant || null,
             size: cartItem.size_variant || null,
@@ -467,7 +491,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             rotation: cartItem.rotation || 0,
           },
           frameTransform: { rotation: cartItem.frame_rotation || 0 },
-          customSize: cartItem.custom_size || { width: '', height: '', applied: false },
+          customSize: cartItem.customSize || { width: '', height: '', applied: false },
           cartItemId: cartItem.id,
           printOptions: cartItem.printOptions || {
             size: { width: cartItem.print_width || '', height: cartItem.print_height || '', unit: cartItem.print_unit || 'inches' },
@@ -480,6 +504,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             borderUnit: cartItem.border_unit || 'px',
           },
           customFrameColor: cartItem.custom_frame_color || null,
+          mackBoardColor: cartItem.mack_board_color || '#ffffff', // Include Mack board color from cart
         };
         setUploadedImages([image]);
         setSelectedImageId(nextId);
@@ -488,7 +513,9 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         setFrameTransform(image.frameTransform);
         setCustomSize(image.customSize);
         setOriginalImage(img);
+        setMackBoardColor(image.mackBoardColor);
         onCategorySelect('frame');
+        if (mackBoards.length > 0) mackBoards.forEach(item => loadMackBoardImage(item.mackBoard));
       };
     }
   }, [cartItem, nextId, onCategorySelect, getImageUrl]);
@@ -536,6 +563,22 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     }
   }, [activeCategory, selectedImageId, cropping, uploadedImages, onCategorySelect, getImageUrl]);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleWheel = (e) => {
+      if (isMagnifierActive) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -1 : 1;
+        setMagnificationFactor((prev) => Math.min(10, Math.max(1, prev + delta)));
+      }
+    };
+
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', handleWheel);
+  }, [isMagnifierActive]);
+
   const triggerUpload = () => fileInputRef.current.click();
 
   const handleFileChange = (event) => {
@@ -555,7 +598,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           adjusted_file: null,
           adjusted_url: null,
           frame: null,
-          mackBoard: null,
+          mackBoards: [],
           variants: { color: null, size: null, finish: null, hanging: null },
           transform: { x: 0, y: 0, scale, rotation: 0 },
           frameTransform: { rotation: 0 },
@@ -571,12 +614,14 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             borderUnit: 'px',
           },
           customFrameColor: null,
+          mackBoardColor: '#ffffff', // Default Mack board color for new images
         };
         setUploadedImages((prev) => [...prev, newImage]);
         setSelectedImageId(nextId);
         setNextId((prev) => prev + 1);
         setFrameTransform({ rotation: 0 });
         setCustomSize({ width: '', height: '', applied: false });
+        setMackBoardColor('#ffffff');
         onCategorySelect('crop');
       };
     }
@@ -590,6 +635,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       setImageTransform(selectedImage.transform);
       setFrameTransform(selectedImage.frameTransform || { rotation: 0 });
       setCustomSize(selectedImage.customSize || { width: '', height: '', applied: false });
+      setMackBoardColor(selectedImage.mackBoardColor || '#ffffff');
     }
   };
 
@@ -598,63 +644,60 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   };
 
   const handleCanvasMouseDown = useCallback((e) => {
-  if (!canvasRef.current) {
-    console.error('Canvas reference is not defined');
-    return;
-  }
-  if (!uploadedImages.find((img) => img.id === selectedImageId)) return;
+    if (!canvasRef.current) return;
+    if (!uploadedImages.find((img) => img.id === selectedImageId)) return;
 
-  const rect = canvasRef.current.getBoundingClientRect();
-  if (!rect) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    if (!rect) return;
 
-  const mouseX = e.clientX - rect.left;
-  const mouseY = e.clientY - rect.top;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
 
-  const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
+    const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
 
-  if (!cropping && selectedImage?.printOptions.fit === 'bordered') {
-    const borderDepth = getBorderDepthInPixels(selectedImage.printOptions.borderDepth, selectedImage.printOptions.borderUnit);
-    if (
-      mouseY < borderDepth ||
-      mouseY > canvasRef.current.height - borderDepth ||
-      mouseX < borderDepth ||
-      mouseX > canvasRef.current.width - borderDepth
-    ) {
-      borderColorInputRef.current.click();
-      return;
-    }
-  }
-
-  if (cropping) {
-    const handleSize = 8;
-    const items = [
-      { x: cropBox.x - handleSize / 2, y: cropBox.y - handleSize / 2, type: 'nw' },
-      { x: cropBox.x + cropBox.width - handleSize / 2, y: cropBox.y - handleSize / 2, type: 'ne' },
-      { x: cropBox.x - handleSize / 2, y: cropBox.y + cropBox.height - handleSize / 2, type: 'sw' },
-      { x: cropBox.x + cropBox.width - handleSize / 2, y: cropBox.y + cropBox.height - handleSize / 2, type: 'se' },
-      { x: cropBox.x + cropBox.width / 2 - handleSize / 2, y: cropBox.y - handleSize / 2, type: 'n' },
-      { x: cropBox.x + cropBox.width / 2 - handleSize / 2, y: cropBox.y + cropBox.height - handleSize / 2, type: 's' },
-      { x: cropBox.x - handleSize / 2, y: cropBox.y + cropBox.height / 2 - handleSize / 2, type: 'w' },
-      { x: cropBox.x + cropBox.width - handleSize / 2, y: cropBox.y + cropBox.height / 2 - handleSize / 2, type: 'e' },
-    ];
-
-    for (const handle of items) {
-      if (mouseX >= handle.x && mouseX <= handle.x + handleSize && mouseY >= handle.y && mouseY <= handle.y + handleSize) {
-        setCropBox((prev) => ({ ...prev, isResizing: true, resizeHandle: handle.type, startX: mouseX, startY: mouseY }));
+    if (!cropping && selectedImage?.printOptions.fit === 'bordered') {
+      const borderDepth = getBorderDepthInPixels(selectedImage.printOptions.borderDepth, selectedImage.printOptions.borderUnit);
+      if (
+        mouseY < borderDepth ||
+        mouseY > canvasRef.current.height - borderDepth ||
+        mouseX < borderDepth ||
+        mouseX > canvasRef.current.width - borderDepth
+      ) {
+        borderColorInputRef.current.click();
         return;
       }
     }
 
-    if (mouseX >= cropBox.x && mouseX <= cropBox.x + cropBox.width && mouseY >= cropBox.y && mouseY <= cropBox.y + cropBox.height) {
-      setCropBox((prev) => ({ ...prev, startX: mouseX - cropBox.x, startY: mouseY - cropBox.y }));
+    if (cropping) {
+      const handleSize = 8;
+      const items = [
+        { x: cropBox.x - handleSize / 2, y: cropBox.y - handleSize / 2, type: 'nw' },
+        { x: cropBox.x + cropBox.width - handleSize / 2, y: cropBox.y - handleSize / 2, type: 'ne' },
+        { x: cropBox.x - handleSize / 2, y: cropBox.y + cropBox.height - handleSize / 2, type: 'sw' },
+        { x: cropBox.x + cropBox.width - handleSize / 2, y: cropBox.y + cropBox.height - handleSize / 2, type: 'se' },
+        { x: cropBox.x + cropBox.width / 2 - handleSize / 2, y: cropBox.y - handleSize / 2, type: 'n' },
+        { x: cropBox.x + cropBox.width / 2 - handleSize / 2, y: cropBox.y + cropBox.height - handleSize / 2, type: 's' },
+        { x: cropBox.x - handleSize / 2, y: cropBox.y + cropBox.height / 2 - handleSize / 2, type: 'w' },
+        { x: cropBox.x + cropBox.width - handleSize / 2, y: cropBox.y + cropBox.height / 2 - handleSize / 2, type: 'e' },
+      ];
+
+      for (const handle of items) {
+        if (mouseX >= handle.x && mouseX <= handle.x + handleSize && mouseY >= handle.y && mouseY <= handle.y + handleSize) {
+          setCropBox((prev) => ({ ...prev, isResizing: true, resizeHandle: handle.type, startX: mouseX, startY: mouseY }));
+          return;
+        }
+      }
+
+      if (mouseX >= cropBox.x && mouseX <= cropBox.x + cropBox.width && mouseY >= cropBox.y && mouseY <= cropBox.y + cropBox.height) {
+        setCropBox((prev) => ({ ...prev, startX: mouseX - cropBox.x, startY: mouseY - cropBox.y }));
+        setIsDragging(true);
+        return;
+      }
+    } else {
       setIsDragging(true);
-      return;
+      setDragStart({ x: mouseX, y: mouseY });
     }
-  } else {
-    setIsDragging(true);
-    setDragStart({ x: mouseX, y: mouseY });
-  }
-}, [cropping, cropBox, selectedImageId, uploadedImages]);
+  }, [cropping, cropBox, selectedImageId, uploadedImages]);
 
   const handleCanvasMouseMove = useCallback((e) => {
     if (!uploadedImages.find((img) => img.id === selectedImageId)) return;
@@ -791,7 +834,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
 
     if (isMagnifierActive && magnifierCanvasRef.current) {
       const magnifierCtx = magnifierCanvasRef.current.getContext('2d');
-      const magnifierSize = 100;
+      const magnifierSize = 300;
       const sSize = magnifierSize / magnificationFactor;
       const sx = Math.max(0, Math.min(canvasWidth - sSize, mouseX - sSize / 2));
       const sy = Math.max(0, Math.min(canvasHeight - sSize, mouseY - sSize / 2));
@@ -804,7 +847,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       magnifierCtx.fillStyle = 'white';
       magnifierCtx.font = '12px Arial';
       magnifierCtx.fillText(`${magnificationFactor}x`, 5, 15);
-      setMagnifierPosition({ x: e.clientX + 10, y: e.clientY + 10 });
+      setMagnifierPosition({ x: e.clientX + 20, y: e.clientY + 20 });
     }
   }, [cropping, cropBox, isDragging, dragStart, selectedImageId, uploadedImages, imageTransform, isMagnifierActive, magnificationFactor]);
 
@@ -814,6 +857,8 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     const mouseY = e.clientY - rect.top;
     const distance = Math.sqrt((mouseX - dragStart.x) ** 2 + (mouseY - dragStart.y) ** 2);
     if (distance < 5 && !cropping) {
+      const canvas = canvasRef.current;
+      if (canvas) setMagnifiedCanvasUrl(canvas.toDataURL('image/png'));
       setIsMagnified(true);
     }
     setIsDragging(false);
@@ -823,9 +868,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   const handleCanvasMouseLeave = useCallback(() => {
     setIsDragging(false);
     setCropBox((prev) => ({ ...prev, isResizing: false, resizeHandle: '' }));
-    if (canvasRef.current) {
-      canvasRef.current.style.cursor = 'default';
-    }
+    if (canvasRef.current) canvasRef.current.style.cursor = 'default';
   }, []);
 
   const adjustScale = useCallback((delta) => {
@@ -867,11 +910,12 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         const newTransform = { x: 0, y: 0, scale, rotation: 0 };
         const newFrameTransform = { rotation: 0 };
         setUploadedImages((prev) =>
-          prev.map((img) => (img.id === selectedImageId ? { ...img, cropped_file: null, cropped_url: null, adjusted_file: null, adjusted_url: null, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false }, customFrameColor: null, printOptions: { ...img.printOptions, frameDepth: '0' }, mackBoard: null } : img))
+          prev.map((img) => (img.id === selectedImageId ? { ...img, cropped_file: null, cropped_url: null, adjusted_file: null, adjusted_url: null, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false }, customFrameColor: null, printOptions: { ...img.printOptions, frameDepth: '0' }, mackBoards: [], mackBoardColor: '#ffffff' } : img))
         );
         setImageTransform(newTransform);
         setFrameTransform(newFrameTransform);
         setCustomSize({ width: '', height: '', applied: false });
+        setMackBoardColor('#ffffff');
         setOriginalImage(img);
       };
     }
@@ -1003,10 +1047,7 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                   cropped_file: croppedFile,
                   cropped_url: croppedUrl,
                   transform: newTransform,
-                  printOptions: {
-                    ...img.printOptions,
-                    size: defaultSize,
-                  },
+                  printOptions: { ...img.printOptions, size: defaultSize },
                 }
                 : img
             )
@@ -1037,11 +1078,12 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         const newTransform = { x: 0, y: 0, scale, rotation: 0 };
         const newFrameTransform = { rotation: 0 };
         setUploadedImages((prev) =>
-          prev.map((img) => (img.id === selectedImageId ? { ...img, cropped_file: null, cropped_url: null, adjusted_file: null, adjusted_url: null, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false }, customFrameColor: null, printOptions: { ...img.printOptions, frameDepth: '0' }, mackBoard: null } : img))
+          prev.map((img) => (img.id === selectedImageId ? { ...img, cropped_file: null, cropped_url: null, adjusted_file: null, adjusted_url: null, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false }, customFrameColor: null, printOptions: { ...img.printOptions, frameDepth: '0' }, mackBoards: [], mackBoardColor: '#ffffff' } : img))
         );
         setImageTransform(newTransform);
         setFrameTransform(newFrameTransform);
         setCustomSize({ width: '', height: '', applied: false });
+        setMackBoardColor('#ffffff');
         setOriginalImage(img);
       };
     }
@@ -1074,13 +1116,14 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         setUploadedImages((prev) =>
           prev.map((img) =>
             img.id === selectedImageId
-              ? { ...img, frame, variants: { color: null, size: null, finish: null, hanging: null }, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false }, customFrameColor: null, cartItemId: img.cartItemId, printOptions: { ...img.printOptions, frameDepth: '0' }, mackBoard: null }
+              ? { ...img, frame, variants: { color: null, size: null, finish: null, hanging: null }, transform: newTransform, frameTransform: newFrameTransform, customSize: { width: '', height: '', applied: false }, customFrameColor: null, cartItemId: img.cartItemId, printOptions: { ...img.printOptions, frameDepth: '0' }, mackBoards: [], mackBoardColor: '#ffffff' }
               : img
           )
         );
         setImageTransform(newTransform);
         setFrameTransform(newFrameTransform);
         setCustomSize({ width: '', height: '', applied: false });
+        setMackBoardColor('#ffffff');
         setOriginalImage(img);
       };
     }
@@ -1159,13 +1202,14 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     setUploadedImages((prev) =>
       prev.map((img) =>
         img.id === selectedImageId
-          ? { ...img, frame: null, mackBoard: null, variants: { color: null, size: null, finish: null, hanging: null }, frameTransform: { rotation: 0 }, customSize: { width: '', height: '', applied: false }, customFrameColor: null, printOptions: { ...img.printOptions, frameDepth: '0' } }
+          ? { ...img, frame: null, mackBoards: [], variants: { color: null, size: null, finish: null, hanging: null }, frameTransform: { rotation: 0 }, customSize: { width: '', height: '', applied: false }, customFrameColor: null, printOptions: { ...img.printOptions, frameDepth: '0' }, mackBoardColor: '#ffffff' }
           : img
       )
     );
     setFrameImage(null);
     setFrameTransform({ rotation: 0 });
     setCustomSize({ width: '', height: '', applied: false });
+    setMackBoardColor('#ffffff');
   }, [selectedImageId]);
 
   const calculatePrice = (image) => {
@@ -1184,6 +1228,9 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     if (image.variants.hanging) price += parseFloat(image.variants.hanging.price || 0);
     if (image.customSize.width && image.customSize.height) price += 10;
     if (image.printOptions.frameDepth && parseInt(image.printOptions.frameDepth) > 0) price += 5;
+    if (image.mackBoards.length > 0) {
+      price += image.mackBoards.reduce((sum, item) => sum + parseFloat(item.mackBoard.price || 0), 0);
+    }
     return price;
   };
 
@@ -1196,28 +1243,25 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
 
     let printWidth = selectedImage.printOptions.size.width;
     let printHeight = selectedImage.printOptions.size.height;
-    if (!printWidth || !printHeight) {
-      const croppedWidthInches = (cropBox.width / DPI).toFixed(2);
-      const croppedHeightInches = (cropBox.height / DPI).toFixed(2);
-      printWidth = printWidth || croppedWidthInches;
-      printHeight = printHeight || croppedHeightInches;
-      setUploadedImages((prev) =>
-        prev.map((img) =>
-          img.id === selectedImageId
-            ? {
-              ...img,
-              printOptions: {
-                ...img.printOptions,
-                size: { width: printWidth, height: printHeight, unit: img.printOptions.size.unit || 'inches' },
-              },
-            }
-            : img
-        )
-      );
+
+    if (!printWidth || !printHeight || isNaN(parseFloat(printWidth)) || isNaN(parseFloat(printHeight))) {
+      alert('Please set a valid print size (width and height must be numbers)');
+      return;
+    }
+    if (!selectedImage.printOptions.mediaType) {
+      alert('Please select a media type');
+      return;
+    }
+    if (selectedImage.printOptions.mediaType === 'Photopaper' && !selectedImage.printOptions.paperType) {
+      alert('Please select a paper type for Photopaper media');
+      return;
     }
 
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      alert('Canvas not found');
+      return;
+    }
 
     const adjustedImageUrl = canvas.toDataURL('image/png', 1.0);
     let adjustedFile;
@@ -1233,18 +1277,18 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     formData.append('print_height', printHeight);
     formData.append('print_unit', selectedImage.printOptions.size.unit || 'inches');
     formData.append('media_type', selectedImage.printOptions.mediaType);
-    formData.append('paper_type', selectedImage.printOptions.paperType);
+    formData.append('paper_type', selectedImage.printOptions.paperType || '');
     formData.append('fit', selectedImage.printOptions.fit);
     formData.append('border_depth', selectedImage.printOptions.borderDepth);
     formData.append('border_color', selectedImage.printOptions.borderColor);
     formData.append('border_unit', selectedImage.printOptions.borderUnit);
     formData.append('frame_depth', selectedImage.printOptions.frameDepth || '0');
     formData.append('custom_frame_color', selectedImage.customFrameColor || '');
-    if (selectedImage.mackBoard) {
-      formData.append('mack_boards', selectedImage.mackBoard.id);
-    }
+    formData.append('mack_board_color', selectedImage.mackBoardColor || '#ffffff'); // Include Mack board color in form data
 
-    if (!isPrintOnly) {
+    if (isPrintOnly) {
+      formData.append('frame', '');
+    } else {
       formData.append('frame', selectedImage.frame.id);
       if (selectedImage.variants.color) formData.append('color_variant', selectedImage.variants.color.id);
       if (selectedImage.variants.size) formData.append('size_variant', selectedImage.variants.size.id);
@@ -1257,22 +1301,37 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
       formData.append('transform_x', selectedImage.transform.x);
       formData.append('transform_y', selectedImage.transform.y);
       formData.append('scale', selectedImage.transform.scale);
-      formData.append('rotation', selectedImage.transform.rotation);
-      formData.append('frame_rotation', selectedImage.frameTransform.rotation);
+      formData.append('rotation', selectedImage.frameTransform.rotation);
+    }
+
+    const validMackBoards = [];
+    if (!isPrintOnly && selectedImage.mackBoards.length > 0) {
+      selectedImage.mackBoards.forEach((item, index) => {
+        if (!item.mackBoard || !item.mackBoard.id || isNaN(parseInt(item.mackBoard.id))) {
+          console.error(`Invalid mackBoard at index ${index}:`, item);
+          return;
+        }
+        validMackBoards.push({
+          mack_board_id: item.mackBoard.id,
+          width: item.width || 20
+        });
+      });
+    }
+
+    if (validMackBoards.length > 0) {
+      formData.append('mack_boards', JSON.stringify(validMackBoards));
+    } else {
+      formData.append('mack_boards', JSON.stringify([]));
     }
 
     if (!selectedImage.cartItemId) {
       if (selectedImage.original_file) {
         const ext = selectedImage.original_file.name.split('.').pop();
-        const originalFile = new File([selectedImage.original_file], `original.${ext}`, {
-          type: selectedImage.original_file.type,
-        });
+        const originalFile = new File([selectedImage.original_file], `original.${ext}`, { type: selectedImage.original_file.type });
         formData.append('original_image', originalFile);
       }
       if (selectedImage.cropped_file) {
-        const croppedFile = new File([selectedImage.cropped_file], 'cropped.png', {
-          type: 'image/png',
-        });
+        const croppedFile = new File([selectedImage.cropped_file], 'cropped.png', { type: 'image/png' });
         formData.append('cropped_image', croppedFile);
       }
     }
@@ -1280,6 +1339,10 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
 
     const price = calculatePrice(selectedImage);
     formData.append('total_price', price.toFixed(2));
+
+    for (let [key, value] of formData.entries()) {
+      console.log(`FormData: ${key} = ${value}`);
+    }
 
     try {
       const token = localStorage.getItem('token');
@@ -1311,31 +1374,155 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
         localStorage.removeItem('token');
         navigate('/');
       } else {
-        alert('Error saving item: ' + (error.response?.data?.error || 'Unknown error'));
+        alert('Error saving item: ' + JSON.stringify(error.response?.data || error.message));
       }
     }
   };
 
- useEffect(() => {
-  const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
-  if (selectedImage?.mackBoard?.image) {
-    const url = getImageUrl(selectedImage.mackBoard.image);
-    console.log('Attempting to load MackBoard image from:', url);
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.src = url;
-    img.onload = () => {
-      console.log('MackBoard image loaded successfully from:', url);
-      setMackBoardImage(img);
-    };
-    img.onerror = () => {
-      console.error('Failed to load MackBoard image from:', url);
-      setMackBoardImage(null);
-    };
-  } else {
-    setMackBoardImage(null);
-  }
-}, [selectedImageId, uploadedImages, getImageUrl]);
+  const addMackBoard = (mackBoard, position) => {
+    setUploadedImages(prev => prev.map(img => {
+      if (img.id === selectedImageId) {
+        const newMackBoardItem = { mackBoard, width: 20 };
+        let newMackBoards;
+        if (position === 'top') {
+          newMackBoards = [...img.mackBoards, newMackBoardItem];
+        } else {
+          newMackBoards = [newMackBoardItem, ...img.mackBoards];
+        }
+        return { ...img, mackBoards: newMackBoards };
+      }
+      return img;
+    }));
+    loadMackBoardImage(mackBoard);
+  };
+
+  const renderMackBoardOptions = () => {
+    const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
+    if (!selectedImage?.frame) {
+      return <div className="no-items">Please select a frame first</div>;
+    }
+    return (
+      <div className="category-panel">
+        <h3>Selected MackBoards</h3>
+        {selectedImage.mackBoards.length > 0 ? (
+          selectedImage.mackBoards.map((mackBoardItem, index) => (
+            <div key={index} className="mackboard-item" style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ flex: 1 }}>{mackBoardItem.mackBoard.board_name}</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={mackBoardItem.width}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  if (!isNaN(value) && value >= 0) {
+                    setUploadedImages(prev => prev.map(img => {
+                      if (img.id === selectedImageId) {
+                        const newMackBoards = [...img.mackBoards];
+                        newMackBoards[index].width = value;
+                        return { ...img, mackBoards: newMackBoards };
+                      }
+                      return img;
+                    }));
+                  }
+                }}
+                style={{ width: '60px', marginRight: '10px' }}
+              />
+              <button
+                onClick={() => {
+                  setUploadedImages(prev => prev.map(img => {
+                    if (img.id === selectedImageId) {
+                      const newMackBoards = img.mackBoards.filter((_, i) => i !== index);
+                      return { ...img, mackBoards: newMackBoards };
+                    }
+                    return img;
+                  }));
+                }}
+                style={{ padding: '5px 10px' }}
+              >
+                Remove
+              </button>
+            </div>
+          ))
+        ) : (
+          <p>No MackBoards selected</p>
+        )}
+        <div className="mackboard-color-picker" style={{ marginTop: '10px' }}>
+          <label style={{ marginRight: '10px' }}>Mack Board Color:</label>
+          <input
+            type="color"
+            value={mackBoardColor}
+            onChange={(e) => {
+              setMackBoardColor(e.target.value);
+              setUploadedImages(prev => prev.map(img => img.id === selectedImageId ? { ...img, mackBoardColor: e.target.value } : img));
+            }}
+            style={{ width: '50px' }}
+          />
+        </div>
+        <button
+          onClick={() => setShowMackBoardSelector(true)}
+          style={{ marginTop: '10px', padding: '5px 10px' }}
+        >
+          Add MackBoard
+        </button>
+        {showMackBoardSelector && (
+          <div className="mackboard-selector" style={{ marginTop: '10px', border: '1px solid #ccc', padding: '10px' }}>
+            <h4>Select MackBoard to Add</h4>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ marginRight: '10px' }}>
+                <input
+                  type="radio"
+                  value="top"
+                  checked={addPosition === 'top'}
+                  onChange={() => setAddPosition('top')}
+                />
+                On Top
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  value="behind"
+                  checked={addPosition === 'behind'}
+                  onChange={() => setAddPosition('behind')}
+                />
+                Behind
+              </label>
+            </div>
+            <div className="items-grid">
+              {mackBoards.map((mackBoard) => (
+                <div
+                  key={mackBoard.id}
+                  className="item-card"
+                  onClick={() => {
+                    addMackBoard(mackBoard, addPosition);
+                    setShowMackBoardSelector(false);
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="item-image">
+                    <img
+                      src={getImageUrl(mackBoard.image)}
+                      alt={mackBoard.board_name}
+                      onError={handleImageError}
+                    />
+                  </div>
+                  <div className="item-info">
+                    <p className="item-name">{mackBoard.board_name}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowMackBoardSelector(false)}
+              style={{ marginTop: '10px', padding: '5px 10px' }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (uploadedImages.length === 0) {
     return (
@@ -1435,7 +1622,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     return (
       <div className="print-options-panel">
         <h3>Print Options</h3>
-
         <div className="option-group">
           <label>Size</label>
           <div className="size-controls">
@@ -1469,7 +1655,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             </select>
           </div>
         </div>
-
         <div className="option-group">
           <label>Media</label>
           <select
@@ -1482,7 +1667,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             <option value="Fine Art Paper">Fine Art Paper</option>
             <option value="Canvas">Canvas</option>
           </select>
-
           {selectedImage.printOptions.mediaType === 'Photopaper' && (
             <select
               value={selectedImage.printOptions.paperType || ''}
@@ -1498,7 +1682,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             </select>
           )}
         </div>
-
         <div className="option-group">
           <label>Fit</label>
           <div className="fit-controls">
@@ -1524,7 +1707,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             </label>
           </div>
         </div>
-
         {selectedImage.printOptions.fit === 'bordered' && (
           <div className="option-group">
             <label>Border Settings</label>
@@ -1556,7 +1738,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             </div>
           </div>
         )}
-
         {!isPrintOnly && selectedImage.frame && (
           <div className="option-group">
             <label>Frame Depth</label>
@@ -1623,7 +1804,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             </div>
           </div>
         );
-
       case 'color':
         return (
           <div className="category-panel">
@@ -1677,7 +1857,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             </div>
           </div>
         );
-
       case 'size':
         return (
           <div className="category-panel">
@@ -1744,7 +1923,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             </div>
           </div>
         );
-
       case 'finish':
         return (
           <div className="category-panel">
@@ -1779,7 +1957,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             </div>
           </div>
         );
-
       case 'hanging':
         return (
           <div className="category-panel">
@@ -1814,55 +1991,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             </div>
           </div>
         );
-
-      case 'mackboard':
-        return (
-          <div className="category-panel">
-            <h3>Select MackBoard</h3>
-            <div className="items-grid">
-              {selectedImage?.frame ? (
-                <>
-                  <div
-                    className={`item-card ${selectedImage.mackBoard === null ? 'selected' : ''}`}
-                    onClick={() => setUploadedImages(prev => prev.map(img => img.id === selectedImageId ? { ...img, mackBoard: null } : img))}
-                  >
-                    <div className="item-image">
-                      <img src={FALLBACK_IMAGE} alt="No MackBoard" />
-                    </div>
-                    <div className="item-info">
-                      <p className="item-name">No MackBoard</p>
-                    </div>
-                  </div>
-                  {mackBoards.length > 0 ? (
-                    mackBoards.map((mackBoard) => (
-                      <div
-                        key={mackBoard.id}
-                        className={`item-card ${selectedImage.mackBoard?.id === mackBoard.id ? 'selected' : ''}`}
-                        onClick={() => setUploadedImages(prev => prev.map(img => img.id === selectedImageId ? { ...img, mackBoard } : img))}
-                      >
-                        <div className="item-image">
-                          <img
-                            src={getImageUrl(mackBoard.image)}
-                            alt={mackBoard.board_name}
-                            onError={handleImageError}
-                          />
-                        </div>
-                        <div className="item-info">
-                          <p className="item-name">{mackBoard.board_name}</p>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="no-items">No MackBoards available</div>
-                  )}
-                </>
-              ) : (
-                <div className="no-items">Please select a frame first</div>
-              )}
-            </div>
-          </div>
-        );
-
       default:
         return null;
     }
@@ -1907,16 +2035,14 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
               />
             </div>
           )}
-
           {isMagnifierActive && (
             <div
               className="magnifier"
               style={{ position: 'fixed', left: magnifierPosition.x, top: magnifierPosition.y }}
             >
-              <canvas ref={magnifierCanvasRef} width={100} height={100} />
+              <canvas ref={magnifierCanvasRef} width={300} height={300} />
             </div>
           )}
-
           {selectedImage && (
             <div className="canvas-controls">
               <div className="control-group">
@@ -1929,7 +2055,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                   Zoom Out
                 </button>
               </div>
-
               <div className="control-group">
                 <button className="control-btn" onClick={() => adjustImageRotation(90)} title="Rotate Image Right">
                   <RotateCw size={16} />
@@ -1940,7 +2065,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                   Image
                 </button>
               </div>
-
               {selectedImage.frame && (
                 <div className="control-group">
                   <button className="control-btn" onClick={() => adjustFrameRotation(90)} title="Rotate Frame Right">
@@ -1953,7 +2077,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                   </button>
                 </div>
               )}
-
               <div className="control-group">
                 <button className="control-btn" onClick={toggleCropMode} title="Crop">
                   <Crop size={16} />
@@ -1968,7 +2091,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                   Original
                 </button>
               </div>
-
               <div className="control-group">
                 <button
                   className="control-btn"
@@ -1979,7 +2101,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                   Magnifier
                 </button>
               </div>
-
               <div className="control-group">
                 <button
                   className="control-btn"
@@ -1998,7 +2119,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                   Zoom-
                 </button>
               </div>
-
               {!isPrintOnly && (
                 <div className="control-group">
                   <button className="control-btn remove-frame" onClick={resetVariants}>
@@ -2008,7 +2128,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
               )}
             </div>
           )}
-
           <div className="thumbnails-section">
             <div className="thumbnails-container">
               {uploadedImages.map((img) => (
@@ -2033,13 +2152,23 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
           </div>
         </div>
       </div>
-
       <div className="options-section">
         <div className="options-container">
           {renderPrintOptions()}
-
+          {!isPrintOnly && selectedImage?.frame && (
+            <div className="mackboard-control">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={isMackBoardEnabled}
+                  onChange={() => setIsMackBoardEnabled(!isMackBoardEnabled)}
+                />
+                Include MackBoard
+              </label>
+            </div>
+          )}
+          {isMackBoardEnabled && renderMackBoardOptions()}
           {!isPrintOnly && renderCategoryContent()}
-
           <div className="summary-section">
             <h3>Summary</h3>
             <div className="summary-content">
@@ -2073,7 +2202,11 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                   </div>
                   <div className="summary-item">
                     <span>MackBoard:</span>
-                    <span>{selectedImage?.mackBoard?.board_name || 'None'}</span>
+                    <span>{selectedImage?.mackBoards.length > 0 ? selectedImage.mackBoards.map(item => item.mackBoard.board_name).join(', ') : 'None'}</span>
+                  </div>
+                  <div className="summary-item">
+                    <span>MackBoard Color:</span>
+                    <span>{selectedImage?.mackBoardColor || '#ffffff'}</span>
                   </div>
                   <div className="summary-item">
                     <span>Frame Color:</span>
