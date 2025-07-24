@@ -1,5 +1,5 @@
 import React from 'react';
-import { Hash, Palette, Maximize2, Sparkles, Bookmark, Trash2, Layers } from 'lucide-react';
+import { Hash, Palette, Maximize2, Sparkles, Bookmark, Trash2 } from 'lucide-react';
 import './NavIcons.css';
 
 const iconMap = {
@@ -8,7 +8,6 @@ const iconMap = {
   size: Maximize2,
   finish: Sparkles,
   hanging: Bookmark,
-  mackboard: Layers, // Added MackBoard with Layers icon
   remove: Trash2,
 };
 
@@ -18,12 +17,11 @@ const categoryNames = {
   size: 'Size',
   finish: 'Finish',
   hanging: 'Hang',
-  mackboard: 'MackBoard', // Added MackBoard label
   remove: 'Remove',
 };
 
 function NavIcons({ activeCategory, onCategorySelect }) {
-  const categories = ['frame', 'color', 'size', 'finish', 'hanging', 'mackboard', 'remove']; // Added mackboard
+  const categories = ['frame', 'color', 'size', 'finish', 'hanging', 'remove'];
 
   return (
     <div className="modern-nav-icons">
