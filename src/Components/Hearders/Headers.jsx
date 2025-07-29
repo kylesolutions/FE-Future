@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback} from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Upload, ZoomIn, ZoomOut, RotateCw, RotateCcw, Crop, RotateCw as RotateClockwise, MousePointerClick as RotateCounterClockwise, RefreshCw, Rewind, Plus, Check, X, Save, Search, Plus as PlusIcon, Minus } from 'lucide-react';
 import './Headers.css';
+import { useDispatch, useSelector } from 'react-redux';
 
 const BASE_URL = 'http://82.180.146.4:8001';
 const FALLBACK_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAABYSURBVHhe7cExAQAwDMCg7f8/8A2BFXgJAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACA+yU/AJSsIW0W2i4AAAAASUVORK5CYII=';
@@ -47,6 +48,9 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   const borderColorInputRef = useRef(null);
   const magnifierCanvasRef = useRef(null);
   const navigate = useNavigate();
+   const dispatch = useDispatch();
+  const userId = useSelector((state) => state.user.id);
+  
 
   const getImageUrl = useCallback((path) => {
     if (!path) return FALLBACK_IMAGE;
@@ -267,14 +271,41 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
               if (mackBoardImage) {
                 const pattern = ctx.createPattern(mackBoardImage, 'repeat');
                 ctx.fillStyle = pattern;
+                ctx.fillRect(innerX, innerY, innerWidth, matDepth);
+                if (mackBoardItem.color) {
+                  ctx.globalCompositeOperation = 'source-atop';
+                  ctx.fillStyle = mackBoardItem.color;
+                  ctx.fillRect(innerX, innerY, innerWidth, matDepth);
+                  ctx.globalCompositeOperation = 'source-over';
+                }
+                ctx.fillRect(innerX, innerY + innerHeight - matDepth, innerWidth, matDepth);
+                if (mackBoardItem.color) {
+                  ctx.globalCompositeOperation = 'source-atop';
+                  ctx.fillStyle = mackBoardItem.color;
+                  ctx.fillRect(innerX, innerY + innerHeight - matDepth, innerWidth, matDepth);
+                  ctx.globalCompositeOperation = 'source-over';
+                }
+                ctx.fillRect(innerX, innerY + matDepth, matDepth, innerHeight - 2 * matDepth);
+                if (mackBoardItem.color) {
+                  ctx.globalCompositeOperation = 'source-atop';
+                  ctx.fillStyle = mackBoardItem.color;
+                  ctx.fillRect(innerX, innerY + matDepth, matDepth, innerHeight - 2 * matDepth);
+                  ctx.globalCompositeOperation = 'source-over';
+                }
+                ctx.fillRect(innerX + innerWidth - matDepth, innerY + matDepth, matDepth, innerHeight - 2 * matDepth);
+                if (mackBoardItem.color) {
+                  ctx.globalCompositeOperation = 'source-atop';
+                  ctx.fillStyle = mackBoardItem.color;
+                  ctx.fillRect(innerX + innerWidth - matDepth, innerY + matDepth, matDepth, innerHeight - 2 * matDepth);
+                  ctx.globalCompositeOperation = 'source-over';
+                }
               } else {
                 ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(innerX, innerY, innerWidth, matDepth);
+                ctx.fillRect(innerX, innerY + innerHeight - matDepth, innerWidth, matDepth);
+                ctx.fillRect(innerX, innerY + matDepth, matDepth, innerHeight - 2 * matDepth);
+                ctx.fillRect(innerX + innerWidth - matDepth, innerY + matDepth, matDepth, innerHeight - 2 * matDepth);
               }
-              ctx.fillRect(innerX, innerY, innerWidth, matDepth); // Top
-              ctx.fillRect(innerX, innerY + innerHeight - matDepth, innerWidth, matDepth); // Bottom
-              ctx.fillRect(innerX, innerY + matDepth, matDepth, innerHeight - 2 * matDepth); // Left
-              ctx.fillRect(innerX + innerWidth - matDepth, innerY + matDepth, matDepth, innerHeight - 2 * matDepth); // Right
-
               innerX += matDepth;
               innerY += matDepth;
               innerWidth -= 2 * matDepth;
@@ -461,62 +492,6 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
   }, [selectedImageId, uploadedImages, getImageUrl]);
 
   useEffect(() => {
-    if (cartItem) {
-      const img = new Image();
-      img.src = getImageUrl(cartItem.cropped_image || cartItem.original_image);
-      img.onload = () => {
-        const mackBoards = cartItem.mackBoard ? [{ mackBoard: cartItem.mackBoard, width: cartItem.mack_board_width || 20 }] : [];
-        const image = {
-          id: nextId,
-          original_url: cartItem.original_image,
-          cropped_url: cartItem.cropped_image,
-          adjusted_url: cartItem.adjusted_image,
-          original_file: null,
-          cropped_file: null,
-          adjusted_file: null,
-          frame: cartItem.frame,
-          mackBoards,
-          variants: {
-            color: cartItem.color_variant || null,
-            size: cartItem.size_variant || null,
-            finish: cartItem.finish_variant || null,
-            hanging: cartItem.hanging_variant || null,
-          },
-          transform: {
-            x: cartItem.transform_x || 0,
-            y: cartItem.transform_y || 0,
-            scale: cartItem.scale || 1,
-            rotation: cartItem.rotation || 0,
-          },
-          frameTransform: { rotation: cartItem.frame_rotation || 0 },
-          customSize: cartItem.customSize || { width: '', height: '', applied: false },
-          cartItemId: cartItem.id,
-          printOptions: cartItem.printOptions || {
-            size: { width: cartItem.print_width || '', height: cartItem.print_height || '', unit: cartItem.print_unit || 'inches' },
-            mediaType: cartItem.media_type || null,
-            paperType: cartItem.paper_type || null,
-            fit: cartItem.fit || 'borderless',
-            borderDepth: cartItem.border_depth || '0',
-            borderColor: cartItem.border_color || '#ffffff',
-            frameDepth: cartItem.frame_depth || '0',
-            borderUnit: cartItem.border_unit || 'px',
-          },
-          customFrameColor: cartItem.custom_frame_color || null,
-        };
-        setUploadedImages([image]);
-        setSelectedImageId(nextId);
-        setNextId((prev) => prev + 1);
-        setImageTransform(image.transform);
-        setFrameTransform(image.frameTransform);
-        setCustomSize(image.customSize);
-        setOriginalImage(img);
-        onCategorySelect('frame');
-        if (mackBoards.length > 0) mackBoards.forEach(item => loadMackBoardImage(item.mackBoard));
-      };
-    }
-  }, [cartItem, nextId, onCategorySelect, getImageUrl]);
-
-  useEffect(() => {
     if (activeCategory === 'crop' && selectedImageId !== null && !cropping) {
       const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
       if (selectedImage) {
@@ -606,8 +581,8 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             fit: 'borderless',
             borderDepth: '0',
             borderColor: '#ffffff',
-            frameDepth: '0',
             borderUnit: 'px',
+            frameDepth: '0',
           },
           customFrameColor: null,
         };
@@ -1217,180 +1192,292 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
     if (image.variants.hanging) price += parseFloat(image.variants.hanging.price || 0);
     if (image.customSize.width && image.customSize.height) price += 10;
     if (image.printOptions.frameDepth && parseInt(image.printOptions.frameDepth) > 0) price += 5;
-    // Add price for each MackBoard
     if (image.mackBoards.length > 0) {
       price += image.mackBoards.reduce((sum, item) => sum + parseFloat(item.mackBoard.price || 0), 0);
     }
     return price;
   };
 
-  // Headers.jsx
   const handleSave = async () => {
-    const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
-    if (!isPrintOnly && (!selectedImage || !selectedImage.frame)) {
-      alert('Please select a frame');
-      return;
-    }
+  const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
+  if (!selectedImage) {
+    alert('No image selected');
+    return;
+  }
 
-    let printWidth = selectedImage.printOptions.size.width;
-    let printHeight = selectedImage.printOptions.size.height;
+  if (!isPrintOnly && !selectedImage.frame) {
+    alert('Please select a frame');
+    return;
+  }
 
-    if (!printWidth || !printHeight || isNaN(parseFloat(printWidth)) || isNaN(parseFloat(printHeight))) {
-      alert('Please set a valid print size (width and height must be numbers)');
-      return;
-    }
-    if (!selectedImage.printOptions.mediaType) {
-      alert('Please select a media type');
-      return;
-    }
-    if (selectedImage.printOptions.mediaType === 'Photopaper' && !selectedImage.printOptions.paperType) {
-      alert('Please select a paper type for Photopaper media');
-      return;
-    }
+  // Validate print size
+  let printWidth = parseFloat(selectedImage.printOptions.size.width);
+  let printHeight = parseFloat(selectedImage.printOptions.size.height);
+  if (!printWidth || !printHeight || isNaN(printWidth) || isNaN(printHeight)) {
+    alert('Please set a valid print size. Width and height must be numbers.');
+    return;
+  }
 
-    const canvas = canvasRef.current;
-    if (!canvas) {
-      alert('Canvas not found');
-      return;
-    }
+  // Validate media type
+  if (!selectedImage.printOptions.mediaType) {
+    alert('Please select a media type');
+    return;
+  }
+  if (selectedImage.printOptions.mediaType === 'Photopaper' && !selectedImage.printOptions.paperType) {
+    alert('Please select a paper option for Photopaper media.');
+    return;
+  }
 
-    const adjustedImageUrl = canvas.toDataURL('image/png', 1.0);
-    let adjustedFile;
-    await new Promise((resolve) => {
+  const canvas = canvasRef.current;
+  if (!canvas) {
+    alert('Canvas not found');
+    return;
+  }
+
+  // Generate adjusted image file
+  let adjustedFile;
+  try {
+    adjustedFile = await new Promise((resolve, reject) => {
       canvas.toBlob((blob) => {
-        adjustedFile = new File([blob], 'adjusted.png', { type: 'image/png' });
-        resolve();
-      }, 'image/png', 1.0);
-    });
-
-    const formData = new FormData();
-    formData.append('print_width', printWidth);
-    formData.append('print_height', printHeight);
-    formData.append('print_unit', selectedImage.printOptions.size.unit || 'inches');
-    formData.append('media_type', selectedImage.printOptions.mediaType);
-    formData.append('paper_type', selectedImage.printOptions.paperType || '');
-    formData.append('fit', selectedImage.printOptions.fit);
-    formData.append('border_depth', selectedImage.printOptions.borderDepth);
-    formData.append('border_color', selectedImage.printOptions.borderColor);
-    formData.append('border_unit', selectedImage.printOptions.borderUnit);
-    formData.append('frame_depth', selectedImage.printOptions.frameDepth || '0');
-    formData.append('custom_frame_color', selectedImage.customFrameColor || '');
-
-    if (isPrintOnly) {
-      formData.append('frame', '');
-    } else {
-      formData.append('frame', selectedImage.frame.id);
-      if (selectedImage.variants.color) formData.append('color_variant', selectedImage.variants.color.id);
-      if (selectedImage.variants.size) formData.append('size_variant', selectedImage.variants.size.id);
-      if (selectedImage.variants.finish) formData.append('finish_variant', selectedImage.variants.finish.id);
-      if (selectedImage.variants.hanging) formData.append('hanging_variant', selectedImage.variants.hanging.id);
-      if (selectedImage.customSize.width && selectedImage.customSize.height) {
-        formData.append('custom_width', selectedImage.customSize.width);
-        formData.append('custom_height', selectedImage.customSize.height);
-      }
-      formData.append('transform_x', selectedImage.transform.x);
-      formData.append('transform_y', selectedImage.transform.y);
-      formData.append('scale', selectedImage.transform.scale);
-      formData.append('rotation', selectedImage.frameTransform.rotation);
-    }
-
-    // Debug mackBoards
-    console.log('selectedImage.mackBoards:', JSON.stringify(selectedImage.mackBoards, null, 2));
-
-    // Validate and append mack_boards
-    const validMackBoards = [];
-    if (!isPrintOnly && selectedImage.mackBoards.length > 0) {
-      selectedImage.mackBoards.forEach((item, index) => {
-        if (!item.mackBoard || !item.mackBoard.id || isNaN(parseInt(item.mackBoard.id))) {
-          console.error(`Invalid mackBoard at index ${index}:`, item);
+        if (!blob || blob.size === 0) {
+          console.error('Failed to create adjusted image blob');
+          reject(new Error('Error generating adjusted image'));
           return;
         }
-        validMackBoards.push({
-          mack_board_id: item.mackBoard.id,
-          width: item.width || 20
+        const file = new File([blob], 'adjusted.png', { type: 'image/png' });
+        resolve(file);
+      }, 'image/png', 1.0);
+    });
+  } catch (error) {
+    console.error('Error generating adjusted image:', error);
+    alert(error.message);
+    return;
+  }
+
+  if (!adjustedFile || !(adjustedFile instanceof File) || adjustedFile.size === 0) {
+    console.error('Invalid adjusted image file:', adjustedFile);
+    alert('Invalid adjusted image file');
+    return;
+  }
+
+  // Verify user authentication
+  let finalUserId = userId;
+  if (!finalUserId) {
+    finalUserId = localStorage.getItem('userId');
+    if (!finalUserId) {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error('No authentication token found');
+        const response = await axios.get(`${BASE_URL}/api/current-user/`, {
+          headers: { Authorization: `Bearer ${token}` },
         });
+        finalUserId = response.data.id;
+        localStorage.setItem('userId', finalUserId);
+        dispatch(updateUser({
+          id: response.data.id,
+          username: response.data.username,
+          name: response.data.name || '',
+          email: response.data.email || '',
+          phone: response.data.phone || '',
+          type: response.data.is_staff ? 'admin' : response.data.is_user ? 'user' : 'employee',
+          is_blocked: response.data.is_blocked || false,
+        }));
+      } catch (error) {
+        console.error('Error fetching user ID:', error);
+        alert('User not authenticated. Please log in again.');
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('userId');
+        dispatch(logoutUser());
+        navigate('/');
+        return;
+      }
+    }
+  }
+
+  // Create FormData
+  const formData = new FormData();
+
+  // Append image fields
+  formData.append('adjusted_image', adjustedFile);
+  if (!selectedImage.cartItemId) {
+    if (selectedImage.original_file && selectedImage.original_file instanceof File) {
+      formData.append('original_image', selectedImage.original_file);
+    } else {
+      console.warn('original_image is not a valid File object:', selectedImage.original_file);
+      alert('Error: original_image is not a valid file');
+      return;
+    }
+    if (selectedImage.cropped_file && selectedImage.cropped_file instanceof File) {
+      formData.append('cropped_image', selectedImage.cropped_file);
+    } else if (selectedImage.cropped_url) {
+      console.warn('cropped_image is not a File, skipping append:', selectedImage.cropped_url);
+    }
+  }
+
+  // Append user ID (optional, as serializer uses request.user if not provided)
+  formData.append('user', finalUserId);
+
+  // Print options
+  formData.append('print_width', printWidth);
+  formData.append('print_height', printHeight);
+  formData.append('print_unit', selectedImage.printOptions.size.unit || 'inches');
+  formData.append('media_type', selectedImage.printOptions.mediaType || 'Photopaper');
+  formData.append('paper_type', selectedImage.printOptions.paperType || '');
+  formData.append('fit', selectedImage.printOptions.fit || 'borderless');
+  formData.append('border_depth', parseInt(selectedImage.printOptions.borderDepth) || 0);
+  formData.append('border_color', selectedImage.printOptions.borderColor || '#ffffff');
+  formData.append('border_unit', selectedImage.printOptions.borderUnit || 'px');
+  formData.append('frame_depth', parseInt(selectedImage.printOptions.frameDepth) || 0);
+
+  // Frame-related fields (if not print-only)
+  if (!isPrintOnly) {
+    formData.append('frame', selectedImage.frame?.id ? parseInt(selectedImage.frame.id) : '');
+    if (selectedImage.variants?.color?.id) formData.append('color_variant', parseInt(selectedImage.variants.color.id));
+    if (selectedImage.variants?.size?.id) formData.append('size_variant', parseInt(selectedImage.variants.size.id));
+    if (selectedImage.variants?.finish?.id) formData.append('finish_variant', parseInt(selectedImage.variants.finish.id));
+    if (selectedImage.variants?.hanging?.id) formData.append('hanging_variant', parseInt(selectedImage.variants.hanging.id));
+    formData.append('custom_frame_color', selectedImage.customFrameColor || '');
+  } else {
+    formData.append('frame', '');
+  }
+
+  // Custom size
+  if (selectedImage.customSize?.width && selectedImage.customSize?.height) {
+    formData.append('custom_width', parseFloat(selectedImage.customSize.width));
+    formData.append('custom_height', parseFloat(selectedImage.customSize.height));
+  }
+
+  // Image transformations
+  formData.append('transform_x', parseFloat(selectedImage.transform.x) || 0);
+  formData.append('transform_y', parseFloat(selectedImage.transform.y) || 0);
+  formData.append('scale', parseFloat(selectedImage.transform.scale) || 1);
+  formData.append('rotation', parseFloat(selectedImage.transform.rotation) || 0);
+  formData.append('frame_rotation', parseFloat(selectedImage.transform.frame_rotation) || 0);
+
+  // Mack boards
+  const validMackBoards = selectedImage.mackBoards
+    .map((item) => ({
+      mack_board: item.mackBoard?.id ? parseInt(item.mackBoard.id) : null,
+      width: parseInt(item.width) || 20,
+      color: item.color || '',
+    }))
+    .filter((item) => item.mack_board !== null);
+  if (validMackBoards.length > 0) {
+    validMackBoards.forEach((mackBoard, index) => {
+      formData.append(`mack_boards[${index}][mack_board]`, mackBoard.mack_board);
+      formData.append(`mack_boards[${index}][width]`, mackBoard.width);
+      formData.append(`mack_boards[${index}][color]`, mackBoard.color);
+    });
+  }
+
+  // Total price
+  const price = calculatePrice(selectedImage);
+  formData.append('total_price', price.toFixed(2));
+
+  // Status (optional, as it defaults to 'pending' in the model)
+  formData.append('status', 'pending');
+
+  // Log FormData for debugging
+  console.log('Preparing to save item with the following data:');
+  for (let [key, value] of formData.entries()) {
+    console.log(`FormData: ${key} = ${value instanceof File ? `[File: ${value.name}, ${value.size} bytes, ${value.type}]` : value}`);
+  }
+
+  // Send request to backend
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('Not authenticated');
+
+    let response;
+    if (selectedImage.cartItemId) {
+      // Update existing item
+      response = await axios.put(`${BASE_URL}/save-items/${selectedImage.cartItemId}/`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    } else {
+      // Create new item
+      response = await axios.post(`${BASE_URL}/save-items/`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
     }
 
-    // Send mack_boards as JSON string to avoid parsing issues
-    if (validMackBoards.length > 0) {
-      formData.append('mack_boards', JSON.stringify(validMackBoards));
-    } else {
-      formData.append('mack_boards', JSON.stringify([]));
-    }
-
-    if (!selectedImage.cartItemId) {
-      if (selectedImage.original_file) {
-        const ext = selectedImage.original_file.name.split('.').pop();
-        const originalFile = new File([selectedImage.original_file], `original.${ext}`, { type: selectedImage.original_file.type });
-        formData.append('original_image', originalFile);
-      }
-      if (selectedImage.cropped_file) {
-        const croppedFile = new File([selectedImage.cropped_file], 'cropped.png', { type: 'image/png' });
-        formData.append('cropped_image', croppedFile);
-      }
-    }
-    formData.append('adjusted_image', adjustedFile);
-
-    const price = calculatePrice(selectedImage);
-    formData.append('total_price', price.toFixed(2));
-
-    // Log FormData for debugging
-    for (let [key, value] of formData.entries()) {
-      console.log(`FormData: ${key} = ${value}`);
-    }
-
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('Not authenticated');
-
-      let response;
-      if (selectedImage.cartItemId) {
-        response = await axios.put(`${BASE_URL}/save-items/${selectedImage.cartItemId}/`, formData, {
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+    const data = response.data;
+    alert(selectedImage.cartItemId ? 'Item updated successfully' : 'Item saved successfully');
+    setUploadedImages((prev) =>
+      prev.map((img) =>
+        img.id === selectedImageId
+          ? { ...img, adjusted_url: data.adjusted_image, cartItemId: data.id }
+          : img
+      )
+    );
+    navigate('/savedorder');
+  } catch (error) {
+    console.error('Error saving item:', error.message, error.response?.data);
+    if (error.response?.status === 401) {
+      try {
+        const refreshResponse = await axios.post(`${BASE_URL}/api/token/refresh/`, {
+          refresh: localStorage.getItem('refreshToken'),
         });
-      } else {
-        response = await axios.post(`${BASE_URL}/save-items/`, formData, {
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
-        });
-      }
-
-      alert(selectedImage.cartItemId ? 'Item updated successfully' : 'Item saved successfully');
-      setUploadedImages((prev) =>
-        prev.map((img) =>
-          img.id === selectedImageId
-            ? { ...img, adjusted_url: response.data.adjusted_image, cartItemId: response.data.id }
-            : img
-        )
-      );
-      navigate('/savedorder');
-    } catch (error) {
-      console.error('Error saving item:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
+        localStorage.setItem('token', refreshResponse.data.access);
+        // Retry the request with the new token
+        const retryResponse = await axios[selectedImage.cartItemId ? 'put' : 'post'](
+          `${BASE_URL}/save-items/${selectedImage.cartItemId || ''}`,
+          formData,
+          {
+            headers: { Authorization: `Bearer ${refreshResponse.data.access}` },
+          }
+        );
+        const data = retryResponse.data;
+        alert(selectedImage.cartItemId ? 'Item updated successfully' : 'Item saved successfully');
+        setUploadedImages((prev) =>
+          prev.map((img) =>
+            img.id === selectedImageId
+              ? { ...img, adjusted_url: data.adjusted_image, cartItemId: data.id }
+              : img
+          )
+        );
+        navigate('/savedorder');
+      } catch (refreshError) {
+        console.error('Token refresh failed:', refreshError);
+        alert('Session expired. Please log in again.');
         localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('userId');
+        dispatch(logoutUser());
         navigate('/');
-      } else {
-        alert('Error saving item: ' + JSON.stringify(error.response?.data || error.message));
       }
+    } else {
+      alert('Error saving item: ' + JSON.stringify(error.response?.data || error.message));
     }
-  };
+  }
+};
 
   const addMackBoard = (mackBoard, position) => {
-    setUploadedImages(prev => prev.map(img => {
-      if (img.id === selectedImageId) {
-        const newMackBoardItem = { mackBoard, width: 20 };
-        let newMackBoards;
-        if (position === 'top') {
-          newMackBoards = [...img.mackBoards, newMackBoardItem];
-        } else {
-          newMackBoards = [newMackBoardItem, ...img.mackBoards];
-        }
-        return { ...img, mackBoards: newMackBoards };
+  if (!mackBoard?.id) {
+    console.error('Invalid MackBoard:', mackBoard);
+    alert('Cannot add invalid MackBoard');
+    return;
+  }
+  setUploadedImages(prev => prev.map(img => {
+    if (img.id === selectedImageId) {
+      const newMackBoardItem = { mackBoard, width: 20, color: '' };
+      let newMackBoards;
+      if (position === 'top') {
+        newMackBoards = [...img.mackBoards, newMackBoardItem];
+      } else {
+        newMackBoards = [newMackBoardItem, ...img.mackBoards];
       }
-      return img;
-    }));
-    loadMackBoardImage(mackBoard);
-  };
+      return { ...img, mackBoards: newMackBoards };
+    }
+    return img;
+  }));
+  loadMackBoardImage(mackBoard);
+};
 
   const renderMackBoardOptions = () => {
     const selectedImage = uploadedImages.find((img) => img.id === selectedImageId);
@@ -1423,6 +1510,21 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
                   }
                 }}
                 style={{ width: '60px', marginRight: '10px' }}
+              />
+              <input
+                type="color"
+                value={mackBoardItem.color || '#ffffff'}
+                onChange={(e) => {
+                  setUploadedImages(prev => prev.map(img => {
+                    if (img.id === selectedImageId) {
+                      const newMackBoards = [...img.mackBoards];
+                      newMackBoards[index].color = e.target.value;
+                      return { ...img, mackBoards: newMackBoards };
+                    }
+                    return img;
+                  }));
+                }}
+                style={{ marginRight: '10px' }}
               />
               <button
                 onClick={() => {
@@ -1998,45 +2100,45 @@ function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedIma
             />
           </div>
           {isMagnified && (
-  <div
-    style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      width: '100vw',
-      height: '100vh',
-      background: 'rgba(0, 0, 0, 0.8)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-    }}
-    onClick={() => setIsMagnified(false)}
-  >
-    <div style={{ textAlign: 'center' }}>
-      <img
-        src={getImageUrl(selectedImage.cropped_url || selectedImage.original_url)}
-        alt="Magnified"
-        style={{
-          width: selectedImage.printOptions.size.width && selectedImage.printOptions.size.height
-            ? `${(selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.width / 2.54 : selectedImage.printOptions.size.width) * DPI}px`
-            : 'auto',
-          height: selectedImage.printOptions.size.width && selectedImage.printOptions.size.height
-            ? `${(selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.height / 2.54 : selectedImage.printOptions.size.height) * DPI}px`
-            : 'auto',
-          objectFit: 'contain',
-        }}
-      />
-      {selectedImage && (
-        <p style={{ color: 'white', marginTop: '10px' }}>
-          {selectedImage.printOptions.size.width && selectedImage.printOptions.size.height
-            ? `Print Size: ${selectedImage.printOptions.size.width} × ${selectedImage.printOptions.size.height} ${selectedImage.printOptions.size.unit}`
-            : 'Size not specified'}
-        </p>
-      )}
-    </div>
-  </div>
-)}
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100vw',
+                height: '100vh',
+                background: 'rgba(0, 0, 0, 0.8)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+              }}
+              onClick={() => setIsMagnified(false)}
+            >
+              <div style={{ textAlign: 'center' }}>
+                <img
+                  src={getImageUrl(selectedImage.cropped_url || selectedImage.original_url)}
+                  alt="Magnified"
+                  style={{
+                    width: selectedImage.printOptions.size.width && selectedImage.printOptions.size.height
+                      ? `${(selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.width / 2.54 : selectedImage.printOptions.size.width) * DPI}px`
+                      : 'auto',
+                    height: selectedImage.printOptions.size.width && selectedImage.printOptions.size.height
+                      ? `${(selectedImage.printOptions.size.unit === 'cm' ? selectedImage.printOptions.size.height / 2.54 : selectedImage.printOptions.size.height) * DPI}px`
+                      : 'auto',
+                    objectFit: 'contain',
+                  }}
+                />
+                {selectedImage && (
+                  <p style={{ color: 'white', marginTop: '10px' }}>
+                    {selectedImage.printOptions.size.width && selectedImage.printOptions.size.height
+                      ? `Print Size: ${selectedImage.printOptions.size.width} × ${selectedImage.printOptions.size.height} ${selectedImage.printOptions.size.unit}`
+                      : 'Size not specified'}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
           {isMagnifierActive && (
             <div
               className="magnifier"
