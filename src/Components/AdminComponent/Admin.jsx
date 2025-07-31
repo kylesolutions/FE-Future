@@ -9,7 +9,12 @@ function Admin() {
   const [mode, setMode] = useState('create'); // 'create', 'add_variants', or 'edit'
   const [frames, setFrames] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [mackBoards, setMackBoards] = useState([]); // State for MackBoards
+  const [mackBoards, setMackBoards] = useState([]);
+  const [mugs, setMugs] = useState([]);
+  const [caps, setCaps] = useState([]);
+  const [tshirts, setTshirts] = useState([]);
+  const [tiles, setTiles] = useState([]);
+  const [pens, setPens] = useState([]);
   const [selectedFrameId, setSelectedFrameId] = useState('');
   const [frameData, setFrameData] = useState({
     name: '',
@@ -21,7 +26,12 @@ function Admin() {
     category_id: '',
   });
   const [categoryData, setCategoryData] = useState({ frameCategory: '' });
-  const [mackBoardData, setMackBoardData] = useState({ board_name: '', image: null }); // State for MackBoard form
+  const [mackBoardData, setMackBoardData] = useState({ board_name: '', image: null });
+  const [mugData, setMugData] = useState({ mug_name: '', price: '', image: null });
+  const [capData, setCapData] = useState({ cap_name: '', price: '', image: null });
+  const [tshirtData, setTshirtData] = useState({ tshirt_name: '', price: '', image: null });
+  const [tileData, setTileData] = useState({ tile_name: '', price: '', image: null });
+  const [penData, setPenData] = useState({ pen_name: '', price: '', image: null });
   const [variants, setVariants] = useState({
     color: [{ color_name: '', image: null, corner_image: null, image_key: `color_0_${Date.now()}`, price: '' }],
     size: [{ size_name: '', inner_width: '', inner_height: '', image: null, corner_image: null, image_key: `size_0_${Date.now()}`, price: '' }],
@@ -39,21 +49,31 @@ function Admin() {
     }
   }, [user, navigate]);
 
-  // Fetch frames, categories, and MackBoards
+  // Fetch all data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [framesResponse, categoriesResponse, mackBoardsResponse] = await Promise.all([
+        const [framesResponse, categoriesResponse, mackBoardsResponse, mugsResponse, capsResponse, tshirtsResponse, tilesResponse, pensResponse] = await Promise.all([
           axios.get('http://82.180.146.4:8001/frames/'),
           axios.get('http://82.180.146.4:8001/categories/'),
           axios.get('http://82.180.146.4:8001/mack_boards/'),
+          axios.get('http://82.180.146.4:8001/mugs/'),
+          axios.get('http://82.180.146.4:8001/caps/'),
+          axios.get('http://82.180.146.4:8001/tshirts/'),
+          axios.get('http://82.180.146.4:8001/tiles/'),
+          axios.get('http://82.180.146.4:8001/pens/'),
         ]);
         setFrames(framesResponse.data);
         setCategories(categoriesResponse.data);
         setMackBoards(mackBoardsResponse.data);
+        setMugs(mugsResponse.data);
+        setCaps(capsResponse.data);
+        setTshirts(tshirtsResponse.data);
+        setTiles(tilesResponse.data);
+        setPens(pensResponse.data);
       } catch (err) {
         console.error('Failed to fetch data:', err);
-        setError('Failed to load frames, categories, or MackBoards.');
+        setError('Failed to load data.');
       }
     };
     fetchData();
@@ -89,6 +109,31 @@ function Admin() {
   const handleMackBoardChange = (e) => {
     const { name, value, files } = e.target;
     setMackBoardData({ ...mackBoardData, [name]: files ? files[0] : value });
+  };
+
+  const handleMugChange = (e) => {
+    const { name, value, files } = e.target;
+    setMugData({ ...mugData, [name]: files ? files[0] : value });
+  };
+
+  const handleCapChange = (e) => {
+    const { name, value, files } = e.target;
+    setCapData({ ...capData, [name]: files ? files[0] : value });
+  };
+
+  const handleTshirtChange = (e) => {
+    const { name, value, files } = e.target;
+    setTshirtData({ ...tshirtData, [name]: files ? files[0] : value });
+  };
+
+  const handleTileChange = (e) => {
+    const { name, value, files } = e.target;
+    setTileData({ ...tileData, [name]: files ? files[0] : value });
+  };
+
+  const handlePenChange = (e) => {
+    const { name, value, files } = e.target;
+    setPenData({ ...penData, [name]: files ? files[0] : value });
   };
 
   const handleVariantChange = (variantType, index, e) => {
@@ -217,6 +262,316 @@ function Admin() {
         }
       } else {
         setError('Failed to create MackBoard: ' + (error.response?.data?.detail || error.message));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMugSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('mug_name', mugData.mug_name);
+      formData.append('price', mugData.price);
+      if (mugData.image) {
+        formData.append('image', mugData.image);
+      }
+      const response = await axios.post('http://82.180.146.4:8001/mugs/', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setMugs([...mugs, response.data]);
+      setMugData({ mug_name: '', price: '', image: null });
+      alert('Mug created successfully!');
+    } catch (error) {
+      console.error('Mug creation error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (newToken) {
+          try {
+            const formData = new FormData();
+            formData.append('mug_name', mugData.mug_name);
+            formData.append('price', mugData.price);
+            if (mugData.image) {
+              formData.append('image', mugData.image);
+            }
+            const response = await axios.post('http://82.180.146.4:8001/mugs/', formData, {
+              headers: {
+                Authorization: `Bearer ${newToken}`,
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+            setMugs([...mugs, response.data]);
+            setMugData({ mug_name: '', price: '', image: null });
+            alert('Mug created successfully!');
+          } catch (retryError) {
+            setError('Session expired. Please log in again.');
+            navigate('/login');
+          }
+        } else {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+        }
+      } else {
+        setError('Failed to create Mug: ' + (error.response?.data?.detail || error.message));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCapSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('cap_name', capData.cap_name);
+      formData.append('price', capData.price);
+      if (capData.image) {
+        formData.append('image', capData.image);
+      }
+      const response = await axios.post('http://82.180.146.4:8001/caps/', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setCaps([...caps, response.data]);
+      setCapData({ cap_name: '', price: '', image: null });
+      alert('Cap created successfully!');
+    } catch (error) {
+      console.error('Cap creation error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (newToken) {
+          try {
+            const formData = new FormData();
+            formData.append('cap_name', capData.cap_name);
+            formData.append('price', capData.price);
+            if (capData.image) {
+              formData.append('image', capData.image);
+            }
+            const response = await axios.post('http://82.180.146.4:8001/caps/', formData, {
+              headers: {
+                Authorization: `Bearer ${newToken}`,
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+            setCaps([...caps, response.data]);
+            setCapData({ cap_name: '', price: '', image: null });
+            alert('Cap created successfully!');
+          } catch (retryError) {
+            setError('Session expired. Please log in again.');
+            navigate('/login');
+          }
+        } else {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+        }
+      } else {
+        setError('Failed to create Cap: ' + (error.response?.data?.detail || error.message));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTshirtSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('tshirt_name', tshirtData.tshirt_name);
+      formData.append('price', tshirtData.price);
+      if (tshirtData.image) {
+        formData.append('image', tshirtData.image);
+      }
+      const response = await axios.post('http://82.180.146.4:8001/tshirts/', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setTshirts([...tshirts, response.data]);
+      setTshirtData({ tshirt_name: '', price: '', image: null });
+      alert('Tshirt created successfully!');
+    } catch (error) {
+      console.error('Tshirt creation error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (newToken) {
+          try {
+            const formData = new FormData();
+            formData.append('tshirt_name', tshirtData.tshirt_name);
+            formData.append('price', tshirtData.price);
+            if (tshirtData.image) {
+              formData.append('image', tshirtData.image);
+            }
+            const response = await axios.post('http://82.180.146.4:8001/tshirts/', formData, {
+              headers: {
+                Authorization: `Bearer ${newToken}`,
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+            setTshirts([...tshirts, response.data]);
+            setTshirtData({ tshirt_name: '', price: '', image: null });
+            alert('Tshirt created successfully!');
+          } catch (retryError) {
+            setError('Session expired. Please log in again.');
+            navigate('/login');
+          }
+        } else {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+        }
+      } else {
+        setError('Failed to create Tshirt: ' + (error.response?.data?.detail || error.message));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTileSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('tile_name', tileData.tile_name);
+      formData.append('price', tileData.price);
+      if (tileData.image) {
+        formData.append('image', tileData.image);
+      }
+      const response = await axios.post('http://82.180.146.4:8001/tiles/', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setTiles([...tiles, response.data]);
+      setTileData({ tile_name: '', price: '', image: null });
+      alert('Tile created successfully!');
+    } catch (error) {
+      console.error('Tile creation error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (newToken) {
+          try {
+            const formData = new FormData();
+            formData.append('tile_name', tileData.tile_name);
+            formData.append('price', tileData.price);
+            if (tileData.image) {
+              formData.append('image', tileData.image);
+            }
+            const response = await axios.post('http://82.180.146.4:8001/tiles/', formData, {
+              headers: {
+                Authorization: `Bearer ${newToken}`,
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+            setTiles([...tiles, response.data]);
+            setTileData({ tile_name: '', price: '', image: null });
+            alert('Tile created successfully!');
+          } catch (retryError) {
+            setError('Session expired. Please log in again.');
+            navigate('/login');
+          }
+        } else {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+        }
+      } else {
+        setError('Failed to create Tile: ' + (error.response?.data?.detail || error.message));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePenSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('pen_name', penData.pen_name);
+      formData.append('price', penData.price);
+      if (penData.image) {
+        formData.append('image', penData.image);
+      }
+      const response = await axios.post('http://82.180.146.4:8001/pens/', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setPens([...pens, response.data]);
+      setPenData({ pen_name: '', price: '', image: null });
+      alert('Pen created successfully!');
+    } catch (error) {
+      console.error('Pen creation error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (newToken) {
+          try {
+            const formData = new FormData();
+            formData.append('pen_name', penData.pen_name);
+            formData.append('price', penData.price);
+            if (penData.image) {
+              formData.append('image', penData.image);
+            }
+            const response = await axios.post('http://82.180.146.4:8001/pens/', formData, {
+              headers: {
+                Authorization: `Bearer ${newToken}`,
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+            setPens([...pens, response.data]);
+            setPenData({ pen_name: '', price: '', image: null });
+            alert('Pen created successfully!');
+          } catch (retryError) {
+            setError('Session expired. Please log in again.');
+            navigate('/login');
+          }
+        } else {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+        }
+      } else {
+        setError('Failed to create Pen: ' + (error.response?.data?.detail || error.message));
       }
     } finally {
       setIsLoading(false);
@@ -578,6 +933,206 @@ function Admin() {
         </div>
         <button type="submit" className="btn btn-primary" disabled={isLoading}>
           {isLoading ? 'Creating...' : 'Create MackBoard'}
+        </button>
+      </form>
+
+      <h3>Create Mug</h3>
+      <form onSubmit={handleMugSubmit} className="mb-4">
+        <div className="mb-3">
+          <label className="form-label">Mug Name</label>
+          <input
+            type="text"
+            name="mug_name"
+            value={mugData.mug_name}
+            onChange={handleMugChange}
+            className="form-control"
+            required
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Price</label>
+          <input
+            type="number"
+            name="price"
+            value={mugData.price}
+            onChange={handleMugChange}
+            className="form-control"
+            required
+            step="0.01"
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Image (Optional)</label>
+          <input
+            type="file"
+            name="image"
+            onChange={handleMugChange}
+            className="form-control"
+            accept="image/*"
+          />
+        </div>
+        <button type="submit" className="btn btn-primary" disabled={isLoading}>
+          {isLoading ? 'Creating...' : 'Create Mug'}
+        </button>
+      </form>
+
+      <h3>Create Cap</h3>
+      <form onSubmit={handleCapSubmit} className="mb-4">
+        <div className="mb-3">
+          <label className="form-label">Cap Name</label>
+          <input
+            type="text"
+            name="cap_name"
+            value={capData.cap_name}
+            onChange={handleCapChange}
+            className="form-control"
+            required
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Price</label>
+          <input
+            type="number"
+            name="price"
+            value={capData.price}
+            onChange={handleCapChange}
+            className="form-control"
+            required
+            step="0.01"
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Image (Optional)</label>
+          <input
+            type="file"
+            name="image"
+            onChange={handleCapChange}
+            className="form-control"
+            accept="image/*"
+          />
+        </div>
+        <button type="submit" className="btn btn-primary" disabled={isLoading}>
+          {isLoading ? 'Creating...' : 'Create Cap'}
+        </button>
+      </form>
+
+      <h3>Create Tshirt</h3>
+      <form onSubmit={handleTshirtSubmit} className="mb-4">
+        <div className="mb-3">
+          <label className="form-label">Tshirt Name</label>
+          <input
+            type="text"
+            name="tshirt_name"
+            value={tshirtData.tshirt_name}
+            onChange={handleTshirtChange}
+            className="form-control"
+            required
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Price</label>
+          <input
+            type="number"
+            name="price"
+            value={tshirtData.price}
+            onChange={handleTshirtChange}
+            className="form-control"
+            required
+            step="0.01"
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Image (Optional)</label>
+          <input
+            type="file"
+            name="image"
+            onChange={handleTshirtChange}
+            className="form-control"
+            accept="image/*"
+          />
+        </div>
+        <button type="submit" className="btn btn-primary" disabled={isLoading}>
+          {isLoading ? 'Creating...' : 'Create Tshirt'}
+        </button>
+      </form>
+
+      <h3>Create Tile</h3>
+      <form onSubmit={handleTileSubmit} className="mb-4">
+        <div className="mb-3">
+          <label className="form-label">Tile Name</label>
+          <input
+            type="text"
+            name="tile_name"
+            value={tileData.tile_name}
+            onChange={handleTileChange}
+            className="form-control"
+            required
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Price</label>
+          <input
+            type="number"
+            name="price"
+            value={tileData.price}
+            onChange={handleTileChange}
+            className="form-control"
+            required
+            step="0.01"
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Image (Optional)</label>
+          <input
+            type="file"
+            name="image"
+            onChange={handleTileChange}
+            className="form-control"
+            accept="image/*"
+          />
+        </div>
+        <button type="submit" className="btn btn-primary" disabled={isLoading}>
+          {isLoading ? 'Creating...' : 'Create Tile'}
+        </button>
+      </form>
+
+      <h3>Create Pen</h3>
+      <form onSubmit={handlePenSubmit} className="mb-4">
+        <div className="mb-3">
+          <label className="form-label">Pen Name</label>
+          <input
+            type="text"
+            name="pen_name"
+            value={penData.pen_name}
+            onChange={handlePenChange}
+            className="form-control"
+            required
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Price</label>
+          <input
+            type="number"
+            name="price"
+            value={penData.price}
+            onChange={handlePenChange}
+            className="form-control"
+            required
+            step="0.01"
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Image (Optional)</label>
+          <input
+            type="file"
+            name="image"
+            onChange={handlePenChange}
+            className="form-control"
+            accept="image/*"
+          />
+        </div>
+        <button type="submit" className="btn btn-primary" disabled={isLoading}>
+          {isLoading ? 'Creating...' : 'Create Pen'}
         </button>
       </form>
 

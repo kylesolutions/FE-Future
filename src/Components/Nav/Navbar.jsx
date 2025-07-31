@@ -90,6 +90,9 @@ function Navbar() {
                 <li className="nav-item">
                   <Link className="nav-link" to="/ordersview">Order List</Link>
                 </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/giftorder">Gift Order List</Link>
+                </li>
               </>
             )}
           </ul>

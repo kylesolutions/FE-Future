@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import './Payment.css';
 
 const BASE_URL = 'http://82.180.146.4:8001';
 
@@ -33,15 +34,31 @@ function Payment() {
           setLoading(false);
         } else {
           // Fetch pending orders for non-admins
-          const response = await axios.get(`${BASE_URL}/save-items/`, {
+          const savedItemsResponse = await axios.get(`${BASE_URL}/save-items/`, {
             headers: { Authorization: `Bearer ${token}` },
           });
-          const pendingOrders = response.data.filter(item => item.status === 'pending');
-          setSavedOrders(pendingOrders);
+          const giftOrdersResponse = await axios.get(`${BASE_URL}/gift-orders/list/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          console.log('Raw SavedItems response:', savedItemsResponse.data);
+          console.log('Raw GiftOrders response:', giftOrdersResponse.data);
+
+          const savedItems = savedItemsResponse.data
+            .filter(item => item.status?.trim().toLowerCase() === 'pending')
+            .map(item => ({ ...item, type: 'frame' }));
+          const giftOrders = giftOrdersResponse.data
+            .filter(item => item.status?.trim().toLowerCase() === 'pending')
+            .map(item => ({ ...item, type: 'gift' }));
+
+          const combinedOrders = [...savedItems, ...giftOrders];
+          console.log('Processed orders:', combinedOrders);
+          setSavedOrders(combinedOrders);
           setLoading(false);
         }
       } catch (error) {
         console.error('Error fetching saved orders:', error.response?.data || error.message);
+        setSubmissionError('Failed to load orders. Please try again.');
         setLoading(false);
         if (error.response?.status === 401) {
           localStorage.removeItem('token');
@@ -80,21 +97,32 @@ function Payment() {
       if (!token) throw new Error('Not authenticated');
 
       // Prepare order details for email
-      const orderDetails = savedOrders.map((item) => ({
-        frame: item.frame?.name || 'None',
-        color: item.color_variant?.color_name || 'None',
-        size: item.size_variant?.size_name || 'None',
-        finish: item.finish_variant?.finish_name || 'None',
-        hanging: item.hanging_variant?.hanging_name || 'None',
-        printSize: `${item.print_width || 'N/A'} x ${item.print_height || 'N/A'} ${item.print_unit || 'inches'}`,
-        mediaType: item.media_type || 'None',
-        paperType: item.media_type === 'Photopaper' && item.paper_type ? item.paper_type : 'None',
-        fit: item.fit || 'None',
-        frameDepth: item.frame_depth ? `${item.frame_depth} px` : 'None',
-        borderDepth: item.fit === 'bordered' ? `${item.border_depth || 0} px` : 'None',
-        borderColor: item.fit === 'bordered' ? item.border_color || '#ffffff' : 'None',
-        price: item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00',
-      }));
+      const orderDetails = savedOrders.map((item) => {
+        if (item.type === 'gift') {
+          return {
+            type: 'gift',
+            content_type: item.content_type.split(' | ')[1],
+            object_id: item.object_id,
+            price: parseFloat(item.total_price).toFixed(2),
+          };
+        }
+        return {
+          type: 'frame',
+          frame: item.frame?.name || 'None',
+          color: item.color_variant?.color_name || 'None',
+          size: item.size_variant?.size_name || 'None',
+          finish: item.finish_variant?.finish_name || 'None',
+          hanging: item.hanging_variant?.hanging_name || 'None',
+          printSize: `${item.print_width || 'N/A'} x ${item.print_height || 'N/A'} ${item.print_unit || 'inches'}`,
+          mediaType: item.media_type || 'None',
+          paperType: item.media_type === 'Photopaper' && item.paper_type ? item.paper_type : 'None',
+          fit: item.fit || 'None',
+          frameDepth: item.frame_depth ? `${item.frame_depth} px` : 'None',
+          borderDepth: item.fit === 'bordered' ? `${item.border_depth || 0} px` : 'None',
+          borderColor: item.fit === 'bordered' ? item.border_color || '#ffffff' : 'None',
+          price: item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00',
+        };
+      });
 
       const totalCost = savedOrders.reduce((sum, item) => sum + (item.total_price ? parseFloat(item.total_price) : 0), 0);
 
@@ -114,14 +142,29 @@ function Payment() {
         }
       );
 
-      // Update saved orders status to 'paid'
-      await axios.post(
-        `${BASE_URL}/update-saved-items-status/`,
-        { orderIds: savedOrders.map((item) => item.id) },
-        {
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        }
-      );
+      // Update saved items status
+      const savedItemIds = savedOrders.filter(item => item.type === 'frame').map(item => item.id);
+      if (savedItemIds.length > 0) {
+        await axios.post(
+          `${BASE_URL}/update-saved-items-status/`,
+          { orderIds: savedItemIds },
+          {
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Update gift orders status
+      const giftOrderIds = savedOrders.filter(item => item.type === 'gift').map(item => item.id);
+      if (giftOrderIds.length > 0) {
+        await axios.post(
+          `${BASE_URL}/update-gift-orders-status/`,
+          { orderIds: giftOrderIds },
+          {
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          }
+        );
+      }
 
       setSubmissionError('');
       setSubmissionSuccess(true);
@@ -174,23 +217,28 @@ function Payment() {
                 ${savedOrders.map((item) => `
                   <tr>
                     <td>
-                      <img src="${getImageUrl(item.adjusted_image || item.cropped_image || item.original_image)}" alt="Item" style="width: 50px; height: 50px; object-fit: cover;" />
+                      <img src="${getImageUrl(item.adjusted_image || item.cropped_image || item.uploaded_image || item.original_image)}" alt="Item" style="width: 50px; height: 50px; object-fit: cover;" />
                     </td>
                     <td>
-                      <p><strong>Frame:</strong> ${item.frame?.name || 'None'}</p>
-                      ${item.color_variant ? `<p><strong>Color:</strong> ${item.color_variant.color_name}</p>` : ''}
-                      ${item.size_variant ? `<p><strong>Size:</strong> ${item.size_variant.size_name}</p>` : ''}
-                      ${item.finish_variant ? `<p><strong>Finish:</strong> ${item.finish_variant.finish_name}</p>` : ''}
-                      ${item.hanging_variant ? `<p><strong>Hanging:</strong> ${item.hanging_variant.hanging_name}</p>` : ''}
-                      ${(item.print_width || item.print_height) ? `<p><strong>Print Size:</strong> ${item.print_width || 'N/A'} x ${item.print_height || 'N/A'} ${item.print_unit}</p>` : ''}
-                      <p><strong>Media Type:</strong> ${item.media_type || 'None'}</p>
-                      ${item.media_type === 'Photopaper' && item.paper_type ? `<p><strong>Paper Type:</strong> ${item.paper_type}</p>` : ''}
-                      <p><strong>Fit:</strong> ${item.fit || 'None'}</p>
-                      ${item.frame_depth ? `<p><strong>Frame Depth:</strong> ${item.frame_depth} px</p>` : ''}
-                      ${item.fit === 'bordered' ? `
-                        <p><strong>Border Depth:</strong> ${item.border_depth || 0} px</p>
-                        <p><strong>Border Color:</strong> ${item.border_color || '#ffffff'}</p>
-                      ` : ''}
+                      ${item.type === 'gift' ? `
+                        <p><strong>Item Type:</strong> ${item.content_type.split(' | ')[1]}</p>
+                        <p><strong>Item ID:</strong> ${item.object_id}</p>
+                      ` : `
+                        <p><strong>Frame:</strong> ${item.frame?.name || 'None'}</p>
+                        ${item.color_variant ? `<p><strong>Color:</strong> ${item.color_variant.color_name}</p>` : ''}
+                        ${item.size_variant ? `<p><strong>Size:</strong> ${item.size_variant.size_name}</p>` : ''}
+                        ${item.finish_variant ? `<p><strong>Finish:</strong> ${item.finish_variant.finish_name}</p>` : ''}
+                        ${item.hanging_variant ? `<p><strong>Hanging:</strong> ${item.hanging_variant.hanging_name}</p>` : ''}
+                        ${(item.print_width || item.print_height) ? `<p><strong>Print Size:</strong> ${item.print_width || 'N/A'} x ${item.print_height || 'N/A'} ${item.print_unit}</p>` : ''}
+                        <p><strong>Media Type:</strong> ${item.media_type || 'None'}</p>
+                        ${item.media_type === 'Photopaper' && item.paper_type ? `<p><strong>Paper Type:</strong> ${item.paper_type}</p>` : ''}
+                        <p><strong>Fit:</strong> ${item.fit || 'None'}</p>
+                        ${item.frame_depth ? `<p><strong>Frame Depth:</strong> ${item.frame_depth} px</p>` : ''}
+                        ${item.fit === 'bordered' ? `
+                          <p><strong>Border Depth:</strong> ${item.border_depth || 0} px</p>
+                          <p><strong>Border Color:</strong> ${item.border_color || '#ffffff'}</p>
+                        ` : ''}
+                      `}
                     </td>
                     <td>$${item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00'}</td>
                     <td>${item.status || 'Pending'}</td>
@@ -232,19 +280,30 @@ function Payment() {
         <div className="col-md-6">
           <h4>Order Summary</h4>
           {savedOrders.map((item) => (
-            <div key={item.id} className="card mb-3">
+            <div key={`${item.type}-${item.id}`} className="card mb-3">
               <div className="card-body d-flex align-items-center">
                 <img
-                  src={getImageUrl(item.adjusted_image || item.cropped_image || item.original_image)}
+                  src={getImageUrl(item.adjusted_image || item.cropped_image || item.uploaded_image || item.original_image)}
                   alt="Item"
                   style={{ height: '80px', width: '80px', objectFit: 'cover', marginRight: '15px' }}
                   onError={(e) => { e.target.src = 'https://via.placeholder.com/80x80?text=Image+Not+Found'; }}
                 />
                 <div>
-                  <p><strong>Frame:</strong> {item.frame?.name || 'None'}</p>
-                  <p><strong>Print Size:</strong> {item.print_width || 'N/A'} x {item.print_height || 'N/A'} {item.print_unit}</p>
-                  <p><strong>Price:</strong> ${item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00'}</p>
-                  <p><strong>Status:</strong> {item.status || 'Pending'}</p>
+                  {item.type === 'gift' ? (
+                    <>
+                      <p><strong>Item Type:</strong> {item.content_type.split(' | ')[1]}</p>
+                      <p><strong>Item ID:</strong> {item.object_id}</p>
+                      <p><strong>Price:</strong> ${parseFloat(item.total_price).toFixed(2)}</p>
+                      <p><strong>Status:</strong> {item.status || 'Pending'}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p><strong>Frame:</strong> {item.frame?.name || 'None'}</p>
+                      <p><strong>Print Size:</strong> {item.print_width || 'N/A'} x {item.print_height || 'N/A'} {item.print_unit}</p>
+                      <p><strong>Price:</strong> ${item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00'}</p>
+                      <p><strong>Status:</strong> {item.status || 'Pending'}</p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

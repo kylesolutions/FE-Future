@@ -32,6 +32,22 @@ function FirstTab() {
               Print & Frame
             </button>
           </div>
+          <div className="col-12 col-sm-6 col-md-4 col-lg-3 d-flex justify-content-center">
+            <button
+              className="main-button"
+              onClick={() => navigate('/document', { state: { isDocumentPrinting: true } })}
+            >
+              Document Printing
+            </button>
+          </div>
+          <div className="col-12 col-sm-6 col-md-4 col-lg-3 d-flex justify-content-center">
+            <button
+              className="main-button"
+              onClick={() => navigate('/gifting', { state: { isGiftPrinting: true } })}
+            >
+              Gift Printing
+            </button>
+          </div>
         </div>
       </div>
     </div>
