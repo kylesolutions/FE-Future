@@ -13,6 +13,7 @@ function Payment() {
     name: '',
     email: '',
     phone: '',
+    customMessage: '', // New field for custom message
   });
   const [submissionError, setSubmissionError] = useState('');
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
@@ -28,12 +29,10 @@ function Payment() {
         const token = localStorage.getItem('token');
         if (!token) throw new Error('Not authenticated');
 
-        // Use orders from location.state if provided
         if (location.state?.selectedOrders) {
           setSavedOrders(location.state.selectedOrders);
           setLoading(false);
         } else {
-          // Fetch pending orders for non-admins
           const savedItemsResponse = await axios.get(`${BASE_URL}/save-items/`, {
             headers: { Authorization: `Bearer ${token}` },
           });
@@ -80,7 +79,7 @@ function Payment() {
     e.preventDefault();
     // Basic validation
     if (!customerDetails.name || !customerDetails.email || !customerDetails.phone) {
-      setSubmissionError('Please fill in all customer details.');
+      setSubmissionError('Please fill in all required customer details.');
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerDetails.email)) {
@@ -109,10 +108,10 @@ function Payment() {
         return {
           type: 'frame',
           frame: item.frame?.name || 'None',
-          color: item.color_variant?.color_name || 'None',
-          size: item.size_variant?.size_name || 'None',
-          finish: item.finish_variant?.finish_name || 'None',
-          hanging: item.hanging_variant?.hanging_name || 'None',
+          color: item.color_variant?.name || 'None',
+          size: item.size_variant?.name || 'None',
+          finish: item.finish_variant?.name || 'None',
+          hanging: item.hanging_variant?.name || 'None',
           printSize: `${item.print_width || 'N/A'} x ${item.print_height || 'N/A'} ${item.print_unit || 'inches'}`,
           mediaType: item.media_type || 'None',
           paperType: item.media_type === 'Photopaper' && item.paper_type ? item.paper_type : 'None',
@@ -120,6 +119,11 @@ function Payment() {
           frameDepth: item.frame_depth ? `${item.frame_depth} px` : 'None',
           borderDepth: item.fit === 'bordered' ? `${item.border_depth || 0} px` : 'None',
           borderColor: item.fit === 'bordered' ? item.border_color || '#ffffff' : 'None',
+          mackBoards: item.mack_boards && item.mack_boards.length > 0
+            ? item.mack_boards
+                .map((mb) => `${mb.mack_board?.board_name || 'N/A'} (${mb.mack_board_color?.color_name || 'N/A'}, ${mb.width}px)`)
+                .join(', ')
+            : 'None',
           price: item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00',
         };
       });
@@ -136,6 +140,7 @@ function Payment() {
           orderDetails,
           totalCost: totalCost.toFixed(2),
           senderEmail: 'jayalakshmikyle@gmail.com',
+          customMessage: customerDetails.customMessage, // Include custom message
         },
         {
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -193,6 +198,7 @@ function Payment() {
             .bill-table th, .bill-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
             .bill-table th { background-color: #f2f2f2; }
             .total { margin-top: 20px; font-weight: bold; text-align: right; }
+            .customer-details { margin-top: 20px; }
             @media print {
               .no-print { display: none; }
             }
@@ -203,6 +209,12 @@ function Payment() {
             <div class="bill-header">
               <h1>Order Bill</h1>
               <p>Date: ${new Date().toLocaleDateString()}</p>
+            </div>
+            <div class="customer-details">
+              <p><strong>Customer Name:</strong> ${customerDetails.name || 'N/A'}</p>
+              <p><strong>Email:</strong> ${customerDetails.email || 'N/A'}</p>
+              <p><strong>Phone:</strong> ${customerDetails.phone || 'N/A'}</p>
+              ${customerDetails.customMessage ? `<p><strong>Custom Message:</strong> ${customerDetails.customMessage}</p>` : ''}
             </div>
             <table class="bill-table">
               <thead>
@@ -225,10 +237,10 @@ function Payment() {
                         <p><strong>Item ID:</strong> ${item.object_id}</p>
                       ` : `
                         <p><strong>Frame:</strong> ${item.frame?.name || 'None'}</p>
-                        ${item.color_variant ? `<p><strong>Color:</strong> ${item.color_variant.color_name}</p>` : ''}
-                        ${item.size_variant ? `<p><strong>Size:</strong> ${item.size_variant.size_name}</p>` : ''}
-                        ${item.finish_variant ? `<p><strong>Finish:</strong> ${item.finish_variant.finish_name}</p>` : ''}
-                        ${item.hanging_variant ? `<p><strong>Hanging:</strong> ${item.hanging_variant.hanging_name}</p>` : ''}
+                        ${item.color_variant ? `<p><strong>Color:</strong> ${item.color_variant.name}</p>` : ''}
+                        ${item.size_variant ? `<p><strong>Size:</strong> ${item.size_variant.name}</p>` : ''}
+                        ${item.finish_variant ? `<p><strong>Finish:</strong> ${item.finish_variant.name}</p>` : ''}
+                        ${item.hanging_variant ? `<p><strong>Hanging:</strong> ${item.hanging_variant.name}</p>` : ''}
                         ${(item.print_width || item.print_height) ? `<p><strong>Print Size:</strong> ${item.print_width || 'N/A'} x ${item.print_height || 'N/A'} ${item.print_unit}</p>` : ''}
                         <p><strong>Media Type:</strong> ${item.media_type || 'None'}</p>
                         ${item.media_type === 'Photopaper' && item.paper_type ? `<p><strong>Paper Type:</strong> ${item.paper_type}</p>` : ''}
@@ -237,6 +249,11 @@ function Payment() {
                         ${item.fit === 'bordered' ? `
                           <p><strong>Border Depth:</strong> ${item.border_depth || 0} px</p>
                           <p><strong>Border Color:</strong> ${item.border_color || '#ffffff'}</p>
+                        ` : ''}
+                        ${item.mack_boards && item.mack_boards.length > 0 ? `
+                          <p><strong>Mack Boards:</strong> ${item.mack_boards
+                            .map((mb) => `${mb.mack_board?.board_name || 'N/A'} (${mb.mack_board_color?.color_name || 'N/A'}, ${mb.width}px)`)
+                            .join(', ')}</p>
                         ` : ''}
                       `}
                     </td>
@@ -299,7 +316,21 @@ function Payment() {
                   ) : (
                     <>
                       <p><strong>Frame:</strong> {item.frame?.name || 'None'}</p>
+                      {item.color_variant && <p><strong>Color:</strong> {item.color_variant.name}</p>}
+                      {item.size_variant && <p><strong>Size:</strong> {item.size_variant.name}</p>}
+                      {item.finish_variant && <p><strong>Finish:</strong> {item.finish_variant.name}</p>}
+                      {item.hanging_variant && <p><strong>Hanging:</strong> {item.hanging_variant.name}</p>}
                       <p><strong>Print Size:</strong> {item.print_width || 'N/A'} x {item.print_height || 'N/A'} {item.print_unit}</p>
+                      <p><strong>Media Type:</strong> {item.media_type || 'None'}</p>
+                      {item.media_type === 'Photopaper' && item.paper_type && (
+                        <p><strong>Paper Type:</strong> {item.paper_type}</p>
+                      )}
+                      <p><strong>Fit:</strong> {item.fit || 'None'}</p>
+                      {item.mack_boards && item.mack_boards.length > 0 && (
+                        <p><strong>Mack Boards:</strong> {item.mack_boards
+                          .map((mb) => `${mb.mack_board?.board_name || 'N/A'} (${mb.mack_board_color?.color_name || 'N/A'}, ${mb.width}px)`)
+                          .join(', ')}</p>
+                      )}
                       <p><strong>Price:</strong> ${item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00'}</p>
                       <p><strong>Status:</strong> {item.status || 'Pending'}</p>
                     </>
@@ -333,6 +364,7 @@ function Payment() {
                   value={customerDetails.name}
                   onChange={handleInputChange}
                   placeholder="John Doe"
+                  required
                 />
               </div>
               <div className="mb-3">
@@ -345,6 +377,7 @@ function Payment() {
                   value={customerDetails.email}
                   onChange={handleInputChange}
                   placeholder="example@domain.com"
+                  required
                 />
               </div>
               <div className="mb-3">
@@ -358,6 +391,19 @@ function Payment() {
                   onChange={handleInputChange}
                   placeholder="1234567890"
                   maxLength="10"
+                  required
+                />
+              </div>
+              <div className="mb-3">
+                <label htmlFor="customMessage" className="form-label">Custom Message (Optional)</label>
+                <textarea
+                  className="form-control"
+                  id="customMessage"
+                  name="customMessage"
+                  value={customerDetails.customMessage}
+                  onChange={handleInputChange}
+                  placeholder="Add a custom message to include in the email"
+                  rows="4"
                 />
               </div>
               {submissionError && <div className="alert alert-danger">{submissionError}</div>}

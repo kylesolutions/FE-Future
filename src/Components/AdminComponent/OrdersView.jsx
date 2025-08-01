@@ -6,6 +6,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { format } from 'date-fns';
 
+
 const BASE_URL = 'http://82.180.146.4:8001';
 
 function OrdersView() {
@@ -14,8 +15,9 @@ function OrdersView() {
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
+  const [expandedRows, setExpandedRows] = useState({}); // Track expanded rows
   const navigate = useNavigate();
-  const user = useSelector((state) => state.user); // Access user state from Redux
+  const user = useSelector((state) => state.user);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -142,28 +144,28 @@ function OrdersView() {
   // Download the original image
   const handleDownloadImage = async (imagePath) => {
     try {
-        const token = localStorage.getItem('token');
-        if (!token) throw new Error('Not authenticated');
-        const fullUrl = getImageUrl(imagePath); // Get the correct full URL
-        console.log('Downloading image from:', fullUrl); // Debug log
-        const response = await axios.get(fullUrl, {
-            headers: { Authorization: `Bearer ${token}` },
-            responseType: 'blob', // Handle binary data
-        });
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        const filename = imagePath.split('/').pop() || 'original_image.jpg'; // Extract filename
-        link.setAttribute('download', filename);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
+      const fullUrl = getImageUrl(imagePath);
+      console.log('Downloading image from:', fullUrl);
+      const response = await axios.get(fullUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      const filename = imagePath.split('/').pop() || 'original_image.jpg';
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-        console.error('Error downloading image:', error, 'imagePath:', imagePath);
-        alert('Failed to download image. Please try again.');
+      console.error('Error downloading image:', error, 'imagePath:', imagePath);
+      alert('Failed to download image. Please try again.');
     }
-};
+  };
 
   // Construct image URLs
   const getImageUrl = (path) => {
@@ -172,13 +174,21 @@ function OrdersView() {
     return `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
   };
 
+  // Toggle row expansion
+  const toggleRow = (itemId) => {
+    setExpandedRows((prev) => ({
+      ...prev,
+      [itemId]: !prev[itemId],
+    }));
+  };
+
   // Calculate total cost
   const totalCost = filteredOrders.reduce(
     (sum, item) => sum + (item.total_price ? parseFloat(item.total_price) : 0),
     0
   );
 
-  if (loading) return <div className="text-center mt-5">Loading...</div>;
+  if (loading || isLoading) return <div className="text-center mt-5">Loading...</div>;
   if (filteredOrders.length === 0)
     return <div className="text-center mt-5">No orders found for the selected date range</div>;
 
@@ -222,9 +232,11 @@ function OrdersView() {
         <table className="table table-striped table-bordered">
           <thead className="table">
             <tr>
+              <th></th> {/* For expand/collapse button */}
               <th>Image</th>
               <th>User</th>
               <th>Frame</th>
+              <th>Mack Boards</th>
               <th>Print Size</th>
               <th>Media Type</th>
               <th>Fit</th>
@@ -234,63 +246,137 @@ function OrdersView() {
               <th>Actions</th>
             </tr>
           </thead>
-          
           <tbody>
             {filteredOrders.map((item) => (
-              <tr key={item.id}>
-                <td>
-                  <img
-                    src={getImageUrl(item.adjusted_image || item.cropped_image || item.original_image)}
-                    alt="Item"
-                    style={{ height: '50px', width: '50px', objectFit: 'cover' }}
-                    onError={(e) => {
-                      e.target.src = 'https://via.placeholder.com/50x50?text=Image+Not+Found';
-                    }}
-                  />
-                </td>
-                <td>{item.user?.username || item.user || 'Unknown'}</td>
-                <td>{item.frame?.name || 'None'}</td>
-                <td>
-                  {item.print_width || 'N/A'} x {item.print_height || 'N/A'} {item.print_unit}
-                </td>
-                <td>
-                  {item.media_type || 'None'}
-                  {item.media_type === 'Photopaper' && item.paper_type && ` (${item.paper_type})`}
-                </td>
-                <td>
-                  {item.fit || 'None'}
-                  {item.fit === 'bordered' && (
-                    <div>
-                      <small>
-                        Border: {item.border_depth || 0}px, {item.border_color || '#ffffff'}
-                      </small>
+              <React.Fragment key={item.id}>
+                <tr>
+                  <td>
+                    <button
+                      className="btn btn-link btn-sm"
+                      onClick={() => toggleRow(item.id)}
+                    >
+                      <i className={`bi ${expandedRows[item.id] ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
+                    </button>
+                  </td>
+                  <td>
+                    <img
+                      src={getImageUrl(item.adjusted_image || item.cropped_image || item.original_image)}
+                      alt="Item"
+                      style={{ height: '50px', width: '50px', objectFit: 'cover' }}
+                      onError={(e) => {
+                        e.target.src = 'https://via.placeholder.com/50x50?text=Image+Not+Found';
+                      }}
+                    />
+                  </td>
+                  <td>{item.user?.username || item.user || 'Unknown'}</td>
+                  <td>{item.frame?.name || 'None'}</td>
+                  <td>
+                    {item.mack_boards && item.mack_boards.length > 0
+                      ? item.mack_boards
+                          .map((mb) => `${mb.mack_board?.board_name || 'N/A'} (${mb.mack_board_color?.color_name || 'N/A'})`)
+                          .join(', ')
+                      : 'None'}
+                  </td>
+                  <td>
+                    {item.print_width || 'N/A'} x {item.print_height || 'N/A'} {item.print_unit}
+                  </td>
+                  <td>
+                    {item.media_type || 'None'}
+                    {item.media_type === 'Photopaper' && item.paper_type && ` (${item.paper_type})`}
+                  </td>
+                  <td>
+                    {item.fit || 'None'}
+                    {item.fit === 'bordered' && (
+                      <div>
+                        <small>
+                          Border: {item.border_depth || 0}px, {item.border_color || '#ffffff'}
+                        </small>
+                      </div>
+                    )}
+                  </td>
+                  <td>${item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00'}</td>
+                  <td>
+                    {isAdmin ? (
+                      <select
+                        value={item.status}
+                        onChange={(e) => handleUpdateStatus(item.id, e.target.value)}
+                        className="form-select form-select-sm"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="paid">Paid</option>
+                      </select>
+                    ) : (
+                      item.status
+                    )}
+                  </td>
+                  <td>{format(new Date(item.created_at), 'MM/dd/yyyy HH:mm:ss')}</td>
+                  <td>
+                    <div className="d-flex gap-2">
+                      {(isAdmin || item.user?.id === user?.id) && item.original_image && (
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={() => handleDownloadImage(item.original_image)}
+                        >
+                          <i className="bi bi-download"></i> Download
+                        </button>
+                      )}
+                      {isAdmin && (
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => handleDeleteOrder(item.id)}
+                        >
+                          <i className="bi bi-trash"></i> Delete
+                        </button>
+                      )}
                     </div>
-                  )}
-                </td>
-                <td>${item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00'}</td>
-                <td>{item.status}</td>
-                <td>{format(new Date(item.created_at), 'MM/dd/yyyy HH:mm:ss')}</td>
-                <td>
-                  <div className="d-flex gap-2">
-                    {(isAdmin || item.user?.id === user?.id) && item.original_image && (
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => handleDownloadImage(item.original_image)}
-                      >
-                        <i className="bi bi-download"></i> Download
-                      </button>
-                    )}
-                    {isAdmin && (
-                      <button
-                        className="btn btn-danger btn-sm"
-                        onClick={() => handleDeleteOrder(item.id)}
-                      >
-                        <i className="bi bi-trash"></i> Delete
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
+                  </td>
+                </tr>
+                {expandedRows[item.id] && (
+                  <tr>
+                    <td colSpan="12">
+                      <div className="p-3 bg-light">
+                        <h5>Order Details (ID: {item.id})</h5>
+                        <div className="row">
+                          <div className="col-md-6">
+                            <p><strong>Custom Size:</strong> {item.custom_width || 'N/A'} x {item.custom_height || 'N/A'}</p>
+                            <p><strong>Color Variant:</strong> {item.color_variant?.name || 'None'}</p>
+                            <p><strong>Size Variant:</strong> {item.size_variant?.name || 'None'}</p>
+                            <p><strong>Finish Variant:</strong> {item.finish_variant?.name || 'None'}</p>
+                            <p><strong>Hanging Variant:</strong> {item.hanging_variant?.name || 'None'}</p>
+                            <p><strong>Custom Frame Color:</strong> {item.custom_frame_color || 'None'}</p>
+                          </div>
+                          <div className="col-md-6">
+                            <p><strong>Transformations:</strong></p>
+                            <ul>
+                              <li>X: {item.transform_x || 0}</li>
+                              <li>Y: {item.transform_y || 0}</li>
+                              <li>Scale: {item.scale || 1}</li>
+                              <li>Rotation: {item.rotation || 0}°</li>
+                              <li>Frame Rotation: {item.frame_rotation || 0}°</li>
+                            </ul>
+                            <p><strong>Frame Depth:</strong> {item.frame_depth || 0}px</p>
+                            <p><strong>Border Unit:</strong> {item.border_unit || 'N/A'}</p>
+                            <p><strong>Updated At:</strong> {format(new Date(item.updated_at), 'MM/dd/yyyy HH:mm:ss')}</p>
+                          </div>
+                        </div>
+                        <p><strong>Mack Boards:</strong></p>
+                        {item.mack_boards && item.mack_boards.length > 0 ? (
+                          <ul>
+                            {item.mack_boards.map((mb) => (
+                              <li key={mb.id}>
+                                {mb.mack_board?.board_name || 'N/A'} ({mb.mack_board_color?.color_name || 'N/A'}) - 
+                                Width: {mb.width}px, Position: {mb.position}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p>None</p>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
           </tbody>
         </table>

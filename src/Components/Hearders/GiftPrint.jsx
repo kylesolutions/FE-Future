@@ -572,7 +572,7 @@ function GiftPrint() {
                           }}
                         >
                           {item.image && (
-                            <div className="item-image">
+                            <div className="gift-item-image">
                               <img
                                 src={item.image.startsWith('http') ? item.image : `${BASE_URL}${item.image}`}
                                 alt={item[`${category.slice(0, -1)}_name`] || item.name || 'Item'}
@@ -583,9 +583,9 @@ function GiftPrint() {
                               />
                             </div>
                           )}
-                          <div className="item-info">
+                          <div className="gift-item-info">
                             <h4>{item[`${category.slice(0, -1)}_name`] || item.name || 'Unnamed Item'}</h4>
-                            {item.price && <p className="item-price">${item.price}</p>}
+                            {item.price && <p className="gift-item-price">${item.price}</p>}
                           </div>
                         </div>
                       ))}
@@ -599,8 +599,8 @@ function GiftPrint() {
 
         <div className="main-workspace" ref={containerRef}>
           <div className="workspace-controls">
-            <div className="control-group">
-              <button className="control-btn primary" onClick={triggerFileUpload}>
+            <div className="gift-control-group">
+              <button className="gift-control-btn primary" onClick={triggerFileUpload}>
                 <Upload size={18} />
                 <span>Upload Image</span>
               </button>
@@ -614,9 +614,9 @@ function GiftPrint() {
             </div>
 
             {uploadedImage && (
-              <div className="control-group">
+              <div className="gift-control-group">
                 <button
-                  className={`control-btn ${isCropping ? 'danger' : 'secondary'}`}
+                  className={`gift-control-btn ${isCropping ? 'danger' : 'secondary'}`}
                   onClick={handleCrop}
                 >
                   {isCropping ? <X size={18} /> : <Crop size={18} />}
@@ -624,19 +624,19 @@ function GiftPrint() {
                 </button>
 
                 {isCropping && (
-                  <button className="control-btn success" onClick={applyCrop}>
+                  <button className="gift-control-btn success" onClick={applyCrop}>
                     <Check size={18} />
                     <span>Apply Crop</span>
                   </button>
                 )}
                 {!isCropping && (
-                  <button className="control-btn success" onClick={handleSave}>
+                  <button className="gift-control-btn success" onClick={handleSave}>
                     <Save size={18} />
                     <span>Save</span>
                   </button>
                 )}
                 {selectedItem && uploadedImage && (
-                  <button className="control-btn primary" onClick={handleSaveOrder}>
+                  <button className="gift-control-btn primary" onClick={handleSaveOrder}>
                     <Save size={18} />
                     <span>Save Order</span>
                   </button>
@@ -652,11 +652,11 @@ function GiftPrint() {
           )}
 
           <div className="canvas-workspace">
-            <div className="canvas-container">
+            <div className="gift-canvas-container">
               <Stage
                 width={canvasSize.width}
                 height={canvasSize.height}
-                className="design-canvas"
+                className="gift-design-canvas"
                 ref={stageRef}
                 onClick={handleStageClick}
               >

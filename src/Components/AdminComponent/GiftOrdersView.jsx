@@ -192,6 +192,11 @@ function GiftOrdersView() {
               <th>User</th>
               <th>Item Type</th>
               <th>Item ID</th>
+              <th>Image Position X</th>
+              <th>Image Position Y</th>
+              <th>Image Scale X</th>
+              <th>Image Scale Y</th>
+              <th>Image Rotation</th>
               <th>Price</th>
               <th>Status</th>
               <th>Created At</th>
@@ -215,6 +220,11 @@ function GiftOrdersView() {
                 <td>{order.username || order.user || 'Unknown'}</td>
                 <td>{order.content_type.split(' | ')[1]}</td>
                 <td>{order.object_id}</td>
+                <td>{order.image_position_x}</td>
+                <td>{order.image_position_y}</td>
+                <td>{order.image_scale_x}</td>
+                <td>{order.image_scale_y }</td>
+                <td>{order.image_rotation}</td>
                 <td>${parseFloat(order.total_price).toFixed(2)}</td>
                 <td>{order.status || 'Pending'}</td>
                 <td>{format(new Date(order.created_at), 'MM/dd/yyyy HH:mm:ss')}</td>

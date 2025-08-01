@@ -173,51 +173,6 @@ function SavedOrder() {
                   </div>
                   <div className="d-flex flex-column">
                     <button
-                      className="btn btn-secondary mb-2"
-                      onClick={() => navigate(item.type === 'gift' ? '/gift-designer' : '/', {
-                        state: {
-                          cartItem: {
-                            id: item.id,
-                            type: item.type,
-                            original_image: item.original_image ? getImageUrl(item.original_image) : null,
-                            cropped_image: item.cropped_image ? getImageUrl(item.cropped_image) : null,
-                            adjusted_image: item.adjusted_image ? getImageUrl(item.adjusted_image) : null,
-                            uploaded_image: item.uploaded_image ? getImageUrl(item.uploaded_image) : null,
-                            frame: item.frame || null,
-                            mack_boards: item.mack_boards?.map((mb) => ({
-                              mack_board: mb.mack_board,
-                              width: mb.width,
-                              color: mb.color,
-                            })) || [],
-                            color_variant: item.color_variant || null,
-                            size_variant: item.size_variant || null,
-                            finish_variant: item.finish_variant || null,
-                            hanging_variant: item.hanging_variant || null,
-                            transform_x: item.transform_x || item.image_position_x || 0,
-                            transform_y: item.transform_y || item.image_position_y || 0,
-                            scale: item.scale || Math.min(item.image_scale_x || 1, item.image_scale_y || 1),
-                            rotation: item.rotation || item.image_rotation || 0,
-                            frame_rotation: item.frame_rotation || 0,
-                            print_width: item.print_width || null,
-                            print_height: item.print_height || null,
-                            print_unit: item.print_unit || 'inches',
-                            media_type: item.media_type || 'Photopaper',
-                            paper_type: item.paper_type || null,
-                            fit: item.fit || 'borderless',
-                            border_depth: item.border_depth || 0,
-                            border_color: item.border_color || '#ffffff',
-                            border_unit: item.border_unit || 'px',
-                            status: item.status || 'pending',
-                            custom_frame_color: item.custom_frame_color || null,
-                            content_type: item.content_type || null,
-                            object_id: item.object_id || null,
-                          }
-                        }
-                      })}
-                    >
-                      <i className="bi bi-pencil-square"></i> Edit
-                    </button>
-                    <button
                       className="btn btn-danger"
                       onClick={() => handleRemoveItem(item.id, item.type)}
                     >

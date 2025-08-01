@@ -82,7 +82,7 @@ function Navbar() {
             {isAdmin && (
               <>
                 <li className="nav-item">
-                  <Link className="nav-link" to="/admin/create-frame">Create Frame</Link>
+                  <Link className="nav-link" to="/admin/create-frame">Create</Link>
                 </li>
                 <li className="nav-item">
                   <Link className="nav-link" to="/details">Details</Link>

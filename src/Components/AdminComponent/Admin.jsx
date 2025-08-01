@@ -26,7 +26,7 @@ function Admin() {
     category_id: '',
   });
   const [categoryData, setCategoryData] = useState({ frameCategory: '' });
-  const [mackBoardData, setMackBoardData] = useState({ board_name: '', image: null });
+  const [mackBoardData, setMackBoardData] = useState({ board_name: '', image: null, price: '' });
   const [mugData, setMugData] = useState({ mug_name: '', price: '', image: null });
   const [capData, setCapData] = useState({ cap_name: '', price: '', image: null });
   const [tshirtData, setTshirtData] = useState({ tshirt_name: '', price: '', image: null });
@@ -40,6 +40,8 @@ function Admin() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  // State for color variant form with image support
+  const [colorVariantData, setColorVariantData] = useState({ mack_board_id: '', color_name: '', image: null });
 
   // Redirect if not admin
   useEffect(() => {
@@ -96,6 +98,7 @@ function Admin() {
     }
   };
 
+  // Handlers for form changes
   const handleFrameChange = (e) => {
     const { name, value, files } = e.target;
     setFrameData({ ...frameData, [name]: files ? files[0] : value });
@@ -164,6 +167,76 @@ function Admin() {
     setVariants(newVariants);
   };
 
+  // Handler for color variant form changes, including image
+  const handleColorVariantChange = (e) => {
+    const { name, value, files } = e.target;
+    setColorVariantData({ ...colorVariantData, [name]: files ? files[0] : value });
+  };
+
+  // Submit handler for color variants with image upload
+  const handleColorVariantSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('mack_board', colorVariantData.mack_board_id);
+      formData.append('color_name', colorVariantData.color_name);
+      if (colorVariantData.image) {
+        formData.append('image', colorVariantData.image);
+      }
+      const response = await axios.post('http://82.180.146.4:8001/mack_board_color_variants/', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      alert('Color variant created successfully!');
+      setColorVariantData({ mack_board_id: '', color_name: '', image: null });
+    } catch (error) {
+      console.error('Color variant creation error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (newToken) {
+          try {
+            const formData = new FormData();
+            formData.append('mack_board', colorVariantData.mack_board_id);
+            formData.append('color_name', colorVariantData.color_name);
+            if (colorVariantData.image) {
+              formData.append('image', colorVariantData.image);
+            }
+            const response = await axios.post('http://82.180.146.4:8001/mack_board_color_variants/', formData, {
+              headers: {
+                Authorization: `Bearer ${newToken}`,
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+            alert('Color variant created successfully!');
+            setColorVariantData({ mack_board_id: '', color_name: '', image: null });
+          } catch (retryError) {
+            setError('Session expired. Please log in again.');
+            navigate('/login');
+          }
+        } else {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+        }
+      } else if (error.response?.status === 403) {
+        setError('Only admins can create color variants.');
+      } else {
+        setError('Failed to create color variant: ' + (error.response?.data?.detail || error.message));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Submit handlers for other forms
   const handleCategorySubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -223,6 +296,9 @@ function Admin() {
       if (mackBoardData.image) {
         formData.append('image', mackBoardData.image);
       }
+      if (mackBoardData.price) {
+        formData.append('price', mackBoardData.price);
+      }
       const response = await axios.post('http://82.180.146.4:8001/mack_boards/', formData, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -230,8 +306,8 @@ function Admin() {
         },
       });
       setMackBoards([...mackBoards, response.data]);
-      setMackBoardData({ board_name: '', image: null });
-      alert('MackBoard created successfully!');
+      setMackBoardData({ board_name: '', image: null, price: '' });
+      alert('MatBoard created successfully!');
     } catch (error) {
       console.error('MackBoard creation error:', error.response?.data || error.message);
       if (error.response?.status === 401) {
@@ -243,6 +319,9 @@ function Admin() {
             if (mackBoardData.image) {
               formData.append('image', mackBoardData.image);
             }
+            if (mackBoardData.price) {
+              formData.append('price', mackBoardData.price);
+            }
             const response = await axios.post('http://82.180.146.4:8001/mack_boards/', formData, {
               headers: {
                 Authorization: `Bearer ${newToken}`,
@@ -250,8 +329,8 @@ function Admin() {
               },
             });
             setMackBoards([...mackBoards, response.data]);
-            setMackBoardData({ board_name: '', image: null });
-            alert('MackBoard created successfully!');
+            setMackBoardData({ board_name: '', image: null, price: '' });
+            alert('MatBoard created successfully!');
           } catch (retryError) {
             setError('Session expired. Please log in again.');
             navigate('/login');
@@ -260,8 +339,10 @@ function Admin() {
           setError('Session expired. Please log in again.');
           navigate('/login');
         }
+      } else if (error.response?.status === 403) {
+        setError('Only admins can create MatBoards.');
       } else {
-        setError('Failed to create MackBoard: ' + (error.response?.data?.detail || error.message));
+        setError('Failed to create MatBoard: ' + (error.response?.data?.detail || error.message));
       }
     } finally {
       setIsLoading(false);
@@ -598,10 +679,6 @@ function Admin() {
             formData.append(key, frameData[key]);
           }
         }
-        console.log('Submitting frame data:');
-        for (let [key, value] of formData.entries()) {
-          console.log(`${key}: ${value}`);
-        }
         const frameResponse = await axios.post('http://82.180.146.4:8001/frames/', formData, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -609,7 +686,6 @@ function Admin() {
           },
         });
         frameId = frameResponse.data.id;
-        console.log('Frame created:', frameResponse.data);
         setFrames([...frames, frameResponse.data]);
       } else if (mode === 'edit') {
         frameId = selectedFrameId;
@@ -623,17 +699,12 @@ function Admin() {
             formData.append(key, frameData[key]);
           }
         }
-        console.log('Updating frame data:');
-        for (let [key, value] of formData.entries()) {
-          console.log(`${key}: ${value}`);
-        }
         const frameResponse = await axios.put(`http://82.180.146.4:8001/frames/${frameId}/`, formData, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
           },
         });
-        console.log('Frame updated:', frameResponse.data);
         setFrames(frames.map(f => f.id === Number(frameId) ? frameResponse.data : f));
       } else {
         frameId = selectedFrameId;
@@ -681,13 +752,7 @@ function Admin() {
           }
         });
 
-        console.log('Submitting variants for frame ID:', frameId);
-        console.log('variants:', variantsData);
-        for (let [key, value] of variantFormData.entries()) {
-          console.log(`${key}: ${value}`);
-        }
-
-        const variantResponse = await axios.post(
+        await axios.post(
           `http://82.180.146.4:8001/frames/${frameId}/variants/`,
           variantFormData,
           {
@@ -697,7 +762,6 @@ function Admin() {
             },
           }
         );
-        console.log('Variants created:', variantResponse.data);
       }
 
       alert(
@@ -847,12 +911,7 @@ function Admin() {
         setError('Only admins can perform this action.');
         navigate('/');
       } else {
-        setError(
-          'Failed to submit: ' +
-          (error.response?.data?.errors?.map((e) => e.error).join('; ') ||
-            JSON.stringify(error.response?.data) ||
-            error.message)
-        );
+        setError('Failed to submit: ' + (error.response?.data?.detail || error.message));
       }
     } finally {
       setIsLoading(false);
@@ -908,7 +967,7 @@ function Admin() {
         </button>
       </form>
 
-      <h3>Create MackBoard</h3>
+      <h3>Create MatBoard</h3>
       <form onSubmit={handleMackBoardSubmit} className="mb-4">
         <div className="mb-3">
           <label className="form-label">Board Name</label>
@@ -922,6 +981,17 @@ function Admin() {
           />
         </div>
         <div className="mb-3">
+          <label className="form-label">Price (Optional)</label>
+          <input
+            type="number"
+            name="price"
+            value={mackBoardData.price}
+            onChange={handleMackBoardChange}
+            className="form-control"
+            step="0.01"
+          />
+        </div>
+        <div className="mb-3">
           <label className="form-label">Image (Optional)</label>
           <input
             type="file"
@@ -932,7 +1002,52 @@ function Admin() {
           />
         </div>
         <button type="submit" className="btn btn-primary" disabled={isLoading}>
-          {isLoading ? 'Creating...' : 'Create MackBoard'}
+          {isLoading ? 'Creating...' : 'Create MatBoard'}
+        </button>
+      </form>
+
+      <h3>Create MatBoard Color Variant</h3>
+      <form onSubmit={handleColorVariantSubmit} className="mb-4">
+        <div className="mb-3">
+          <label className="form-label">Select MatBoard</label>
+          <select
+            name="mack_board_id"
+            value={colorVariantData.mack_board_id}
+            onChange={handleColorVariantChange}
+            className="form-control"
+            required
+          >
+            <option value="">-- Select MackBoard --</option>
+            {mackBoards.map((mackBoard) => (
+              <option key={mackBoard.id} value={mackBoard.id}>
+                {mackBoard.board_name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Color Name</label>
+          <input
+            type="text"
+            name="color_name"
+            value={colorVariantData.color_name}
+            onChange={handleColorVariantChange}
+            className="form-control"
+            required
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Color Image</label>
+          <input
+            type="file"
+            name="image"
+            onChange={handleColorVariantChange}
+            className="form-control"
+            accept="image/*"
+          />
+        </div>
+        <button type="submit" className="btn btn-primary" disabled={isLoading}>
+          {isLoading ? 'Creating...' : 'Create Color Variant'}
         </button>
       </form>
 
