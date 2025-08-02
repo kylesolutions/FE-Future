@@ -13,14 +13,14 @@ function Payment() {
     name: '',
     email: '',
     phone: '',
-    customMessage: '', // New field for custom message
+    customMessage: '',
   });
   const [submissionError, setSubmissionError] = useState('');
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const user = useSelector((state) => state.user);
-  const isAdmin = user.type === 'is_staff' || user.type === 'is_superuser';
+  const isAdmin = user.is_staff || user.is_superuser;
 
   // Initialize orders from location state or fetch for non-admins
   useEffect(() => {
@@ -33,15 +33,21 @@ function Payment() {
           setSavedOrders(location.state.selectedOrders);
           setLoading(false);
         } else {
-          const savedItemsResponse = await axios.get(`${BASE_URL}/save-items/`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const giftOrdersResponse = await axios.get(`${BASE_URL}/gift-orders/list/`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const [savedItemsResponse, giftOrdersResponse, documentOrdersResponse] = await Promise.all([
+            axios.get(`${BASE_URL}/save-items/`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => ({ data: [] })),
+            axios.get(`${BASE_URL}/gift-orders/list/`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => ({ data: [] })),
+            axios.get(`${BASE_URL}/api/document-print-orders/`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => ({ data: [] })),
+          ]);
 
           console.log('Raw SavedItems response:', savedItemsResponse.data);
           console.log('Raw GiftOrders response:', giftOrdersResponse.data);
+          console.log('Raw DocumentOrders response:', documentOrdersResponse.data);
 
           const savedItems = savedItemsResponse.data
             .filter(item => item.status?.trim().toLowerCase() === 'pending')
@@ -49,8 +55,11 @@ function Payment() {
           const giftOrders = giftOrdersResponse.data
             .filter(item => item.status?.trim().toLowerCase() === 'pending')
             .map(item => ({ ...item, type: 'gift' }));
+          const documentOrders = documentOrdersResponse.data
+            .filter(item => item.status?.trim().toLowerCase() === 'pending')
+            .map(item => ({ ...item, type: 'document' }));
 
-          const combinedOrders = [...savedItems, ...giftOrders];
+          const combinedOrders = [...savedItems, ...giftOrders, ...documentOrders];
           console.log('Processed orders:', combinedOrders);
           setSavedOrders(combinedOrders);
           setLoading(false);
@@ -104,28 +113,42 @@ function Payment() {
             object_id: item.object_id,
             price: parseFloat(item.total_price).toFixed(2),
           };
+        } else if (item.type === 'document') {
+          return {
+            type: 'document',
+            print_type: item.print_type || 'N/A',
+            print_size: item.print_size || 'N/A',
+            paper_type: item.paper_type || 'N/A',
+            quantity: item.quantity || 'N/A',
+            lamination: item.lamination ? 'Yes' : 'No',
+            lamination_type: item.lamination_type || 'N/A',
+            delivery_method: item.delivery_method || 'N/A',
+            delivery_charge: parseFloat(item.delivery_charge || 0).toFixed(2),
+            price: parseFloat(item.total_price).toFixed(2),
+          };
+        } else {
+          return {
+            type: 'frame',
+            frame: item.frame?.name || 'None',
+            color: item.color_variant?.color_name || 'None',
+            size: item.size_variant?.size_name || 'None',
+            finish: item.finish_variant?.finish_name || 'None',
+            hanging: item.hanging_variant?.hanging_name || 'None',
+            printSize: `${item.print_width || 'N/A'} x ${item.print_height || 'N/A'} ${item.print_unit || 'inches'}`,
+            mediaType: item.media_type || 'None',
+            paperType: item.media_type === 'Photopaper' && item.paper_type ? item.paper_type : 'None',
+            fit: item.fit || 'None',
+            frameDepth: item.frame_depth ? `${item.frame_depth} px` : 'None',
+            borderDepth: item.fit === 'bordered' ? `${item.border_depth || 0} px` : 'None',
+            borderColor: item.fit === 'bordered' ? item.border_color || '#ffffff' : 'None',
+            mackBoards: item.mack_boards && item.mack_boards.length > 0
+              ? item.mack_boards
+                  .map((mb) => `${mb.mack_board?.board_name || 'N/A'} (${mb.mack_board_color?.color_name || 'N/A'}, ${mb.width}px)`)
+                  .join(', ')
+              : 'None',
+            price: item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00',
+          };
         }
-        return {
-          type: 'frame',
-          frame: item.frame?.name || 'None',
-          color: item.color_variant?.name || 'None',
-          size: item.size_variant?.name || 'None',
-          finish: item.finish_variant?.name || 'None',
-          hanging: item.hanging_variant?.name || 'None',
-          printSize: `${item.print_width || 'N/A'} x ${item.print_height || 'N/A'} ${item.print_unit || 'inches'}`,
-          mediaType: item.media_type || 'None',
-          paperType: item.media_type === 'Photopaper' && item.paper_type ? item.paper_type : 'None',
-          fit: item.fit || 'None',
-          frameDepth: item.frame_depth ? `${item.frame_depth} px` : 'None',
-          borderDepth: item.fit === 'bordered' ? `${item.border_depth || 0} px` : 'None',
-          borderColor: item.fit === 'bordered' ? item.border_color || '#ffffff' : 'None',
-          mackBoards: item.mack_boards && item.mack_boards.length > 0
-            ? item.mack_boards
-                .map((mb) => `${mb.mack_board?.board_name || 'N/A'} (${mb.mack_board_color?.color_name || 'N/A'}, ${mb.width}px)`)
-                .join(', ')
-            : 'None',
-          price: item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00',
-        };
       });
 
       const totalCost = savedOrders.reduce((sum, item) => sum + (item.total_price ? parseFloat(item.total_price) : 0), 0);
@@ -140,7 +163,7 @@ function Payment() {
           orderDetails,
           totalCost: totalCost.toFixed(2),
           senderEmail: 'jayalakshmikyle@gmail.com',
-          customMessage: customerDetails.customMessage, // Include custom message
+          customMessage: customerDetails.customMessage,
         },
         {
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -165,6 +188,18 @@ function Payment() {
         await axios.post(
           `${BASE_URL}/update-gift-orders-status/`,
           { orderIds: giftOrderIds },
+          {
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Update document print orders status
+      const documentOrderIds = savedOrders.filter(item => item.type === 'document').map(item => item.id);
+      if (documentOrderIds.length > 0) {
+        await axios.post(
+          `${BASE_URL}/update-document-print-orders-status/`,
+          { orderIds: documentOrderIds },
           {
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
           }
@@ -229,18 +264,31 @@ function Payment() {
                 ${savedOrders.map((item) => `
                   <tr>
                     <td>
-                      <img src="${getImageUrl(item.adjusted_image || item.cropped_image || item.uploaded_image || item.original_image)}" alt="Item" style="width: 50px; height: 50px; object-fit: cover;" />
+                      ${item.type === 'document' ? 
+                        (item.file ? `<a href="${getImageUrl(item.file)}" target="_blank">View Document</a>` : 'No File') :
+                        `<img src="${getImageUrl(item.adjusted_image || item.cropped_image || item.uploaded_image || item.original_image)}" alt="Item" style="width: 50px; height: 50px; object-fit: cover;" />`
+                      }
                     </td>
                     <td>
                       ${item.type === 'gift' ? `
                         <p><strong>Item Type:</strong> ${item.content_type.split(' | ')[1]}</p>
                         <p><strong>Item ID:</strong> ${item.object_id}</p>
+                      ` : item.type === 'document' ? `
+                        <p><strong>Order Type:</strong> Document Print</p>
+                        <p><strong>Print Type:</strong> ${item.print_type || 'N/A'}</p>
+                        <p><strong>Print Size:</strong> ${item.print_size || 'N/A'}</p>
+                        <p><strong>Paper Type:</strong> ${item.paper_type || 'N/A'}</p>
+                        <p><strong>Quantity:</strong> ${item.quantity || 'N/A'}</p>
+                        <p><strong>Lamination:</strong> ${item.lamination ? 'Yes' : 'No'}</p>
+                        ${item.lamination ? `<p><strong>Lamination Type:</strong> ${item.lamination_type || 'N/A'}</p>` : ''}
+                        <p><strong>Delivery Method:</strong> ${item.delivery_method || 'N/A'}</p>
+                        <p><strong>Delivery Charge:</strong> $${parseFloat(item.delivery_charge || 0).toFixed(2)}</p>
                       ` : `
                         <p><strong>Frame:</strong> ${item.frame?.name || 'None'}</p>
-                        ${item.color_variant ? `<p><strong>Color:</strong> ${item.color_variant.name}</p>` : ''}
-                        ${item.size_variant ? `<p><strong>Size:</strong> ${item.size_variant.name}</p>` : ''}
-                        ${item.finish_variant ? `<p><strong>Finish:</strong> ${item.finish_variant.name}</p>` : ''}
-                        ${item.hanging_variant ? `<p><strong>Hanging:</strong> ${item.hanging_variant.name}</p>` : ''}
+                        ${item.color_variant ? `<p><strong>Color:</strong> ${item.color_variant.color_name}</p>` : ''}
+                        ${item.size_variant ? `<p><strong>Size:</strong> ${item.size_variant.size_name}</p>` : ''}
+                        ${item.finish_variant ? `<p><strong>Finish:</strong> ${item.finish_variant.finish_name}</p>` : ''}
+                        ${item.hanging_variant ? `<p><strong>Hanging:</strong> ${item.hanging_variant.hanging_name}</p>` : ''}
                         ${(item.print_width || item.print_height) ? `<p><strong>Print Size:</strong> ${item.print_width || 'N/A'} x ${item.print_height || 'N/A'} ${item.print_unit}</p>` : ''}
                         <p><strong>Media Type:</strong> ${item.media_type || 'None'}</p>
                         ${item.media_type === 'Photopaper' && item.paper_type ? `<p><strong>Paper Type:</strong> ${item.paper_type}</p>` : ''}
@@ -274,7 +322,7 @@ function Payment() {
     printWindow.document.close();
   };
 
-  // Construct image URLs
+  // Construct image/file URLs
   const getImageUrl = (path) => {
     if (!path) return 'https://via.placeholder.com/100x100?text=Image+Not+Found';
     if (path.startsWith('http') || path.startsWith('blob:') || path.startsWith('data:')) return path;
@@ -299,12 +347,24 @@ function Payment() {
           {savedOrders.map((item) => (
             <div key={`${item.type}-${item.id}`} className="card mb-3">
               <div className="card-body d-flex align-items-center">
-                <img
-                  src={getImageUrl(item.adjusted_image || item.cropped_image || item.uploaded_image || item.original_image)}
-                  alt="Item"
-                  style={{ height: '80px', width: '80px', objectFit: 'cover', marginRight: '15px' }}
-                  onError={(e) => { e.target.src = 'https://via.placeholder.com/80x80?text=Image+Not+Found'; }}
-                />
+                {item.type === 'document' ? (
+                  <div style={{ marginRight: '15px' }}>
+                    {item.file ? (
+                      <a href={getImageUrl(item.file)} target="_blank" rel="noopener noreferrer">
+                        View Document
+                      </a>
+                    ) : (
+                      'No File'
+                    )}
+                  </div>
+                ) : (
+                  <img
+                    src={getImageUrl(item.adjusted_image || item.cropped_image || item.uploaded_image || item.original_image)}
+                    alt="Item"
+                    style={{ height: '80px', width: '80px', objectFit: 'cover', marginRight: '15px' }}
+                    onError={(e) => { e.target.src = 'https://via.placeholder.com/80x80?text=Image+Not+Found'; }}
+                  />
+                )}
                 <div>
                   {item.type === 'gift' ? (
                     <>
@@ -313,13 +373,27 @@ function Payment() {
                       <p><strong>Price:</strong> ${parseFloat(item.total_price).toFixed(2)}</p>
                       <p><strong>Status:</strong> {item.status || 'Pending'}</p>
                     </>
+                  ) : item.type === 'document' ? (
+                    <>
+                      <p><strong>Order Type:</strong> Document Print</p>
+                      <p><strong>Print Type:</strong> {item.print_type || 'N/A'}</p>
+                      <p><strong>Print Size:</strong> {item.print_size || 'N/A'}</p>
+                      <p><strong>Paper Type:</strong> {item.paper_type || 'N/A'}</p>
+                      <p><strong>Quantity:</strong> {item.quantity || 'N/A'}</p>
+                      <p><strong>Lamination:</strong> {item.lamination ? 'Yes' : 'No'}</p>
+                      {item.lamination && <p><strong>Lamination Type:</strong> {item.lamination_type || 'N/A'}</p>}
+                      <p><strong>Delivery Method:</strong> {item.delivery_method || 'N/A'}</p>
+                      <p><strong>Delivery Charge:</strong> ${parseFloat(item.delivery_charge || 0).toFixed(2)}</p>
+                      <p><strong>Price:</strong> ${parseFloat(item.total_price).toFixed(2)}</p>
+                      <p><strong>Status:</strong> {item.status || 'Pending'}</p>
+                    </>
                   ) : (
                     <>
                       <p><strong>Frame:</strong> {item.frame?.name || 'None'}</p>
-                      {item.color_variant && <p><strong>Color:</strong> {item.color_variant.name}</p>}
-                      {item.size_variant && <p><strong>Size:</strong> {item.size_variant.name}</p>}
-                      {item.finish_variant && <p><strong>Finish:</strong> {item.finish_variant.name}</p>}
-                      {item.hanging_variant && <p><strong>Hanging:</strong> {item.hanging_variant.name}</p>}
+                      {item.color_variant && <p><strong>Color:</strong> {item.color_variant.color_name}</p>}
+                      {item.size_variant && <p><strong>Size:</strong> {item.size_variant.size_name}</p>}
+                      {item.finish_variant && <p><strong>Finish:</strong> {item.finish_variant.finish_name}</p>}
+                      {item.hanging_variant && <p><strong>Hanging:</strong> {item.hanging_variant.hanging_name}</p>}
                       <p><strong>Print Size:</strong> {item.print_width || 'N/A'} x {item.print_height || 'N/A'} {item.print_unit}</p>
                       <p><strong>Media Type:</strong> {item.media_type || 'None'}</p>
                       {item.media_type === 'Photopaper' && item.paper_type && (

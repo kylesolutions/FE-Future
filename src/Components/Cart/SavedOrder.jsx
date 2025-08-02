@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { FileText } from 'lucide-react'; // Import FileText icon for document orders
 
 const BASE_URL = 'http://82.180.146.4:8001';
 
@@ -18,18 +19,22 @@ function SavedOrder() {
         const token = localStorage.getItem('token');
         if (!token) throw new Error('Not authenticated');
 
-        // Fetch SavedItems
-        const savedItemsResponse = await axios.get(`${BASE_URL}/save-items/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // Fetch SavedItems, GiftOrders, and DocumentPrintOrders
+        const [savedItemsResponse, giftOrdersResponse, documentOrdersResponse] = await Promise.all([
+          axios.get(`${BASE_URL}/save-items/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch(() => ({ data: [] })),
+          axios.get(`${BASE_URL}/gift-orders/list/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch(() => ({ data: [] })),
+          axios.get(`${BASE_URL}/api/document-print-orders/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch(() => ({ data: [] })),
+        ]);
+
         console.log('Raw SavedItems response:', savedItemsResponse.data);
-
-        // Fetch GiftOrders
-        const giftOrdersResponse = await axios.get(`${BASE_URL}/gift-orders/list/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
         console.log('Raw GiftOrders response:', giftOrdersResponse.data);
-
+        console.log('Raw DocumentOrders response:', documentOrdersResponse.data);
         console.log('Authenticated user:', user);
 
         // Combine and process orders
@@ -39,7 +44,10 @@ function SavedOrder() {
         const giftOrders = giftOrdersResponse.data
           .filter(item => item.status?.trim().toLowerCase() === 'pending')
           .map(item => ({ ...item, type: 'gift' }));
-        const orders = [...savedItems, ...giftOrders];
+        const documentOrders = documentOrdersResponse.data
+          .filter(item => item.status?.trim().toLowerCase() === 'pending')
+          .map(item => ({ ...item, type: 'document' }));
+        const orders = [...savedItems, ...giftOrders, ...documentOrders];
         console.log('Processed orders:', orders);
 
         setSavedOrders(orders);
@@ -63,9 +71,14 @@ function SavedOrder() {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Not authenticated');
 
-      const endpoint = itemType === 'gift' 
-        ? `${BASE_URL}/gift-orders/${itemId}/`
-        : `${BASE_URL}/save-items/${itemId}/`;
+      let endpoint;
+      if (itemType === 'gift') {
+        endpoint = `${BASE_URL}/gift-orders/${itemId}/`;
+      } else if (itemType === 'document') {
+        endpoint = `${BASE_URL}/api/document-print-orders/${itemId}/`;
+      } else {
+        endpoint = `${BASE_URL}/save-items/${itemId}/`;
+      }
 
       await axios.delete(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
@@ -122,12 +135,18 @@ function SavedOrder() {
                 <div className="card-body d-flex justify-content-between align-items-center">
                   <div className="d-flex">
                     <div>
-                      <img
-                        src={getImageUrl(item.adjusted_image || item.cropped_image || item.uploaded_image || item.original_image)}
-                        alt="Order item"
-                        style={{ height: '100px', width: '100px', objectFit: 'cover' }}
-                        onError={(e) => { e.target.src = 'https://via.placeholder.com/100x100?text=Image+Not+Found'; }}
-                      />
+                      {item.type === 'document' ? (
+                        <div style={{ height: '100px', width: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8f9fa' }}>
+                          <FileText size={50} color="#6c757d" />
+                        </div>
+                      ) : (
+                        <img
+                          src={getImageUrl(item.adjusted_image || item.cropped_image || item.uploaded_image || item.original_image)}
+                          alt="Order item"
+                          style={{ height: '100px', width: '100px', objectFit: 'cover' }}
+                          onError={(e) => { e.target.src = 'https://via.placeholder.com/100x100?text=Image+Not+Found'; }}
+                        />
+                      )}
                     </div>
                   </div>
                   <div className="flex-grow-1 mx-3">
@@ -135,6 +154,21 @@ function SavedOrder() {
                       <>
                         <p><strong>Item Type:</strong> {item.content_type.split(' | ')[1]}</p>
                         <p><strong>Item ID:</strong> {item.object_id}</p>
+                        <p><strong>Price:</strong> ${parseFloat(item.total_price).toFixed(2)}</p>
+                        <p><strong>Created At:</strong> {formatDate(item.created_at)}</p>
+                        <p><strong>Status:</strong> {item.status || 'Pending'}</p>
+                      </>
+                    ) : item.type === 'document' ? (
+                      <>
+                        <p><strong>Order Type:</strong> Document Print</p>
+                        <p><strong>Print Type:</strong> {item.print_type_name || 'N/A'}</p>
+                        <p><strong>Print Size:</strong> {item.print_size_name || 'N/A'}</p>
+                        <p><strong>Paper Type:</strong> {item.paper_type_name || 'N/A'}</p>
+                        <p><strong>Quantity:</strong> {item.quantity || 'N/A'}</p>
+                        <p><strong>Lamination:</strong> {item.lamination ? 'Yes' : 'No'}</p>
+                        {item.lamination && <p><strong>Lamination Type:</strong> {item.lamination_type_name || 'N/A'}</p>}
+                        <p><strong>Delivery Method:</strong> {item.delivery_method || 'N/A'}</p>
+                        <p><strong>Delivery Charge:</strong> ${parseFloat(item.delivery_charge || 0).toFixed(2)}</p>
                         <p><strong>Price:</strong> ${parseFloat(item.total_price).toFixed(2)}</p>
                         <p><strong>Created At:</strong> {formatDate(item.created_at)}</p>
                         <p><strong>Status:</strong> {item.status || 'Pending'}</p>

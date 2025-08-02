@@ -88,10 +88,13 @@ function Navbar() {
                   <Link className="nav-link" to="/details">Details</Link>
                 </li>
                 <li className="nav-item">
-                  <Link className="nav-link" to="/ordersview">Order List</Link>
+                  <Link className="nav-link" to="/ordersview">Photos Order List</Link>
                 </li>
                 <li className="nav-item">
                   <Link className="nav-link" to="/giftorder">Gift Order List</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/documentorder">Doc Order List</Link>
                 </li>
               </>
             )}

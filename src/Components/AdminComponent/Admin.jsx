@@ -15,6 +15,10 @@ function Admin() {
   const [tshirts, setTshirts] = useState([]);
   const [tiles, setTiles] = useState([]);
   const [pens, setPens] = useState([]);
+  const [printTypes, setPrintTypes] = useState([]);
+  const [printSizes, setPrintSizes] = useState([]);
+  const [paperTypes, setPaperTypes] = useState([]);
+  const [laminationTypes, setLaminationTypes] = useState([]);
   const [selectedFrameId, setSelectedFrameId] = useState('');
   const [frameData, setFrameData] = useState({
     name: '',
@@ -32,6 +36,10 @@ function Admin() {
   const [tshirtData, setTshirtData] = useState({ tshirt_name: '', price: '', image: null });
   const [tileData, setTileData] = useState({ tile_name: '', price: '', image: null });
   const [penData, setPenData] = useState({ pen_name: '', price: '', image: null });
+  const [printTypeData, setPrintTypeData] = useState({ name: '', price: '', image: null });
+  const [printSizeData, setPrintSizeData] = useState({ name: '', price: '', image: null });
+  const [paperTypeData, setPaperTypeData] = useState({ name: '', price: '', image: null });
+  const [laminationTypeData, setLaminationTypeData] = useState({ name: '', price: '', image: null });
   const [variants, setVariants] = useState({
     color: [{ color_name: '', image: null, corner_image: null, image_key: `color_0_${Date.now()}`, price: '' }],
     size: [{ size_name: '', inner_width: '', inner_height: '', image: null, corner_image: null, image_key: `size_0_${Date.now()}`, price: '' }],
@@ -40,7 +48,6 @@ function Admin() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  // State for color variant form with image support
   const [colorVariantData, setColorVariantData] = useState({ mack_board_id: '', color_name: '', image: null });
 
   // Redirect if not admin
@@ -55,15 +62,25 @@ function Admin() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [framesResponse, categoriesResponse, mackBoardsResponse, mugsResponse, capsResponse, tshirtsResponse, tilesResponse, pensResponse] = await Promise.all([
-          axios.get('http://82.180.146.4:8001/frames/'),
-          axios.get('http://82.180.146.4:8001/categories/'),
-          axios.get('http://82.180.146.4:8001/mack_boards/'),
-          axios.get('http://82.180.146.4:8001/mugs/'),
-          axios.get('http://82.180.146.4:8001/caps/'),
-          axios.get('http://82.180.146.4:8001/tshirts/'),
-          axios.get('http://82.180.146.4:8001/tiles/'),
-          axios.get('http://82.180.146.4:8001/pens/'),
+        const token = localStorage.getItem('token');
+        const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+        const [
+          framesResponse, categoriesResponse, mackBoardsResponse, mugsResponse, capsResponse,
+          tshirtsResponse, tilesResponse, pensResponse, printTypesResponse, printSizesResponse,
+          paperTypesResponse, laminationTypesResponse
+        ] = await Promise.all([
+          axios.get('http://82.180.146.4:8001/frames/', config),
+          axios.get('http://82.180.146.4:8001/categories/', config),
+          axios.get('http://82.180.146.4:8001/mack_boards/', config),
+          axios.get('http://82.180.146.4:8001/mugs/', config),
+          axios.get('http://82.180.146.4:8001/caps/', config),
+          axios.get('http://82.180.146.4:8001/tshirts/', config),
+          axios.get('http://82.180.146.4:8001/tiles/', config),
+          axios.get('http://82.180.146.4:8001/pens/', config),
+          axios.get('http://82.180.146.4:8001/api/print-types/', config),
+          axios.get('http://82.180.146.4:8001/api/print-sizes/', config),
+          axios.get('http://82.180.146.4:8001/api/paper-types/', config),
+          axios.get('http://82.180.146.4:8001/api/lamination-types/', config),
         ]);
         setFrames(framesResponse.data);
         setCategories(categoriesResponse.data);
@@ -73,13 +90,24 @@ function Admin() {
         setTshirts(tshirtsResponse.data);
         setTiles(tilesResponse.data);
         setPens(pensResponse.data);
+        setPrintTypes(printTypesResponse.data);
+        setPrintSizes(printSizesResponse.data);
+        setPaperTypes(paperTypesResponse.data);
+        setLaminationTypes(laminationTypesResponse.data);
       } catch (err) {
         console.error('Failed to fetch data:', err);
-        setError('Failed to load data.');
+        if (err.response?.status === 401) {
+          setError('Session expired. Please log in again.');
+          localStorage.removeItem('token');
+          localStorage.removeItem('refresh_token');
+          navigate('/login');
+        } else {
+          setError('Failed to load data.');
+        }
       }
     };
     fetchData();
-  }, []);
+  }, [navigate]);
 
   // Refresh token function
   const refreshToken = async () => {
@@ -139,6 +167,26 @@ function Admin() {
     setPenData({ ...penData, [name]: files ? files[0] : value });
   };
 
+  const handlePrintTypeChange = (e) => {
+    const { name, value, files } = e.target;
+    setPrintTypeData({ ...printTypeData, [name]: files ? files[0] : value });
+  };
+
+  const handlePrintSizeChange = (e) => {
+    const { name, value, files } = e.target;
+    setPrintSizeData({ ...printSizeData, [name]: files ? files[0] : value });
+  };
+
+  const handlePaperTypeChange = (e) => {
+    const { name, value, files } = e.target;
+    setPaperTypeData({ ...paperTypeData, [name]: files ? files[0] : value });
+  };
+
+  const handleLaminationTypeChange = (e) => {
+    const { name, value, files } = e.target;
+    setLaminationTypeData({ ...laminationTypeData, [name]: files ? files[0] : value });
+  };
+
   const handleVariantChange = (variantType, index, e) => {
     const { name, value, files } = e.target;
     const newVariants = { ...variants };
@@ -167,76 +215,12 @@ function Admin() {
     setVariants(newVariants);
   };
 
-  // Handler for color variant form changes, including image
   const handleColorVariantChange = (e) => {
     const { name, value, files } = e.target;
     setColorVariantData({ ...colorVariantData, [name]: files ? files[0] : value });
   };
 
-  // Submit handler for color variants with image upload
-  const handleColorVariantSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Session expired. Please log in again.');
-        navigate('/login');
-        return;
-      }
-      const formData = new FormData();
-      formData.append('mack_board', colorVariantData.mack_board_id);
-      formData.append('color_name', colorVariantData.color_name);
-      if (colorVariantData.image) {
-        formData.append('image', colorVariantData.image);
-      }
-      const response = await axios.post('http://82.180.146.4:8001/mack_board_color_variants/', formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      alert('Color variant created successfully!');
-      setColorVariantData({ mack_board_id: '', color_name: '', image: null });
-    } catch (error) {
-      console.error('Color variant creation error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        const newToken = await refreshToken();
-        if (newToken) {
-          try {
-            const formData = new FormData();
-            formData.append('mack_board', colorVariantData.mack_board_id);
-            formData.append('color_name', colorVariantData.color_name);
-            if (colorVariantData.image) {
-              formData.append('image', colorVariantData.image);
-            }
-            const response = await axios.post('http://82.180.146.4:8001/mack_board_color_variants/', formData, {
-              headers: {
-                Authorization: `Bearer ${newToken}`,
-                'Content-Type': 'multipart/form-data',
-              },
-            });
-            alert('Color variant created successfully!');
-            setColorVariantData({ mack_board_id: '', color_name: '', image: null });
-          } catch (retryError) {
-            setError('Session expired. Please log in again.');
-            navigate('/login');
-          }
-        } else {
-          setError('Session expired. Please log in again.');
-          navigate('/login');
-        }
-      } else if (error.response?.status === 403) {
-        setError('Only admins can create color variants.');
-      } else {
-        setError('Failed to create color variant: ' + (error.response?.data?.detail || error.message));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Submit handlers for other forms
+  // Submit handlers
   const handleCategorySubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -343,6 +327,68 @@ function Admin() {
         setError('Only admins can create MatBoards.');
       } else {
         setError('Failed to create MatBoard: ' + (error.response?.data?.detail || error.message));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleColorVariantSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('mack_board', colorVariantData.mack_board_id);
+      formData.append('color_name', colorVariantData.color_name);
+      if (colorVariantData.image) {
+        formData.append('image', colorVariantData.image);
+      }
+      const response = await axios.post('http://82.180.146.4:8001/mack_board_color_variants/', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      alert('Color variant created successfully!');
+      setColorVariantData({ mack_board_id: '', color_name: '', image: null });
+    } catch (error) {
+      console.error('Color variant creation error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (newToken) {
+          try {
+            const formData = new FormData();
+            formData.append('mack_board', colorVariantData.mack_board_id);
+            formData.append('color_name', colorVariantData.color_name);
+            if (colorVariantData.image) {
+              formData.append('image', colorVariantData.image);
+            }
+            const response = await axios.post('http://82.180.146.4:8001/mack_board_color_variants/', formData, {
+              headers: {
+                Authorization: `Bearer ${newToken}`,
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+            alert('Color variant created successfully!');
+            setColorVariantData({ mack_board_id: '', color_name: '', image: null });
+          } catch (retryError) {
+            setError('Session expired. Please log in again.');
+            navigate('/login');
+          }
+        } else {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+        }
+      } else if (error.response?.status === 403) {
+        setError('Only admins can create color variants.');
+      } else {
+        setError('Failed to create color variant: ' + (error.response?.data?.detail || error.message));
       }
     } finally {
       setIsLoading(false);
@@ -659,6 +705,262 @@ function Admin() {
     }
   };
 
+  const handlePrintTypeSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('name', printTypeData.name);
+      formData.append('price', printTypeData.price);
+      if (printTypeData.image) {
+        formData.append('image', printTypeData.image);
+      }
+      const response = await axios.post('http://82.180.146.4:8001/api/print-types/', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setPrintTypes([...printTypes, response.data]);
+      setPrintTypeData({ name: '', price: '', image: null });
+      alert('Print Type created successfully!');
+    } catch (error) {
+      console.error('Print Type creation error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (newToken) {
+          try {
+            const formData = new FormData();
+            formData.append('name', printTypeData.name);
+            formData.append('price', printTypeData.price);
+            if (printTypeData.image) {
+              formData.append('image', printTypeData.image);
+            }
+            const response = await axios.post('http://82.180.146.4:8001/api/print-types/', formData, {
+              headers: {
+                Authorization: `Bearer ${newToken}`,
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+            setPrintTypes([...printTypes, response.data]);
+            setPrintTypeData({ name: '', price: '', image: null });
+            alert('Print Type created successfully!');
+          } catch (retryError) {
+            setError('Session expired. Please log in again.');
+            navigate('/login');
+          }
+        } else {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+        }
+      } else if (error.response?.status === 403) {
+        setError('Only admins can create Print Types.');
+      } else {
+        setError('Failed to create Print Type: ' + (error.response?.data?.name?.[0] || error.response?.data?.detail || error.message));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePrintSizeSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('name', printSizeData.name);
+      formData.append('price', printSizeData.price);
+      if (printSizeData.image) {
+        formData.append('image', printSizeData.image);
+      }
+      const response = await axios.post('http://82.180.146.4:8001/api/print-sizes/', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setPrintSizes([...printSizes, response.data]);
+      setPrintSizeData({ name: '', price: '', image: null });
+      alert('Print Size created successfully!');
+    } catch (error) {
+      console.error('Print Size creation error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (newToken) {
+          try {
+            const formData = new FormData();
+            formData.append('name', printSizeData.name);
+            formData.append('price', printSizeData.price);
+            if (printSizeData.image) {
+              formData.append('image', printSizeData.image);
+            }
+            const response = await axios.post('http://82.180.146.4:8001/api/print-sizes/', formData, {
+              headers: {
+                Authorization: `Bearer ${newToken}`,
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+            setPrintSizes([...printSizes, response.data]);
+            setPrintSizeData({ name: '', price: '', image: null });
+            alert('Print Size created successfully!');
+          } catch (retryError) {
+            setError('Session expired. Please log in again.');
+            navigate('/login');
+          }
+        } else {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+        }
+      } else if (error.response?.status === 403) {
+        setError('Only admins can create Print Sizes.');
+      } else {
+        setError('Failed to create Print Size: ' + (error.response?.data?.name?.[0] || error.response?.data?.detail || error.message));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePaperTypeSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('name', paperTypeData.name);
+      formData.append('price', paperTypeData.price);
+      if (paperTypeData.image) {
+        formData.append('image', paperTypeData.image);
+      }
+      const response = await axios.post('http://82.180.146.4:8001/api/paper-types/', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setPaperTypes([...paperTypes, response.data]);
+      setPaperTypeData({ name: '', price: '', image: null });
+      alert('Paper Type created successfully!');
+    } catch (error) {
+      console.error('Paper Type creation error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (newToken) {
+          try {
+            const formData = new FormData();
+            formData.append('name', paperTypeData.name);
+            formData.append('price', paperTypeData.price);
+            if (paperTypeData.image) {
+              formData.append('image', paperTypeData.image);
+            }
+            const response = await axios.post('http://82.180.146.4:8001/api/paper-types/', formData, {
+              headers: {
+                Authorization: `Bearer ${newToken}`,
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+            setPaperTypes([...paperTypes, response.data]);
+            setPaperTypeData({ name: '', price: '', image: null });
+            alert('Paper Type created successfully!');
+          } catch (retryError) {
+            setError('Session expired. Please log in again.');
+            navigate('/login');
+          }
+        } else {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+        }
+      } else if (error.response?.status === 403) {
+        setError('Only admins can create Paper Types.');
+      } else {
+        setError('Failed to create Paper Type: ' + (error.response?.data?.name?.[0] || error.response?.data?.detail || error.message));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLaminationTypeSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('name', laminationTypeData.name);
+      formData.append('price', laminationTypeData.price);
+      if (laminationTypeData.image) {
+        formData.append('image', laminationTypeData.image);
+      }
+      const response = await axios.post('http://82.180.146.4:8001/api/lamination-types/', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setLaminationTypes([...laminationTypes, response.data]);
+      setLaminationTypeData({ name: '', price: '', image: null });
+      alert('Lamination Type created successfully!');
+    } catch (error) {
+      console.error('Lamination Type creation error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (newToken) {
+          try {
+            const formData = new FormData();
+            formData.append('name', laminationTypeData.name);
+            formData.append('price', laminationTypeData.price);
+            if (laminationTypeData.image) {
+              formData.append('image', laminationTypeData.image);
+            }
+            const response = await axios.post('http://82.180.146.4:8001/api/lamination-types/', formData, {
+              headers: {
+                Authorization: `Bearer ${newToken}`,
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+            setLaminationTypes([...laminationTypes, response.data]);
+            setLaminationTypeData({ name: '', price: '', image: null });
+            alert('Lamination Type created successfully!');
+          } catch (retryError) {
+            setError('Session expired. Please log in again.');
+            navigate('/login');
+          }
+        } else {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+        }
+      } else if (error.response?.status === 403) {
+        setError('Only admins can create Lamination Types.');
+      } else {
+        setError('Failed to create Lamination Type: ' + (error.response?.data?.name?.[0] || error.response?.data?.detail || error.message));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -949,6 +1251,131 @@ function Admin() {
 
   return (
     <div className="container mt-5">
+      <h2>Admin Dashboard</h2>
+
+      <h3>Create Print Type</h3>
+      <form onSubmit={handlePrintTypeSubmit} className="mb-4">
+        <div className="mb-3">
+          <label className="form-label">Print Type Name</label>
+          <input
+            type="text"
+            name="name"
+            value={printTypeData.name}
+            onChange={handlePrintTypeChange}
+            className="form-control"
+            required
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Price</label>
+          <input
+            type="number"
+            name="price"
+            value={printTypeData.price}
+            onChange={handlePrintTypeChange}
+            className="form-control"
+            required
+            step="0.01"
+          />
+        </div>
+        <button type="submit" className="btn btn-primary" disabled={isLoading}>
+          {isLoading ? 'Creating...' : 'Create Print Type'}
+        </button>
+      </form>
+
+      <h3>Create Print Size</h3>
+      <form onSubmit={handlePrintSizeSubmit} className="mb-4">
+        <div className="mb-3">
+          <label className="form-label">Print Size Name</label>
+          <input
+            type="text"
+            name="name"
+            value={printSizeData.name}
+            onChange={handlePrintSizeChange}
+            className="form-control"
+            required
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Price</label>
+          <input
+            type="number"
+            name="price"
+            value={printSizeData.price}
+            onChange={handlePrintSizeChange}
+            className="form-control"
+            required
+            step="0.01"
+          />
+        </div>
+        
+        <button type="submit" className="btn btn-primary" disabled={isLoading}>
+          {isLoading ? 'Creating...' : 'Create Print Size'}
+        </button>
+      </form>
+
+      <h3>Create Paper Type</h3>
+      <form onSubmit={handlePaperTypeSubmit} className="mb-4">
+        <div className="mb-3">
+          <label className="form-label">Paper Type Name</label>
+          <input
+            type="text"
+            name="name"
+            value={paperTypeData.name}
+            onChange={handlePaperTypeChange}
+            className="form-control"
+            required
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Price</label>
+          <input
+            type="number"
+            name="price"
+            value={paperTypeData.price}
+            onChange={handlePaperTypeChange}
+            className="form-control"
+            required
+            step="0.01"
+          />
+        </div>
+        
+        <button type="submit" className="btn btn-primary" disabled={isLoading}>
+          {isLoading ? 'Creating...' : 'Create Paper Type'}
+        </button>
+      </form>
+
+      <h3>Create Lamination Type</h3>
+      <form onSubmit={handleLaminationTypeSubmit} className="mb-4">
+        <div className="mb-3">
+          <label className="form-label">Lamination Type Name</label>
+          <input
+            type="text"
+            name="name"
+            value={laminationTypeData.name}
+            onChange={handleLaminationTypeChange}
+            className="form-control"
+            required
+          />
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Price</label>
+          <input
+            type="number"
+            name="price"
+            value={laminationTypeData.price}
+            onChange={handleLaminationTypeChange}
+            className="form-control"
+            required
+            step="0.01"
+          />
+        </div>
+        
+        <button type="submit" className="btn btn-primary" disabled={isLoading}>
+          {isLoading ? 'Creating...' : 'Create Lamination Type'}
+        </button>
+      </form>
+      
       <h3>Create Category</h3>
       <form onSubmit={handleCategorySubmit} className="mb-4">
         <div className="mb-3">

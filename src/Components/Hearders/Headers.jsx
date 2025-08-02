@@ -13,7 +13,7 @@ const DEFAULT_INNER_WIDTH = 320;
 const DEFAULT_INNER_HEIGHT = 320;
 const DPI = 96;
 
-function Headers({ activeCategory, onCategorySelect, cartItem, setHasUploadedImages, isPrintOnly }) {
+function Headers({ activeCategory, onCategorySelect, setHasUploadedImages, isPrintOnly }) {
   const [frames, setFrames] = useState([]);
   const [categories, setCategories] = useState([]);
   const [mackBoards, setMackBoards] = useState([]);
