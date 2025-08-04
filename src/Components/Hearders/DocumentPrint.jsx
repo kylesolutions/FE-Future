@@ -44,17 +44,11 @@ function DocumentPrint() {
         setPrintSizes(printSizeRes.data);
         setPaperTypes(paperTypeRes.data);
         setLaminationTypes(laminationTypeRes.data);
-        // Set defaults only if data is available
         if (printTypeRes.data.length > 0) setPrintType(printTypeRes.data[0].id.toString());
         if (printSizeRes.data.length > 0) setPrintSize(printSizeRes.data[0].id.toString());
         if (paperTypeRes.data.length > 0) setPaperType(paperTypeRes.data[0].id.toString());
-        if (lamination === 'Yes' && laminationTypeRes.data.length > 0) {
-          setLaminationType(laminationTypeRes.data[0].id.toString());
-        }
         if (printTypeRes.data.length === 0 || printSizeRes.data.length === 0 || paperTypeRes.data.length === 0) {
           setError('Required printing options are not available. Please contact support.');
-        } else if (lamination === 'Yes' && laminationTypeRes.data.length === 0) {
-          setError('Lamination types are not available. Please disable lamination or contact support.');
         } else {
           setError(null);
         }
@@ -117,18 +111,19 @@ function DocumentPrint() {
   const handleLaminationChange = (e) => {
     const value = e.target.value;
     setLamination(value);
-    if (value === 'No') {
-      setLaminationType('');
-    } else if (value === 'Yes' && laminationTypes.length > 0) {
-      setLaminationType(laminationTypes[0].id.toString());
-    } else if (value === 'Yes') {
-      setError('Lamination types are not available. Please disable lamination or contact support.');
-    }
+    setLaminationType(''); // Always reset laminationType
+    console.log('Lamination changed:', value, 'LaminationType:', '');
+    setError(null);
+  };
+
+  const handleLaminationTypeChange = (e) => {
+    const value = e.target.value;
+    setLaminationType(value);
+    console.log('LaminationType changed:', value);
     setError(null);
   };
 
   const handleSave = async () => {
-    // Frontend validation
     if (!file) {
       setError('Please upload a file.');
       return;
@@ -147,10 +142,6 @@ function DocumentPrint() {
     }
     if (!paperType || isNaN(parseInt(paperType))) {
       setError('Please select a valid paper type.');
-      return;
-    }
-    if (lamination === 'Yes' && (!laminationType || isNaN(parseInt(laminationType)))) {
-      setError('Please select a valid lamination type.');
       return;
     }
 
@@ -205,8 +196,8 @@ function DocumentPrint() {
     formData.append('paper_type', paperType);
     formData.append('delivery_method', deliveryMethod);
     formData.append('delivery_charge', deliveryCharge);
-    formData.append('lamination', lamination === 'Yes');
-    if (lamination === 'Yes' && laminationType) {
+    formData.append('lamination', lamination === 'Yes' ? 'true' : 'false');
+    if (lamination === 'Yes' && laminationType && laminationType !== '') {
       formData.append('lamination_type', laminationType);
     }
 
@@ -460,16 +451,14 @@ function DocumentPrint() {
 
                 {lamination === 'Yes' && (
                   <div className="document-form-group document-form-group-full">
-                    <label className="document-label">Lamination Type</label>
+                    <label className="document-label">Lamination Type (Optional)</label>
+                    <small className="text-muted">Select a lamination type or leave as 'No Lamination Type'.</small>
                     <select
                       value={laminationType}
-                      onChange={(e) => {
-                        setLaminationType(e.target.value);
-                        setError(null);
-                      }}
+                      onChange={handleLaminationTypeChange}
                       className="document-select"
                     >
-                      <option value="">Select Lamination Type</option>
+                      <option value="">No Lamination Type</option>
                       {laminationTypes.map((type) => (
                         <option key={type.id} value={type.id}>
                           {type.name} (AED {parseFloat(type.price).toFixed(2)})
@@ -511,7 +500,7 @@ function DocumentPrint() {
             <div className="document-actions">
               <button
                 onClick={handleSave}
-                disabled={loading || !file || !printType || !printSize || !paperType || (lamination === 'Yes' && !laminationType)}
+                disabled={loading || !file || !printType || !printSize || !paperType}
                 className="document-save-btn"
               >
                 {loading ? (
