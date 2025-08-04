@@ -106,50 +106,57 @@ function Payment() {
 
       // Prepare order details for email
       const orderDetails = savedOrders.map((item) => {
-        if (item.type === 'gift') {
-          return {
-            type: 'gift',
-            content_type: item.content_type.split(' | ')[1],
-            object_id: item.object_id,
-            price: parseFloat(item.total_price).toFixed(2),
-          };
-        } else if (item.type === 'document') {
-          return {
-            type: 'document',
-            print_type: item.print_type || 'N/A',
-            print_size: item.print_size || 'N/A',
-            paper_type: item.paper_type || 'N/A',
-            quantity: item.quantity || 'N/A',
-            lamination: item.lamination ? 'Yes' : 'No',
-            lamination_type: item.lamination_type || 'N/A',
-            delivery_method: item.delivery_method || 'N/A',
-            delivery_charge: parseFloat(item.delivery_charge || 0).toFixed(2),
-            price: parseFloat(item.total_price).toFixed(2),
-          };
-        } else {
-          return {
-            type: 'frame',
-            frame: item.frame?.name || 'None',
-            color: item.color_variant?.color_name || 'None',
-            size: item.size_variant?.size_name || 'None',
-            finish: item.finish_variant?.finish_name || 'None',
-            hanging: item.hanging_variant?.hanging_name || 'None',
-            printSize: `${item.print_width || 'N/A'} x ${item.print_height || 'N/A'} ${item.print_unit || 'inches'}`,
-            mediaType: item.media_type || 'None',
-            paperType: item.media_type === 'Photopaper' && item.paper_type ? item.paper_type : 'None',
-            fit: item.fit || 'None',
-            frameDepth: item.frame_depth ? `${item.frame_depth} px` : 'None',
-            borderDepth: item.fit === 'bordered' ? `${item.border_depth || 0} px` : 'None',
-            borderColor: item.fit === 'bordered' ? item.border_color || '#ffffff' : 'None',
-            mackBoards: item.mack_boards && item.mack_boards.length > 0
-              ? item.mack_boards
-                  .map((mb) => `${mb.mack_board?.board_name || 'N/A'} (${mb.mack_board_color?.color_name || 'N/A'}, ${mb.width}px)`)
-                  .join(', ')
-              : 'None',
-            price: item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00',
-          };
-        }
-      });
+  const imageUrl = item.type === 'document' 
+    ? getImageUrl(item.file) 
+    : getImageUrl(item.adjusted_image || item.cropped_image || item.uploaded_image || item.original_image);
+
+  if (item.type === 'gift') {
+    return {
+      type: 'gift',
+      content_type: item.content_type.split(' | ')[1],
+      object_id: item.object_id,
+      price: parseFloat(item.total_price).toFixed(2),
+      imageUrl: imageUrl, // Include image URL if applicable
+    };
+  } else if (item.type === 'document') {
+    return {
+      type: 'document',
+      print_type: item.print_type || 'N/A',
+      print_size: item.print_size || 'N/A',
+      paper_type: item.paper_type || 'N/A',
+      quantity: item.quantity || 'N/A',
+      lamination: item.lamination ? 'Yes' : 'No',
+      lamination_type: item.lamination_type || 'N/A',
+      delivery_method: item.delivery_method || 'N/A',
+      delivery_charge: parseFloat(item.delivery_charge || 0).toFixed(2),
+      price: parseFloat(item.total_price).toFixed(2),
+      imageUrl: imageUrl, // Include document file URL
+    };
+  } else {
+    return {
+      type: 'frame',
+      frame: item.frame?.name || 'None',
+      color: item.color_variant?.color_name || 'None',
+      size: item.size_variant?.size_name || 'None',
+      finish: item.finish_variant?.finish_name || 'None',
+      hanging: item.hanging_variant?.hanging_name || 'None',
+      printSize: `${item.print_width || 'N/A'} x ${item.print_height || 'N/A'} ${item.print_unit || 'inches'}`,
+      mediaType: item.media_type || 'None',
+      paperType: item.media_type === 'Photopaper' && item.paper_type ? item.paper_type : 'None',
+      fit: item.fit || 'None',
+      frameDepth: item.frame_depth ? `${item.frame_depth} px` : 'None',
+      borderDepth: item.fit === 'bordered' ? `${item.border_depth || 0} px` : 'None',
+      borderColor: item.fit === 'bordered' ? item.border_color || '#ffffff' : 'None',
+      mackBoards: item.mack_boards && item.mack_boards.length > 0
+        ? item.mack_boards
+            .map((mb) => `${mb.mack_board?.board_name || 'N/A'} (${mb.mack_board_color?.color_name || 'N/A'}, ${mb.width}px)`)
+            .join(', ')
+        : 'None',
+      price: item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00',
+      imageUrl: imageUrl, // Include frame image URL
+    };
+  }
+});
 
       const totalCost = savedOrders.reduce((sum, item) => sum + (item.total_price ? parseFloat(item.total_price) : 0), 0);
 
