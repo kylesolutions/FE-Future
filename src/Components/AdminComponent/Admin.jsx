@@ -2,6 +2,34 @@ import axios from 'axios';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { 
+  Settings, 
+  Plus, 
+  Edit, 
+  Package, 
+  Coffee, 
+  Crown, 
+  Grid, 
+  Pen, 
+  FileText, 
+  Printer, 
+  Layers, 
+  Shield,
+  Hash,
+  Palette,
+  Maximize2,
+  Sparkles,
+  Bookmark,
+  Upload,
+  Save,
+  Trash2,
+  AlertCircle,
+  CheckCircle,
+  Loader
+} from 'lucide-react';
+import './admin.css';
+
+const BASE_URL = 'http://82.180.146.4:8001';
 
 function Admin() {
   const navigate = useNavigate();
@@ -48,7 +76,9 @@ function Admin() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const [colorVariantData, setColorVariantData] = useState({ mack_board_id: '', color_name: '', image: null });
+  const [activeSection, setActiveSection] = useState('frames');
 
   // Redirect if not admin
   useEffect(() => {
@@ -69,18 +99,18 @@ function Admin() {
           tshirtsResponse, tilesResponse, pensResponse, printTypesResponse, printSizesResponse,
           paperTypesResponse, laminationTypesResponse
         ] = await Promise.all([
-          axios.get('http://82.180.146.4:8001/frames/', config),
-          axios.get('http://82.180.146.4:8001/categories/', config),
-          axios.get('http://82.180.146.4:8001/mack_boards/', config),
-          axios.get('http://82.180.146.4:8001/mugs/', config),
-          axios.get('http://82.180.146.4:8001/caps/', config),
-          axios.get('http://82.180.146.4:8001/tshirts/', config),
-          axios.get('http://82.180.146.4:8001/tiles/', config),
-          axios.get('http://82.180.146.4:8001/pens/', config),
-          axios.get('http://82.180.146.4:8001/api/print-types/', config),
-          axios.get('http://82.180.146.4:8001/api/print-sizes/', config),
-          axios.get('http://82.180.146.4:8001/api/paper-types/', config),
-          axios.get('http://82.180.146.4:8001/api/lamination-types/', config),
+          axios.get(`${BASE_URL}/frames/`, config),
+          axios.get(`${BASE_URL}/categories/`, config),
+          axios.get(`${BASE_URL}/mack_boards/`, config),
+          axios.get(`${BASE_URL}/mugs/`, config),
+          axios.get(`${BASE_URL}/caps/`, config),
+          axios.get(`${BASE_URL}/tshirts/`, config),
+          axios.get(`${BASE_URL}/tiles/`, config),
+          axios.get(`${BASE_URL}/pens/`, config),
+          axios.get(`${BASE_URL}/api/print-types/`, config),
+          axios.get(`${BASE_URL}/api/print-sizes/`, config),
+          axios.get(`${BASE_URL}/api/paper-types/`, config),
+          axios.get(`${BASE_URL}/api/lamination-types/`, config),
         ]);
         setFrames(framesResponse.data);
         setCategories(categoriesResponse.data);
@@ -109,12 +139,23 @@ function Admin() {
     fetchData();
   }, [navigate]);
 
+  // Clear messages after 5 seconds
+  useEffect(() => {
+    if (error || success) {
+      const timer = setTimeout(() => {
+        setError(null);
+        setSuccess(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error, success]);
+
   // Refresh token function
   const refreshToken = async () => {
     try {
       const refresh = localStorage.getItem('refresh_token');
       if (!refresh) throw new Error('No refresh token available');
-      const response = await axios.post('http://82.180.146.4:8001/api/token/refresh/', { refresh });
+      const response = await axios.post(`${BASE_URL}/api/token/refresh/`, { refresh });
       localStorage.setItem('token', response.data.access);
       return response.data.access;
     } catch (err) {
@@ -220,750 +261,167 @@ function Admin() {
     setColorVariantData({ ...colorVariantData, [name]: files ? files[0] : value });
   };
 
+  // Generic submit handler
+  const createSubmitHandler = (endpoint, data, successMessage, resetData) => {
+    return async (e) => {
+      e.preventDefault();
+      setIsLoading(true);
+      setError(null);
+      setSuccess(null);
+      
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+          return;
+        }
+
+        const isFormData = data instanceof FormData || Object.values(data).some(value => value instanceof File);
+        const requestData = isFormData ? (() => {
+          const formData = new FormData();
+          Object.entries(data).forEach(([key, value]) => {
+            if (value !== null && value !== '') {
+              formData.append(key, value);
+            }
+          });
+          return formData;
+        })() : data;
+
+        const config = {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...(isFormData && { 'Content-Type': 'multipart/form-data' }),
+          },
+        };
+
+        const response = await axios.post(`${BASE_URL}${endpoint}`, requestData, config);
+        setSuccess(successMessage);
+        resetData();
+        
+        // Update state based on endpoint
+        if (endpoint.includes('categories')) setCategories(prev => [...prev, response.data]);
+        else if (endpoint.includes('mack_boards')) setMackBoards(prev => [...prev, response.data]);
+        else if (endpoint.includes('mugs')) setMugs(prev => [...prev, response.data]);
+        else if (endpoint.includes('caps')) setCaps(prev => [...prev, response.data]);
+        else if (endpoint.includes('tshirts')) setTshirts(prev => [...prev, response.data]);
+        else if (endpoint.includes('tiles')) setTiles(prev => [...prev, response.data]);
+        else if (endpoint.includes('pens')) setPens(prev => [...prev, response.data]);
+        else if (endpoint.includes('print-types')) setPrintTypes(prev => [...prev, response.data]);
+        else if (endpoint.includes('print-sizes')) setPrintSizes(prev => [...prev, response.data]);
+        else if (endpoint.includes('paper-types')) setPaperTypes(prev => [...prev, response.data]);
+        else if (endpoint.includes('lamination-types')) setLaminationTypes(prev => [...prev, response.data]);
+        
+      } catch (error) {
+        console.error('Submission error:', error.response?.data || error.message);
+        if (error.response?.status === 401) {
+          const newToken = await refreshToken();
+          if (!newToken) {
+            setError('Session expired. Please log in again.');
+            navigate('/login');
+          }
+        } else if (error.response?.status === 403) {
+          setError('Only admins can perform this action.');
+        } else {
+          setError('Failed to submit: ' + (error.response?.data?.detail || error.message));
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+  };
+
   // Submit handlers
-  const handleCategorySubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Session expired. Please log in again.');
-        navigate('/login');
-        return;
-      }
-      const response = await axios.post('http://82.180.146.4:8001/categories/', categoryData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setCategories([...categories, response.data]);
-      setCategoryData({ frameCategory: '' });
-      alert('Category created successfully!');
-    } catch (error) {
-      console.error('Category creation error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        const newToken = await refreshToken();
-        if (newToken) {
-          try {
-            const response = await axios.post('http://82.180.146.4:8001/categories/', categoryData, {
-              headers: { Authorization: `Bearer ${newToken}` },
-            });
-            setCategories([...categories, response.data]);
-            setCategoryData({ frameCategory: '' });
-            alert('Category created successfully!');
-          } catch (retryError) {
-            setError('Session expired. Please log in again.');
-            navigate('/login');
-          }
-        } else {
-          setError('Session expired. Please log in again.');
-          navigate('/login');
-        }
-      } else {
-        setError('Failed to create category: ' + (error.response?.data?.frameCategory?.[0] || error.message));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const handleCategorySubmit = createSubmitHandler(
+    '/categories/',
+    categoryData,
+    'Category created successfully!',
+    () => setCategoryData({ frameCategory: '' })
+  );
 
-  const handleMackBoardSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Session expired. Please log in again.');
-        navigate('/login');
-        return;
-      }
-      const formData = new FormData();
-      formData.append('board_name', mackBoardData.board_name);
-      if (mackBoardData.image) {
-        formData.append('image', mackBoardData.image);
-      }
-      if (mackBoardData.price) {
-        formData.append('price', mackBoardData.price);
-      }
-      const response = await axios.post('http://82.180.146.4:8001/mack_boards/', formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      setMackBoards([...mackBoards, response.data]);
-      setMackBoardData({ board_name: '', image: null, price: '' });
-      alert('MatBoard created successfully!');
-    } catch (error) {
-      console.error('MackBoard creation error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        const newToken = await refreshToken();
-        if (newToken) {
-          try {
-            const formData = new FormData();
-            formData.append('board_name', mackBoardData.board_name);
-            if (mackBoardData.image) {
-              formData.append('image', mackBoardData.image);
-            }
-            if (mackBoardData.price) {
-              formData.append('price', mackBoardData.price);
-            }
-            const response = await axios.post('http://82.180.146.4:8001/mack_boards/', formData, {
-              headers: {
-                Authorization: `Bearer ${newToken}`,
-                'Content-Type': 'multipart/form-data',
-              },
-            });
-            setMackBoards([...mackBoards, response.data]);
-            setMackBoardData({ board_name: '', image: null, price: '' });
-            alert('MatBoard created successfully!');
-          } catch (retryError) {
-            setError('Session expired. Please log in again.');
-            navigate('/login');
-          }
-        } else {
-          setError('Session expired. Please log in again.');
-          navigate('/login');
-        }
-      } else if (error.response?.status === 403) {
-        setError('Only admins can create MatBoards.');
-      } else {
-        setError('Failed to create MatBoard: ' + (error.response?.data?.detail || error.message));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const handleMackBoardSubmit = createSubmitHandler(
+    '/mack_boards/',
+    mackBoardData,
+    'MatBoard created successfully!',
+    () => setMackBoardData({ board_name: '', image: null, price: '' })
+  );
 
-  const handleColorVariantSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Session expired. Please log in again.');
-        navigate('/login');
-        return;
-      }
-      const formData = new FormData();
-      formData.append('mack_board', colorVariantData.mack_board_id);
-      formData.append('color_name', colorVariantData.color_name);
-      if (colorVariantData.image) {
-        formData.append('image', colorVariantData.image);
-      }
-      const response = await axios.post('http://82.180.146.4:8001/mack_board_color_variants/', formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      alert('Color variant created successfully!');
-      setColorVariantData({ mack_board_id: '', color_name: '', image: null });
-    } catch (error) {
-      console.error('Color variant creation error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        const newToken = await refreshToken();
-        if (newToken) {
-          try {
-            const formData = new FormData();
-            formData.append('mack_board', colorVariantData.mack_board_id);
-            formData.append('color_name', colorVariantData.color_name);
-            if (colorVariantData.image) {
-              formData.append('image', colorVariantData.image);
-            }
-            const response = await axios.post('http://82.180.146.4:8001/mack_board_color_variants/', formData, {
-              headers: {
-                Authorization: `Bearer ${newToken}`,
-                'Content-Type': 'multipart/form-data',
-              },
-            });
-            alert('Color variant created successfully!');
-            setColorVariantData({ mack_board_id: '', color_name: '', image: null });
-          } catch (retryError) {
-            setError('Session expired. Please log in again.');
-            navigate('/login');
-          }
-        } else {
-          setError('Session expired. Please log in again.');
-          navigate('/login');
-        }
-      } else if (error.response?.status === 403) {
-        setError('Only admins can create color variants.');
-      } else {
-        setError('Failed to create color variant: ' + (error.response?.data?.detail || error.message));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const handleMugSubmit = createSubmitHandler(
+    '/mugs/',
+    mugData,
+    'Mug created successfully!',
+    () => setMugData({ mug_name: '', price: '', image: null })
+  );
 
-  const handleMugSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Session expired. Please log in again.');
-        navigate('/login');
-        return;
-      }
-      const formData = new FormData();
-      formData.append('mug_name', mugData.mug_name);
-      formData.append('price', mugData.price);
-      if (mugData.image) {
-        formData.append('image', mugData.image);
-      }
-      const response = await axios.post('http://82.180.146.4:8001/mugs/', formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      setMugs([...mugs, response.data]);
-      setMugData({ mug_name: '', price: '', image: null });
-      alert('Mug created successfully!');
-    } catch (error) {
-      console.error('Mug creation error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        const newToken = await refreshToken();
-        if (newToken) {
-          try {
-            const formData = new FormData();
-            formData.append('mug_name', mugData.mug_name);
-            formData.append('price', mugData.price);
-            if (mugData.image) {
-              formData.append('image', mugData.image);
-            }
-            const response = await axios.post('http://82.180.146.4:8001/mugs/', formData, {
-              headers: {
-                Authorization: `Bearer ${newToken}`,
-                'Content-Type': 'multipart/form-data',
-              },
-            });
-            setMugs([...mugs, response.data]);
-            setMugData({ mug_name: '', price: '', image: null });
-            alert('Mug created successfully!');
-          } catch (retryError) {
-            setError('Session expired. Please log in again.');
-            navigate('/login');
-          }
-        } else {
-          setError('Session expired. Please log in again.');
-          navigate('/login');
-        }
-      } else {
-        setError('Failed to create Mug: ' + (error.response?.data?.detail || error.message));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const handleCapSubmit = createSubmitHandler(
+    '/caps/',
+    capData,
+    'Cap created successfully!',
+    () => setCapData({ cap_name: '', price: '', image: null })
+  );
 
-  const handleCapSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Session expired. Please log in again.');
-        navigate('/login');
-        return;
-      }
-      const formData = new FormData();
-      formData.append('cap_name', capData.cap_name);
-      formData.append('price', capData.price);
-      if (capData.image) {
-        formData.append('image', capData.image);
-      }
-      const response = await axios.post('http://82.180.146.4:8001/caps/', formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      setCaps([...caps, response.data]);
-      setCapData({ cap_name: '', price: '', image: null });
-      alert('Cap created successfully!');
-    } catch (error) {
-      console.error('Cap creation error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        const newToken = await refreshToken();
-        if (newToken) {
-          try {
-            const formData = new FormData();
-            formData.append('cap_name', capData.cap_name);
-            formData.append('price', capData.price);
-            if (capData.image) {
-              formData.append('image', capData.image);
-            }
-            const response = await axios.post('http://82.180.146.4:8001/caps/', formData, {
-              headers: {
-                Authorization: `Bearer ${newToken}`,
-                'Content-Type': 'multipart/form-data',
-              },
-            });
-            setCaps([...caps, response.data]);
-            setCapData({ cap_name: '', price: '', image: null });
-            alert('Cap created successfully!');
-          } catch (retryError) {
-            setError('Session expired. Please log in again.');
-            navigate('/login');
-          }
-        } else {
-          setError('Session expired. Please log in again.');
-          navigate('/login');
-        }
-      } else {
-        setError('Failed to create Cap: ' + (error.response?.data?.detail || error.message));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const handleTshirtSubmit = createSubmitHandler(
+    '/tshirts/',
+    tshirtData,
+    'T-shirt created successfully!',
+    () => setTshirtData({ tshirt_name: '', price: '', image: null })
+  );
 
-  const handleTshirtSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Session expired. Please log in again.');
-        navigate('/login');
-        return;
-      }
-      const formData = new FormData();
-      formData.append('tshirt_name', tshirtData.tshirt_name);
-      formData.append('price', tshirtData.price);
-      if (tshirtData.image) {
-        formData.append('image', tshirtData.image);
-      }
-      const response = await axios.post('http://82.180.146.4:8001/tshirts/', formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      setTshirts([...tshirts, response.data]);
-      setTshirtData({ tshirt_name: '', price: '', image: null });
-      alert('Tshirt created successfully!');
-    } catch (error) {
-      console.error('Tshirt creation error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        const newToken = await refreshToken();
-        if (newToken) {
-          try {
-            const formData = new FormData();
-            formData.append('tshirt_name', tshirtData.tshirt_name);
-            formData.append('price', tshirtData.price);
-            if (tshirtData.image) {
-              formData.append('image', tshirtData.image);
-            }
-            const response = await axios.post('http://82.180.146.4:8001/tshirts/', formData, {
-              headers: {
-                Authorization: `Bearer ${newToken}`,
-                'Content-Type': 'multipart/form-data',
-              },
-            });
-            setTshirts([...tshirts, response.data]);
-            setTshirtData({ tshirt_name: '', price: '', image: null });
-            alert('Tshirt created successfully!');
-          } catch (retryError) {
-            setError('Session expired. Please log in again.');
-            navigate('/login');
-          }
-        } else {
-          setError('Session expired. Please log in again.');
-          navigate('/login');
-        }
-      } else {
-        setError('Failed to create Tshirt: ' + (error.response?.data?.detail || error.message));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const handleTileSubmit = createSubmitHandler(
+    '/tiles/',
+    tileData,
+    'Tile created successfully!',
+    () => setTileData({ tile_name: '', price: '', image: null })
+  );
 
-  const handleTileSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Session expired. Please log in again.');
-        navigate('/login');
-        return;
-      }
-      const formData = new FormData();
-      formData.append('tile_name', tileData.tile_name);
-      formData.append('price', tileData.price);
-      if (tileData.image) {
-        formData.append('image', tileData.image);
-      }
-      const response = await axios.post('http://82.180.146.4:8001/tiles/', formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      setTiles([...tiles, response.data]);
-      setTileData({ tile_name: '', price: '', image: null });
-      alert('Tile created successfully!');
-    } catch (error) {
-      console.error('Tile creation error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        const newToken = await refreshToken();
-        if (newToken) {
-          try {
-            const formData = new FormData();
-            formData.append('tile_name', tileData.tile_name);
-            formData.append('price', tileData.price);
-            if (tileData.image) {
-              formData.append('image', tileData.image);
-            }
-            const response = await axios.post('http://82.180.146.4:8001/tiles/', formData, {
-              headers: {
-                Authorization: `Bearer ${newToken}`,
-                'Content-Type': 'multipart/form-data',
-              },
-            });
-            setTiles([...tiles, response.data]);
-            setTileData({ tile_name: '', price: '', image: null });
-            alert('Tile created successfully!');
-          } catch (retryError) {
-            setError('Session expired. Please log in again.');
-            navigate('/login');
-          }
-        } else {
-          setError('Session expired. Please log in again.');
-          navigate('/login');
-        }
-      } else {
-        setError('Failed to create Tile: ' + (error.response?.data?.detail || error.message));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const handlePenSubmit = createSubmitHandler(
+    '/pens/',
+    penData,
+    'Pen created successfully!',
+    () => setPenData({ pen_name: '', price: '', image: null })
+  );
 
-  const handlePenSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Session expired. Please log in again.');
-        navigate('/login');
-        return;
-      }
-      const formData = new FormData();
-      formData.append('pen_name', penData.pen_name);
-      formData.append('price', penData.price);
-      if (penData.image) {
-        formData.append('image', penData.image);
-      }
-      const response = await axios.post('http://82.180.146.4:8001/pens/', formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      setPens([...pens, response.data]);
-      setPenData({ pen_name: '', price: '', image: null });
-      alert('Pen created successfully!');
-    } catch (error) {
-      console.error('Pen creation error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        const newToken = await refreshToken();
-        if (newToken) {
-          try {
-            const formData = new FormData();
-            formData.append('pen_name', penData.pen_name);
-            formData.append('price', penData.price);
-            if (penData.image) {
-              formData.append('image', penData.image);
-            }
-            const response = await axios.post('http://82.180.146.4:8001/pens/', formData, {
-              headers: {
-                Authorization: `Bearer ${newToken}`,
-                'Content-Type': 'multipart/form-data',
-              },
-            });
-            setPens([...pens, response.data]);
-            setPenData({ pen_name: '', price: '', image: null });
-            alert('Pen created successfully!');
-          } catch (retryError) {
-            setError('Session expired. Please log in again.');
-            navigate('/login');
-          }
-        } else {
-          setError('Session expired. Please log in again.');
-          navigate('/login');
-        }
-      } else {
-        setError('Failed to create Pen: ' + (error.response?.data?.detail || error.message));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const handlePrintTypeSubmit = createSubmitHandler(
+    '/api/print-types/',
+    printTypeData,
+    'Print Type created successfully!',
+    () => setPrintTypeData({ name: '', price: '', image: null })
+  );
 
-  const handlePrintTypeSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Session expired. Please log in again.');
-        navigate('/login');
-        return;
-      }
-      const formData = new FormData();
-      formData.append('name', printTypeData.name);
-      formData.append('price', printTypeData.price);
-      if (printTypeData.image) {
-        formData.append('image', printTypeData.image);
-      }
-      const response = await axios.post('http://82.180.146.4:8001/api/print-types/', formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      setPrintTypes([...printTypes, response.data]);
-      setPrintTypeData({ name: '', price: '', image: null });
-      alert('Print Type created successfully!');
-    } catch (error) {
-      console.error('Print Type creation error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        const newToken = await refreshToken();
-        if (newToken) {
-          try {
-            const formData = new FormData();
-            formData.append('name', printTypeData.name);
-            formData.append('price', printTypeData.price);
-            if (printTypeData.image) {
-              formData.append('image', printTypeData.image);
-            }
-            const response = await axios.post('http://82.180.146.4:8001/api/print-types/', formData, {
-              headers: {
-                Authorization: `Bearer ${newToken}`,
-                'Content-Type': 'multipart/form-data',
-              },
-            });
-            setPrintTypes([...printTypes, response.data]);
-            setPrintTypeData({ name: '', price: '', image: null });
-            alert('Print Type created successfully!');
-          } catch (retryError) {
-            setError('Session expired. Please log in again.');
-            navigate('/login');
-          }
-        } else {
-          setError('Session expired. Please log in again.');
-          navigate('/login');
-        }
-      } else if (error.response?.status === 403) {
-        setError('Only admins can create Print Types.');
-      } else {
-        setError('Failed to create Print Type: ' + (error.response?.data?.name?.[0] || error.response?.data?.detail || error.message));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const handlePrintSizeSubmit = createSubmitHandler(
+    '/api/print-sizes/',
+    printSizeData,
+    'Print Size created successfully!',
+    () => setPrintSizeData({ name: '', price: '', image: null })
+  );
 
-  const handlePrintSizeSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Session expired. Please log in again.');
-        navigate('/login');
-        return;
-      }
-      const formData = new FormData();
-      formData.append('name', printSizeData.name);
-      formData.append('price', printSizeData.price);
-      if (printSizeData.image) {
-        formData.append('image', printSizeData.image);
-      }
-      const response = await axios.post('http://82.180.146.4:8001/api/print-sizes/', formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      setPrintSizes([...printSizes, response.data]);
-      setPrintSizeData({ name: '', price: '', image: null });
-      alert('Print Size created successfully!');
-    } catch (error) {
-      console.error('Print Size creation error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        const newToken = await refreshToken();
-        if (newToken) {
-          try {
-            const formData = new FormData();
-            formData.append('name', printSizeData.name);
-            formData.append('price', printSizeData.price);
-            if (printSizeData.image) {
-              formData.append('image', printSizeData.image);
-            }
-            const response = await axios.post('http://82.180.146.4:8001/api/print-sizes/', formData, {
-              headers: {
-                Authorization: `Bearer ${newToken}`,
-                'Content-Type': 'multipart/form-data',
-              },
-            });
-            setPrintSizes([...printSizes, response.data]);
-            setPrintSizeData({ name: '', price: '', image: null });
-            alert('Print Size created successfully!');
-          } catch (retryError) {
-            setError('Session expired. Please log in again.');
-            navigate('/login');
-          }
-        } else {
-          setError('Session expired. Please log in again.');
-          navigate('/login');
-        }
-      } else if (error.response?.status === 403) {
-        setError('Only admins can create Print Sizes.');
-      } else {
-        setError('Failed to create Print Size: ' + (error.response?.data?.name?.[0] || error.response?.data?.detail || error.message));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const handlePaperTypeSubmit = createSubmitHandler(
+    '/api/paper-types/',
+    paperTypeData,
+    'Paper Type created successfully!',
+    () => setPaperTypeData({ name: '', price: '', image: null })
+  );
 
-  const handlePaperTypeSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Session expired. Please log in again.');
-        navigate('/login');
-        return;
-      }
-      const formData = new FormData();
-      formData.append('name', paperTypeData.name);
-      formData.append('price', paperTypeData.price);
-      if (paperTypeData.image) {
-        formData.append('image', paperTypeData.image);
-      }
-      const response = await axios.post('http://82.180.146.4:8001/api/paper-types/', formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      setPaperTypes([...paperTypes, response.data]);
-      setPaperTypeData({ name: '', price: '', image: null });
-      alert('Paper Type created successfully!');
-    } catch (error) {
-      console.error('Paper Type creation error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        const newToken = await refreshToken();
-        if (newToken) {
-          try {
-            const formData = new FormData();
-            formData.append('name', paperTypeData.name);
-            formData.append('price', paperTypeData.price);
-            if (paperTypeData.image) {
-              formData.append('image', paperTypeData.image);
-            }
-            const response = await axios.post('http://82.180.146.4:8001/api/paper-types/', formData, {
-              headers: {
-                Authorization: `Bearer ${newToken}`,
-                'Content-Type': 'multipart/form-data',
-              },
-            });
-            setPaperTypes([...paperTypes, response.data]);
-            setPaperTypeData({ name: '', price: '', image: null });
-            alert('Paper Type created successfully!');
-          } catch (retryError) {
-            setError('Session expired. Please log in again.');
-            navigate('/login');
-          }
-        } else {
-          setError('Session expired. Please log in again.');
-          navigate('/login');
-        }
-      } else if (error.response?.status === 403) {
-        setError('Only admins can create Paper Types.');
-      } else {
-        setError('Failed to create Paper Type: ' + (error.response?.data?.name?.[0] || error.response?.data?.detail || error.message));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const handleLaminationTypeSubmit = createSubmitHandler(
+    '/api/lamination-types/',
+    laminationTypeData,
+    'Lamination Type created successfully!',
+    () => setLaminationTypeData({ name: '', price: '', image: null })
+  );
 
-  const handleLaminationTypeSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Session expired. Please log in again.');
-        navigate('/login');
-        return;
-      }
-      const formData = new FormData();
-      formData.append('name', laminationTypeData.name);
-      formData.append('price', laminationTypeData.price);
-      if (laminationTypeData.image) {
-        formData.append('image', laminationTypeData.image);
-      }
-      const response = await axios.post('http://82.180.146.4:8001/api/lamination-types/', formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      setLaminationTypes([...laminationTypes, response.data]);
-      setLaminationTypeData({ name: '', price: '', image: null });
-      alert('Lamination Type created successfully!');
-    } catch (error) {
-      console.error('Lamination Type creation error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        const newToken = await refreshToken();
-        if (newToken) {
-          try {
-            const formData = new FormData();
-            formData.append('name', laminationTypeData.name);
-            formData.append('price', laminationTypeData.price);
-            if (laminationTypeData.image) {
-              formData.append('image', laminationTypeData.image);
-            }
-            const response = await axios.post('http://82.180.146.4:8001/api/lamination-types/', formData, {
-              headers: {
-                Authorization: `Bearer ${newToken}`,
-                'Content-Type': 'multipart/form-data',
-              },
-            });
-            setLaminationTypes([...laminationTypes, response.data]);
-            setLaminationTypeData({ name: '', price: '', image: null });
-            alert('Lamination Type created successfully!');
-          } catch (retryError) {
-            setError('Session expired. Please log in again.');
-            navigate('/login');
-          }
-        } else {
-          setError('Session expired. Please log in again.');
-          navigate('/login');
-        }
-      } else if (error.response?.status === 403) {
-        setError('Only admins can create Lamination Types.');
-      } else {
-        setError('Failed to create Lamination Type: ' + (error.response?.data?.name?.[0] || error.response?.data?.detail || error.message));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const handleColorVariantSubmit = createSubmitHandler(
+    '/mack_board_color_variants/',
+    colorVariantData,
+    'Color variant created successfully!',
+    () => setColorVariantData({ mack_board_id: '', color_name: '', image: null })
+  );
 
+  // Frame submission handler (more complex)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
+    setSuccess(null);
     let frameId;
 
     try {
@@ -981,7 +439,7 @@ function Admin() {
             formData.append(key, frameData[key]);
           }
         }
-        const frameResponse = await axios.post('http://82.180.146.4:8001/frames/', formData, {
+        const frameResponse = await axios.post(`${BASE_URL}/frames/`, formData, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
@@ -1001,7 +459,7 @@ function Admin() {
             formData.append(key, frameData[key]);
           }
         }
-        const frameResponse = await axios.put(`http://82.180.146.4:8001/frames/${frameId}/`, formData, {
+        const frameResponse = await axios.put(`${BASE_URL}/frames/${frameId}/`, formData, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
@@ -1055,7 +513,7 @@ function Admin() {
         });
 
         await axios.post(
-          `http://82.180.146.4:8001/frames/${frameId}/variants/`,
+          `${BASE_URL}/frames/${frameId}/variants/`,
           variantFormData,
           {
             headers: {
@@ -1066,13 +524,15 @@ function Admin() {
         );
       }
 
-      alert(
+      setSuccess(
         mode === 'create'
           ? 'Frame and variants created successfully!'
           : mode === 'edit'
           ? 'Frame updated successfully!'
           : 'Variants added successfully!'
       );
+      
+      // Reset form
       setFrameData({
         name: '',
         price: '',
@@ -1094,118 +554,7 @@ function Admin() {
       console.error('Submission error:', error.response?.data || error.message);
       if (error.response?.status === 401) {
         const newToken = await refreshToken();
-        if (newToken) {
-          try {
-            let frameResponse;
-            if (mode === 'create') {
-              const formData = new FormData();
-              for (const key in frameData) {
-                if (frameData[key] !== '' && frameData[key] !== null) {
-                  formData.append(key, frameData[key]);
-                }
-              }
-              frameResponse = await axios.post('http://82.180.146.4:8001/frames/', formData, {
-                headers: {
-                  Authorization: `Bearer ${newToken}`,
-                  'Content-Type': 'multipart/form-data',
-                },
-              });
-              frameId = frameResponse.data.id;
-              setFrames([...frames, frameResponse.data]);
-            } else if (mode === 'edit') {
-              frameId = selectedFrameId;
-              const formData = new FormData();
-              for (const key in frameData) {
-                if (frameData[key] !== '' && frameData[key] !== null) {
-                  formData.append(key, frameData[key]);
-                }
-              }
-              frameResponse = await axios.put(`http://82.180.146.4:8001/frames/${frameId}/`, formData, {
-                headers: {
-                  Authorization: `Bearer ${newToken}`,
-                  'Content-Type': 'multipart/form-data',
-                },
-              });
-              setFrames(frames.map(f => f.id === Number(frameId) ? frameResponse.data : f));
-            } else {
-              frameId = selectedFrameId;
-            }
-
-            const variantsData = [];
-            for (const variantType in variants) {
-              variants[variantType].forEach((variant) => {
-                const hasData = Object.values(variant).some(
-                  (value) => value !== '' && value !== null && value !== variant.image_key
-                );
-                if (!hasData) return;
-                const variantData = {
-                  variant_type: variantType === 'finish' ? 'finish' : variantType,
-                  image_key: variant.image_key,
-                };
-                for (const key in variant) {
-                  if (key !== 'image' && key !== 'corner_image' && key !== 'image_key' && variant[key] !== '' && variant[key] !== null) {
-                    variantData[key] = variant[key];
-                  }
-                }
-                variantsData.push(variantData);
-              });
-            }
-
-            if (variantsData.length > 0) {
-              const variantFormData = new FormData();
-              variantFormData.append('variants', JSON.stringify(variantsData));
-              variantsData.forEach((variant) => {
-                const variantEntry = variants[variant.variant_type].find(
-                  (v) => v.image_key === variant.image_key
-                );
-                if (variantEntry?.image) {
-                  variantFormData.append(variant.image_key, variantEntry.image);
-                }
-                if (variantEntry?.corner_image && variant.variant_type !== 'hanging') {
-                  variantFormData.append(`${variant.image_key}_corner`, variantEntry.corner_image);
-                }
-              });
-
-              await axios.post(
-                `http://82.180.146.4:8001/frames/${frameId}/variants/`,
-                variantFormData,
-                {
-                  headers: {
-                    Authorization: `Bearer ${newToken}`,
-                    'Content-Type': 'multipart/form-data',
-                  },
-                }
-              );
-            }
-            alert(
-              mode === 'create'
-                ? 'Frame and variants created successfully!'
-                : mode === 'edit'
-                ? 'Frame updated successfully!'
-                : 'Variants added successfully!'
-            );
-            setFrameData({
-              name: '',
-              price: '',
-              inner_width: '',
-              inner_height: '',
-              image: null,
-              corner_image: null,
-              category_id: '',
-            });
-            setVariants({
-              color: [{ color_name: '', image: null, corner_image: null, image_key: `color_0_${Date.now()}`, price: '' }],
-              size: [{ size_name: '', inner_width: '', inner_height: '', image: null, corner_image: null, image_key: `size_0_${Date.now()}`, price: '' }],
-              finish: [{ finish_name: '', image: null, corner_image: null, image_key: `finish_0_${Date.now()}`, price: '' }],
-              hanging: [{ hanging_name: '', image: null, image_key: `hanging_0_${Date.now()}`, price: '' }],
-            });
-            setSelectedFrameId('');
-            setMode('create');
-          } catch (retryError) {
-            setError('Session expired. Please log in again.');
-            navigate('/login');
-          }
-        } else {
+        if (!newToken) {
           setError('Session expired. Please log in again.');
           navigate('/login');
         }
@@ -1223,7 +572,7 @@ function Admin() {
   const handleEditFrame = async (frameId) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`http://82.180.146.4:8001/frames/${frameId}/`, {
+      const response = await axios.get(`${BASE_URL}/frames/${frameId}/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setFrameData({
@@ -1243,846 +592,987 @@ function Admin() {
     }
   };
 
-  if (error) {
-    return <div className="alert alert-danger">{error}</div>;
+  if (error && !user.username) {
+    return (
+      <div className="admin-error-page">
+        <div className="admin-error-content">
+          <AlertCircle size={48} />
+          <h2>Access Denied</h2>
+          <p>{error}</p>
+        </div>
+      </div>
+    );
   }
 
   const selectedFrameName = frames.find((f) => f.id === Number(selectedFrameId))?.name || '';
 
+  const sectionIcons = {
+    frames: Hash,
+    categories: Layers,
+    gifts: Package,
+    printing: Printer,
+  };
+
+  const giftIcons = {
+    mugs: Coffee,
+    caps: Crown,
+    tshirts: Package,
+    tiles: Grid,
+    pens: Pen,
+  };
+
   return (
-    <div className="container mt-5">
-      <h2>Admin Dashboard</h2>
-
-      <h3>Create Print Type</h3>
-      <form onSubmit={handlePrintTypeSubmit} className="mb-4">
-        <div className="mb-3">
-          <label className="form-label">Print Type Name</label>
-          <input
-            type="text"
-            name="name"
-            value={printTypeData.name}
-            onChange={handlePrintTypeChange}
-            className="form-control"
-            required
-          />
+    <div className="admin-workspace">
+      {/* Header */}
+      <div className="admin-header">
+        <div className="admin-header-content">
+          <div className="admin-header-icon">
+            <Settings size={32} />
+          </div>
+          <div className="admin-header-text">
+            <h1 className="admin-title">Admin Dashboard</h1>
+            <p className="admin-subtitle">Manage your store inventory and settings</p>
+          </div>
         </div>
-        <div className="mb-3">
-          <label className="form-label">Price</label>
-          <input
-            type="number"
-            name="price"
-            value={printTypeData.price}
-            onChange={handlePrintTypeChange}
-            className="form-control"
-            required
-            step="0.01"
-          />
-        </div>
-        <button type="submit" className="btn btn-primary" disabled={isLoading}>
-          {isLoading ? 'Creating...' : 'Create Print Type'}
-        </button>
-      </form>
-
-      <h3>Create Print Size</h3>
-      <form onSubmit={handlePrintSizeSubmit} className="mb-4">
-        <div className="mb-3">
-          <label className="form-label">Print Size Name</label>
-          <input
-            type="text"
-            name="name"
-            value={printSizeData.name}
-            onChange={handlePrintSizeChange}
-            className="form-control"
-            required
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Price</label>
-          <input
-            type="number"
-            name="price"
-            value={printSizeData.price}
-            onChange={handlePrintSizeChange}
-            className="form-control"
-            required
-            step="0.01"
-          />
-        </div>
-        
-        <button type="submit" className="btn btn-primary" disabled={isLoading}>
-          {isLoading ? 'Creating...' : 'Create Print Size'}
-        </button>
-      </form>
-
-      <h3>Create Paper Type</h3>
-      <form onSubmit={handlePaperTypeSubmit} className="mb-4">
-        <div className="mb-3">
-          <label className="form-label">Paper Type Name</label>
-          <input
-            type="text"
-            name="name"
-            value={paperTypeData.name}
-            onChange={handlePaperTypeChange}
-            className="form-control"
-            required
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Price</label>
-          <input
-            type="number"
-            name="price"
-            value={paperTypeData.price}
-            onChange={handlePaperTypeChange}
-            className="form-control"
-            required
-            step="0.01"
-          />
-        </div>
-        
-        <button type="submit" className="btn btn-primary" disabled={isLoading}>
-          {isLoading ? 'Creating...' : 'Create Paper Type'}
-        </button>
-      </form>
-
-      <h3>Create Lamination Type</h3>
-      <form onSubmit={handleLaminationTypeSubmit} className="mb-4">
-        <div className="mb-3">
-          <label className="form-label">Lamination Type Name</label>
-          <input
-            type="text"
-            name="name"
-            value={laminationTypeData.name}
-            onChange={handleLaminationTypeChange}
-            className="form-control"
-            required
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Price</label>
-          <input
-            type="number"
-            name="price"
-            value={laminationTypeData.price}
-            onChange={handleLaminationTypeChange}
-            className="form-control"
-            required
-            step="0.01"
-          />
-        </div>
-        
-        <button type="submit" className="btn btn-primary" disabled={isLoading}>
-          {isLoading ? 'Creating...' : 'Create Lamination Type'}
-        </button>
-      </form>
-      
-      <h3>Create Category</h3>
-      <form onSubmit={handleCategorySubmit} className="mb-4">
-        <div className="mb-3">
-          <label className="form-label">Category Name</label>
-          <input
-            type="text"
-            name="frameCategory"
-            value={categoryData.frameCategory}
-            onChange={handleCategoryChange}
-            className="form-control"
-            required
-          />
-        </div>
-        <button type="submit" className="btn btn-primary" disabled={isLoading}>
-          {isLoading ? 'Creating...' : 'Create Category'}
-        </button>
-      </form>
-
-      <h3>Create MatBoard</h3>
-      <form onSubmit={handleMackBoardSubmit} className="mb-4">
-        <div className="mb-3">
-          <label className="form-label">Board Name</label>
-          <input
-            type="text"
-            name="board_name"
-            value={mackBoardData.board_name}
-            onChange={handleMackBoardChange}
-            className="form-control"
-            required
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Price (Optional)</label>
-          <input
-            type="number"
-            name="price"
-            value={mackBoardData.price}
-            onChange={handleMackBoardChange}
-            className="form-control"
-            step="0.01"
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Image (Optional)</label>
-          <input
-            type="file"
-            name="image"
-            onChange={handleMackBoardChange}
-            className="form-control"
-            accept="image/*"
-          />
-        </div>
-        <button type="submit" className="btn btn-primary" disabled={isLoading}>
-          {isLoading ? 'Creating...' : 'Create MatBoard'}
-        </button>
-      </form>
-
-      <h3>Create MatBoard Color Variant</h3>
-      <form onSubmit={handleColorVariantSubmit} className="mb-4">
-        <div className="mb-3">
-          <label className="form-label">Select MatBoard</label>
-          <select
-            name="mack_board_id"
-            value={colorVariantData.mack_board_id}
-            onChange={handleColorVariantChange}
-            className="form-control"
-            required
-          >
-            <option value="">-- Select MackBoard --</option>
-            {mackBoards.map((mackBoard) => (
-              <option key={mackBoard.id} value={mackBoard.id}>
-                {mackBoard.board_name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Color Name</label>
-          <input
-            type="text"
-            name="color_name"
-            value={colorVariantData.color_name}
-            onChange={handleColorVariantChange}
-            className="form-control"
-            required
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Color Image</label>
-          <input
-            type="file"
-            name="image"
-            onChange={handleColorVariantChange}
-            className="form-control"
-            accept="image/*"
-          />
-        </div>
-        <button type="submit" className="btn btn-primary" disabled={isLoading}>
-          {isLoading ? 'Creating...' : 'Create Color Variant'}
-        </button>
-      </form>
-
-      <h3>Create Mug</h3>
-      <form onSubmit={handleMugSubmit} className="mb-4">
-        <div className="mb-3">
-          <label className="form-label">Mug Name</label>
-          <input
-            type="text"
-            name="mug_name"
-            value={mugData.mug_name}
-            onChange={handleMugChange}
-            className="form-control"
-            required
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Price</label>
-          <input
-            type="number"
-            name="price"
-            value={mugData.price}
-            onChange={handleMugChange}
-            className="form-control"
-            required
-            step="0.01"
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Image (Optional)</label>
-          <input
-            type="file"
-            name="image"
-            onChange={handleMugChange}
-            className="form-control"
-            accept="image/*"
-          />
-        </div>
-        <button type="submit" className="btn btn-primary" disabled={isLoading}>
-          {isLoading ? 'Creating...' : 'Create Mug'}
-        </button>
-      </form>
-
-      <h3>Create Cap</h3>
-      <form onSubmit={handleCapSubmit} className="mb-4">
-        <div className="mb-3">
-          <label className="form-label">Cap Name</label>
-          <input
-            type="text"
-            name="cap_name"
-            value={capData.cap_name}
-            onChange={handleCapChange}
-            className="form-control"
-            required
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Price</label>
-          <input
-            type="number"
-            name="price"
-            value={capData.price}
-            onChange={handleCapChange}
-            className="form-control"
-            required
-            step="0.01"
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Image (Optional)</label>
-          <input
-            type="file"
-            name="image"
-            onChange={handleCapChange}
-            className="form-control"
-            accept="image/*"
-          />
-        </div>
-        <button type="submit" className="btn btn-primary" disabled={isLoading}>
-          {isLoading ? 'Creating...' : 'Create Cap'}
-        </button>
-      </form>
-
-      <h3>Create Tshirt</h3>
-      <form onSubmit={handleTshirtSubmit} className="mb-4">
-        <div className="mb-3">
-          <label className="form-label">Tshirt Name</label>
-          <input
-            type="text"
-            name="tshirt_name"
-            value={tshirtData.tshirt_name}
-            onChange={handleTshirtChange}
-            className="form-control"
-            required
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Price</label>
-          <input
-            type="number"
-            name="price"
-            value={tshirtData.price}
-            onChange={handleTshirtChange}
-            className="form-control"
-            required
-            step="0.01"
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Image (Optional)</label>
-          <input
-            type="file"
-            name="image"
-            onChange={handleTshirtChange}
-            className="form-control"
-            accept="image/*"
-          />
-        </div>
-        <button type="submit" className="btn btn-primary" disabled={isLoading}>
-          {isLoading ? 'Creating...' : 'Create Tshirt'}
-        </button>
-      </form>
-
-      <h3>Create Tile</h3>
-      <form onSubmit={handleTileSubmit} className="mb-4">
-        <div className="mb-3">
-          <label className="form-label">Tile Name</label>
-          <input
-            type="text"
-            name="tile_name"
-            value={tileData.tile_name}
-            onChange={handleTileChange}
-            className="form-control"
-            required
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Price</label>
-          <input
-            type="number"
-            name="price"
-            value={tileData.price}
-            onChange={handleTileChange}
-            className="form-control"
-            required
-            step="0.01"
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Image (Optional)</label>
-          <input
-            type="file"
-            name="image"
-            onChange={handleTileChange}
-            className="form-control"
-            accept="image/*"
-          />
-        </div>
-        <button type="submit" className="btn btn-primary" disabled={isLoading}>
-          {isLoading ? 'Creating...' : 'Create Tile'}
-        </button>
-      </form>
-
-      <h3>Create Pen</h3>
-      <form onSubmit={handlePenSubmit} className="mb-4">
-        <div className="mb-3">
-          <label className="form-label">Pen Name</label>
-          <input
-            type="text"
-            name="pen_name"
-            value={penData.pen_name}
-            onChange={handlePenChange}
-            className="form-control"
-            required
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Price</label>
-          <input
-            type="number"
-            name="price"
-            value={penData.price}
-            onChange={handlePenChange}
-            className="form-control"
-            required
-            step="0.01"
-          />
-        </div>
-        <div className="mb-3">
-          <label className="form-label">Image (Optional)</label>
-          <input
-            type="file"
-            name="image"
-            onChange={handlePenChange}
-            className="form-control"
-            accept="image/*"
-          />
-        </div>
-        <button type="submit" className="btn btn-primary" disabled={isLoading}>
-          {isLoading ? 'Creating...' : 'Create Pen'}
-        </button>
-      </form>
-
-      <h2>{mode === 'create' ? 'Create Frame' : mode === 'edit' ? 'Edit Frame' : 'Add Variants to Frame'}</h2>
-      <div className="mb-3">
-        <label className="form-label">Mode</label>
-        <select
-          className="form-control"
-          value={mode}
-          onChange={(e) => setMode(e.target.value)}
-        >
-          <option value="create">Create New Frame</option>
-          <option value="edit">Edit Existing Frame</option>
-          <option value="add_variants">Add Variants to Existing Frame</option>
-        </select>
       </div>
-      <form onSubmit={handleSubmit}>
-        {(mode === 'create' || mode === 'edit') && (
-          <>
-            <h3>Frame Details</h3>
-            <div className="mb-3">
-              <label className="form-label">Name</label>
-              <input
-                type="text"
-                name="name"
-                value={frameData.name}
-                onChange={handleFrameChange}
-                className="form-control"
-                required
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Price</label>
-              <input
-                type="number"
-                name="price"
-                value={frameData.price}
-                onChange={handleFrameChange}
-                className="form-control"
-                required
-                step="0.01"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Inner Width</label>
-              <input
-                type="number"
-                name="inner_width"
-                value={frameData.inner_width}
-                onChange={handleFrameChange}
-                className="form-control"
-                required
-                step="0.1"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Inner Height</label>
-              <input
-                type="number"
-                name="inner_height"
-                value={frameData.inner_height}
-                onChange={handleFrameChange}
-                className="form-control"
-                required
-                step="0.1"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Category</label>
-              <select
-                name="category_id"
-                value={frameData.category_id}
-                onChange={handleFrameChange}
-                className="form-control"
-              >
-                <option value="">-- Select Category (Optional) --</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.frameCategory}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Frame Image{mode === 'edit' ? ' (Optional)' : ''}</label>
-              <input
-                type="file"
-                name="image"
-                onChange={handleFrameChange}
-                className="form-control"
-                accept="image/*"
-                required={mode === 'create'}
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Frame Corner Image{mode === 'edit' ? ' (Optional)' : ''}</label>
-              <input
-                type="file"
-                name="corner_image"
-                onChange={handleFrameChange}
-                className="form-control"
-                accept="image/*"
-                required={mode === 'create'}
-              />
-            </div>
-          </>
-        )}
-        {mode === 'edit' && (
-          <div className="mb-3">
-            <label className="form-label">Select Frame to Edit</label>
-            <select
-              className="form-control"
-              value={selectedFrameId}
-              onChange={(e) => handleEditFrame(e.target.value)}
-              required
-            >
-              <option value="">-- Select Frame --</option>
-              {frames.map((frame) => (
-                <option key={frame.id} value={frame.id}>
-                  {frame.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        {mode === 'add_variants' && (
-          <div className="mb-3">
-            <label className="form-label">Select Frame</label>
-            <select
-              className="form-control"
-              value={selectedFrameId}
-              onChange={(e) => setSelectedFrameId(e.target.value)}
-              required
-            >
-              <option value="">-- Select Frame --</option>
-              {frames.map((frame) => (
-                <option key={frame.id} value={frame.id}>
-                  {frame.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        <h3>Color Variants {selectedFrameName && `for ${selectedFrameName}`}</h3>
-        {variants.color.map((variant, index) => (
-          <div key={variant.image_key} className="border p-3 mb-3">
-            <div className="mb-3">
-              <label className="form-label">Color Name</label>
-              <input
-                type="text"
-                name="color_name"
-                value={variant.color_name}
-                onChange={(e) => handleVariantChange('color', index, e)}
-                className="form-control"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Price</label>
-              <input
-                type="number"
-                name="price"
-                value={variant.price}
-                onChange={(e) => handleVariantChange('color', index, e)}
-                className="form-control"
-                step="0.01"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Color Image</label>
-              <input
-                type="file"
-                name="image"
-                onChange={(e) => handleVariantChange('color', index, e)}
-                className="form-control"
-                accept="image/*"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Color Corner Image</label>
-              <input
-                type="file"
-                name="corner_image"
-                onChange={(e) => handleVariantChange('color', index, e)}
-                className="form-control"
-                accept="image/*"
-              />
-            </div>
-            <button
-              type="button"
-              className="btn btn-danger btn-sm"
-              onClick={() => removeVariant('color', index)}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-        <button
-          type="button"
-          className="btn btn-secondary mb-3"
-          onClick={() => addVariant('color')}
-        >
-          Add Color Variant
-        </button>
 
-        <h3>Size Variants {selectedFrameName && `for ${selectedFrameName}`}</h3>
-        {variants.size.map((variant, index) => (
-          <div key={variant.image_key} className="border p-3 mb-3">
-            <div className="mb-3">
-              <label className="form-label">Size Name</label>
-              <input
-                type="text"
-                name="size_name"
-                value={variant.size_name}
-                onChange={(e) => handleVariantChange('size', index, e)}
-                className="form-control"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Inner Width</label>
-              <input
-                type="number"
-                name="inner_width"
-                value={variant.inner_width}
-                onChange={(e) => handleVariantChange('size', index, e)}
-                className="form-control"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Inner Height</label>
-              <input
-                type="number"
-                name="inner_height"
-                value={variant.inner_height}
-                onChange={(e) => handleVariantChange('size', index, e)}
-                className="form-control"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Price</label>
-              <input
-                type="number"
-                name="price"
-                value={variant.price}
-                onChange={(e) => handleVariantChange('size', index, e)}
-                className="form-control"
-                step="0.01"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Size Image (Optional)</label>
-              <input
-                type="file"
-                name="image"
-                onChange={(e) => handleVariantChange('size', index, e)}
-                className="form-control"
-                accept="image/*"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Size Corner Image (Optional)</label>
-              <input
-                type="file"
-                name="corner_image"
-                onChange={(e) => handleVariantChange('size', index, e)}
-                className="form-control"
-                accept="image/*"
-              />
-            </div>
-            <button
-              type="button"
-              className="btn btn-danger btn-sm"
-              onClick={() => removeVariant('size', index)}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-        <button
-          type="button"
-          className="btn btn-secondary mb-3"
-          onClick={() => addVariant('size')}
-        >
-          Add Size Variant
-        </button>
-
-        <h3>Finishing Variants {selectedFrameName && `for ${selectedFrameName}`}</h3>
-        {variants.finish.map((variant, index) => (
-          <div key={variant.image_key} className="border p-3 mb-3">
-            <div className="mb-3">
-              <label className="form-label">Finish Name</label>
-              <input
-                type="text"
-                name="finish_name"
-                value={variant.finish_name}
-                onChange={(e) => handleVariantChange('finish', index, e)}
-                className="form-control"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Price</label>
-              <input
-                type="number"
-                name="price"
-                value={variant.price}
-                onChange={(e) => handleVariantChange('finish', index, e)}
-                className="form-control"
-                step="0.01"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Finish Image</label>
-              <input
-                type="file"
-                name="image"
-                onChange={(e) => handleVariantChange('finish', index, e)}
-                className="form-control"
-                accept="image/*"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Finish Corner Image</label>
-              <input
-                type="file"
-                name="corner_image"
-                onChange={(e) => handleVariantChange('finish', index, e)}
-                className="form-control"
-                accept="image/*"
-              />
-            </div>
-            <button
-              type="button"
-              className="btn btn-danger btn-sm"
-              onClick={() => removeVariant('finish', index)}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-        <button
-          type="button"
-          className="btn btn-secondary mb-3"
-          onClick={() => addVariant('finish')}
-        >
-          Add Finishing Variant
-        </button>
-
-        <h3>Hanging Variants {selectedFrameName && `for ${selectedFrameName}`}</h3>
-        {variants.hanging.map((variant, index) => (
-          <div key={variant.image_key} className="border p-3 mb-3">
-            <div className="mb-3">
-              <label className="form-label">Hanging Name</label>
-              <input
-                type="text"
-                name="hanging_name"
-                value={variant.hanging_name}
-                onChange={(e) => handleVariantChange('hanging', index, e)}
-                className="form-control"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Price</label>
-              <input
-                type="number"
-                name="price"
-                value={variant.price}
-                onChange={(e) => handleVariantChange('hanging', index, e)}
-                className="form-control"
-                step="0.01"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="form-label">Hanging Image</label>
-              <input
-                type="file"
-                name="image"
-                onChange={(e) => handleVariantChange('hanging', index, e)}
-                className="form-control"
-                accept="image/*"
-              />
-            </div>
-            <button
-              type="button"
-              className="btn btn-danger btn-sm"
-              onClick={() => removeVariant('hanging', index)}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-        <button
-          type="button"
-          className="btn btn-secondary mb-3"
-          onClick={() => addVariant('hanging')}
-        >
-          Add Hanging Variant
-        </button>
-        <div>
-          <button type="submit" className="btn btn-primary" disabled={isLoading}>
-            {isLoading
-              ? 'Submitting...'
-              : mode === 'create'
-              ? 'Create Frame'
-              : mode === 'edit'
-              ? 'Update Frame'
-              : 'Add Variants'}
-          </button>
+      {/* Alerts */}
+      {error && (
+        <div className="admin-alert admin-alert-error">
+          <AlertCircle size={20} />
+          <span>{error}</span>
         </div>
-      </form>
+      )}
+
+      {success && (
+        <div className="admin-alert admin-alert-success">
+          <CheckCircle size={20} />
+          <span>{success}</span>
+        </div>
+      )}
+
+      <div className="admin-container">
+        {/* Sidebar Navigation */}
+        <div className="admin-sidebar">
+          <div className="admin-nav-sections">
+            {Object.entries(sectionIcons).map(([section, Icon]) => (
+              <button
+                key={section}
+                className={`admin-nav-item ${activeSection === section ? 'active' : ''}`}
+                onClick={() => setActiveSection(section)}
+              >
+                <Icon size={20} />
+                <span>{section.charAt(0).toUpperCase() + section.slice(1)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="admin-main-content">
+          {/* Frames Section */}
+          {activeSection === 'frames' && (
+            <div className="admin-section">
+              <div className="admin-section-header">
+                <Hash size={24} />
+                <h2>Frame Management</h2>
+              </div>
+
+              <div className="admin-mode-selector">
+                <div className="admin-form-group">
+                  <label className="admin-label">Mode</label>
+                  <select
+                    className="admin-select"
+                    value={mode}
+                    onChange={(e) => setMode(e.target.value)}
+                  >
+                    <option value="create">Create New Frame</option>
+                    <option value="edit">Edit Existing Frame</option>
+                    <option value="add_variants">Add Variants to Existing Frame</option>
+                  </select>
+                </div>
+              </div>
+
+              <form onSubmit={handleSubmit} className="admin-form">
+                {(mode === 'create' || mode === 'edit') && (
+                  <div className="admin-card">
+                    <h3 className="admin-card-title">Frame Details</h3>
+                    <div className="admin-form-grid">
+                      <div className="admin-form-group">
+                        <label className="admin-label">Name</label>
+                        <input
+                          type="text"
+                          name="name"
+                          value={frameData.name}
+                          onChange={handleFrameChange}
+                          className="admin-input"
+                          required
+                        />
+                      </div>
+                      <div className="admin-form-group">
+                        <label className="admin-label">Price</label>
+                        <input
+                          type="number"
+                          name="price"
+                          value={frameData.price}
+                          onChange={handleFrameChange}
+                          className="admin-input"
+                          required
+                          step="0.01"
+                        />
+                      </div>
+                      <div className="admin-form-group">
+                        <label className="admin-label">Inner Width</label>
+                        <input
+                          type="number"
+                          name="inner_width"
+                          value={frameData.inner_width}
+                          onChange={handleFrameChange}
+                          className="admin-input"
+                          required
+                          step="0.1"
+                        />
+                      </div>
+                      <div className="admin-form-group">
+                        <label className="admin-label">Inner Height</label>
+                        <input
+                          type="number"
+                          name="inner_height"
+                          value={frameData.inner_height}
+                          onChange={handleFrameChange}
+                          className="admin-input"
+                          required
+                          step="0.1"
+                        />
+                      </div>
+                      <div className="admin-form-group admin-form-group-full">
+                        <label className="admin-label">Category</label>
+                        <select
+                          name="category_id"
+                          value={frameData.category_id}
+                          onChange={handleFrameChange}
+                          className="admin-select"
+                        >
+                          <option value="">-- Select Category (Optional) --</option>
+                          {categories.map((category) => (
+                            <option key={category.id} value={category.id}>
+                              {category.frameCategory}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="admin-form-group">
+                        <label className="admin-label">
+                          Frame Image{mode === 'edit' ? ' (Optional)' : ''}
+                        </label>
+                        <div className="admin-file-input">
+                          <Upload size={20} />
+                          <input
+                            type="file"
+                            name="image"
+                            onChange={handleFrameChange}
+                            accept="image/*"
+                            required={mode === 'create'}
+                          />
+                          <span>Choose frame image</span>
+                        </div>
+                      </div>
+                      <div className="admin-form-group">
+                        <label className="admin-label">
+                          Frame Corner Image{mode === 'edit' ? ' (Optional)' : ''}
+                        </label>
+                        <div className="admin-file-input">
+                          <Upload size={20} />
+                          <input
+                            type="file"
+                            name="corner_image"
+                            onChange={handleFrameChange}
+                            accept="image/*"
+                            required={mode === 'create'}
+                          />
+                          <span>Choose corner image</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {mode === 'edit' && (
+                  <div className="admin-card">
+                    <h3 className="admin-card-title">Select Frame to Edit</h3>
+                    <div className="admin-form-group">
+                      <select
+                        className="admin-select"
+                        value={selectedFrameId}
+                        onChange={(e) => handleEditFrame(e.target.value)}
+                        required
+                      >
+                        <option value="">-- Select Frame --</option>
+                        {frames.map((frame) => (
+                          <option key={frame.id} value={frame.id}>
+                            {frame.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {mode === 'add_variants' && (
+                  <div className="admin-card">
+                    <h3 className="admin-card-title">Select Frame</h3>
+                    <div className="admin-form-group">
+                      <select
+                        className="admin-select"
+                        value={selectedFrameId}
+                        onChange={(e) => setSelectedFrameId(e.target.value)}
+                        required
+                      >
+                        <option value="">-- Select Frame --</option>
+                        {frames.map((frame) => (
+                          <option key={frame.id} value={frame.id}>
+                            {frame.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Variants Sections */}
+                {['color', 'size', 'finish', 'hanging'].map((variantType) => {
+                  const icons = { color: Palette, size: Maximize2, finish: Sparkles, hanging: Bookmark };
+                  const Icon = icons[variantType];
+                  
+                  return (
+                    <div key={variantType} className="admin-card">
+                      <div className="admin-variant-header">
+                        <div className="admin-variant-title">
+                          <Icon size={20} />
+                          <h3>{variantType.charAt(0).toUpperCase() + variantType.slice(1)} Variants {selectedFrameName && `for ${selectedFrameName}`}</h3>
+                        </div>
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn-secondary"
+                          onClick={() => addVariant(variantType)}
+                        >
+                          <Plus size={16} />
+                          Add {variantType.charAt(0).toUpperCase() + variantType.slice(1)}
+                        </button>
+                      </div>
+
+                      <div className="admin-variants-grid">
+                        {variants[variantType].map((variant, index) => (
+                          <div key={variant.image_key} className="admin-variant-card">
+                            <div className="admin-variant-card-header">
+                              <span>#{index + 1}</span>
+                              <button
+                                type="button"
+                                className="admin-btn admin-btn-danger admin-btn-sm"
+                                onClick={() => removeVariant(variantType, index)}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                            
+                            <div className="admin-variant-fields">
+                              <div className="admin-form-group">
+                                <label className="admin-label">
+                                  {variantType.charAt(0).toUpperCase() + variantType.slice(1)} Name
+                                </label>
+                                <input
+                                  type="text"
+                                  name={`${variantType}_name`}
+                                  value={variant[`${variantType}_name`] || ''}
+                                  onChange={(e) => handleVariantChange(variantType, index, e)}
+                                  className="admin-input"
+                                />
+                              </div>
+
+                              {variantType === 'size' && (
+                                <>
+                                  <div className="admin-form-group">
+                                    <label className="admin-label">Inner Width</label>
+                                    <input
+                                      type="number"
+                                      name="inner_width"
+                                      value={variant.inner_width || ''}
+                                      onChange={(e) => handleVariantChange(variantType, index, e)}
+                                      className="admin-input"
+                                      step="0.1"
+                                    />
+                                  </div>
+                                  <div className="admin-form-group">
+                                    <label className="admin-label">Inner Height</label>
+                                    <input
+                                      type="number"
+                                      name="inner_height"
+                                      value={variant.inner_height || ''}
+                                      onChange={(e) => handleVariantChange(variantType, index, e)}
+                                      className="admin-input"
+                                      step="0.1"
+                                    />
+                                  </div>
+                                </>
+                              )}
+
+                              <div className="admin-form-group">
+                                <label className="admin-label">Price</label>
+                                <input
+                                  type="number"
+                                  name="price"
+                                  value={variant.price || ''}
+                                  onChange={(e) => handleVariantChange(variantType, index, e)}
+                                  className="admin-input"
+                                  step="0.01"
+                                />
+                              </div>
+
+                              <div className="admin-form-group">
+                                <label className="admin-label">{variantType.charAt(0).toUpperCase() + variantType.slice(1)} Image</label>
+                                <div className="admin-file-input">
+                                  <Upload size={16} />
+                                  <input
+                                    type="file"
+                                    name="image"
+                                    onChange={(e) => handleVariantChange(variantType, index, e)}
+                                    accept="image/*"
+                                  />
+                                  <span>Choose image</span>
+                                </div>
+                              </div>
+
+                              {variantType !== 'hanging' && (
+                                <div className="admin-form-group">
+                                  <label className="admin-label">Corner Image</label>
+                                  <div className="admin-file-input">
+                                    <Upload size={16} />
+                                    <input
+                                      type="file"
+                                      name="corner_image"
+                                      onChange={(e) => handleVariantChange(variantType, index, e)}
+                                      accept="image/*"
+                                    />
+                                    <span>Choose corner image</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <div className="admin-form-actions">
+                  <button type="submit" className="admin-btn admin-btn-primary" disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <Loader size={16} className="admin-spinner" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <Save size={16} />
+                        {mode === 'create' ? 'Create Frame' : mode === 'edit' ? 'Update Frame' : 'Add Variants'}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Categories Section */}
+          {activeSection === 'categories' && (
+            <div className="admin-section">
+              <div className="admin-section-header">
+                <Layers size={24} />
+                <h2>Category Management</h2>
+              </div>
+
+              <div className="admin-card">
+                <h3 className="admin-card-title">Create Category</h3>
+                <form onSubmit={handleCategorySubmit} className="admin-form">
+                  <div className="admin-form-group">
+                    <label className="admin-label">Category Name</label>
+                    <input
+                      type="text"
+                      name="frameCategory"
+                      value={categoryData.frameCategory}
+                      onChange={handleCategoryChange}
+                      className="admin-input"
+                      required
+                    />
+                  </div>
+                  <div className="admin-form-actions">
+                    <button type="submit" className="admin-btn admin-btn-primary" disabled={isLoading}>
+                      {isLoading ? (
+                        <>
+                          <Loader size={16} className="admin-spinner" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={16} />
+                          Create Category
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* MatBoard Section */}
+              <div className="admin-card">
+                <h3 className="admin-card-title">Create MatBoard</h3>
+                <form onSubmit={handleMackBoardSubmit} className="admin-form">
+                  <div className="admin-form-grid">
+                    <div className="admin-form-group">
+                      <label className="admin-label">Board Name</label>
+                      <input
+                        type="text"
+                        name="board_name"
+                        value={mackBoardData.board_name}
+                        onChange={handleMackBoardChange}
+                        className="admin-input"
+                        required
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Price (Optional)</label>
+                      <input
+                        type="number"
+                        name="price"
+                        value={mackBoardData.price}
+                        onChange={handleMackBoardChange}
+                        className="admin-input"
+                        step="0.01"
+                      />
+                    </div>
+                    <div className="admin-form-group admin-form-group-full">
+                      <label className="admin-label">Image (Optional)</label>
+                      <div className="admin-file-input">
+                        <Upload size={20} />
+                        <input
+                          type="file"
+                          name="image"
+                          onChange={handleMackBoardChange}
+                          accept="image/*"
+                        />
+                        <span>Choose board image</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="admin-form-actions">
+                    <button type="submit" className="admin-btn admin-btn-primary" disabled={isLoading}>
+                      {isLoading ? (
+                        <>
+                          <Loader size={16} className="admin-spinner" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={16} />
+                          Create MatBoard
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* MatBoard Color Variant Section */}
+              <div className="admin-card">
+                <h3 className="admin-card-title">Create MatBoard Color Variant</h3>
+                <form onSubmit={handleColorVariantSubmit} className="admin-form">
+                  <div className="admin-form-grid">
+                    <div className="admin-form-group">
+                      <label className="admin-label">Select MatBoard</label>
+                      <select
+                        name="mack_board_id"
+                        value={colorVariantData.mack_board_id}
+                        onChange={handleColorVariantChange}
+                        className="admin-select"
+                        required
+                      >
+                        <option value="">-- Select MatBoard --</option>
+                        {mackBoards.map((mackBoard) => (
+                          <option key={mackBoard.id} value={mackBoard.id}>
+                            {mackBoard.board_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Color Name</label>
+                      <input
+                        type="text"
+                        name="color_name"
+                        value={colorVariantData.color_name}
+                        onChange={handleColorVariantChange}
+                        className="admin-input"
+                        required
+                      />
+                    </div>
+                    <div className="admin-form-group admin-form-group-full">
+                      <label className="admin-label">Color Image</label>
+                      <div className="admin-file-input">
+                        <Upload size={20} />
+                        <input
+                          type="file"
+                          name="image"
+                          onChange={handleColorVariantChange}
+                          accept="image/*"
+                        />
+                        <span>Choose color image</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="admin-form-actions">
+                    <button type="submit" className="admin-btn admin-btn-primary" disabled={isLoading}>
+                      {isLoading ? (
+                        <>
+                          <Loader size={16} className="admin-spinner" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={16} />
+                          Create Color Variant
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Gifts Section */}
+          {activeSection === 'gifts' && (
+            <div className="admin-section">
+              <div className="admin-section-header">
+                <Package size={24} />
+                <h2>Gift Items Management</h2>
+              </div>
+
+              <div className="admin-gifts-grid">
+                {/* Mugs */}
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <Coffee size={20} />
+                    <h3>Create Mug</h3>
+                  </div>
+                  <form onSubmit={handleMugSubmit} className="admin-form">
+                    <div className="admin-form-group">
+                      <label className="admin-label">Mug Name</label>
+                      <input
+                        type="text"
+                        name="mug_name"
+                        value={mugData.mug_name}
+                        onChange={handleMugChange}
+                        className="admin-input"
+                        required
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Price</label>
+                      <input
+                        type="number"
+                        name="price"
+                        value={mugData.price}
+                        onChange={handleMugChange}
+                        className="admin-input"
+                        required
+                        step="0.01"
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Image (Optional)</label>
+                      <div className="admin-file-input">
+                        <Upload size={16} />
+                        <input
+                          type="file"
+                          name="image"
+                          onChange={handleMugChange}
+                          accept="image/*"
+                        />
+                        <span>Choose image</span>
+                      </div>
+                    </div>
+                    <button type="submit" className="admin-btn admin-btn-primary admin-btn-sm" disabled={isLoading}>
+                      {isLoading ? <Loader size={14} className="admin-spinner" /> : <Plus size={14} />}
+                      Create
+                    </button>
+                  </form>
+                </div>
+
+                {/* Caps */}
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <Crown size={20} />
+                    <h3>Create Cap</h3>
+                  </div>
+                  <form onSubmit={handleCapSubmit} className="admin-form">
+                    <div className="admin-form-group">
+                      <label className="admin-label">Cap Name</label>
+                      <input
+                        type="text"
+                        name="cap_name"
+                        value={capData.cap_name}
+                        onChange={handleCapChange}
+                        className="admin-input"
+                        required
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Price</label>
+                      <input
+                        type="number"
+                        name="price"
+                        value={capData.price}
+                        onChange={handleCapChange}
+                        className="admin-input"
+                        required
+                        step="0.01"
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Image (Optional)</label>
+                      <div className="admin-file-input">
+                        <Upload size={16} />
+                        <input
+                          type="file"
+                          name="image"
+                          onChange={handleCapChange}
+                          accept="image/*"
+                        />
+                        <span>Choose image</span>
+                      </div>
+                    </div>
+                    <button type="submit" className="admin-btn admin-btn-primary admin-btn-sm" disabled={isLoading}>
+                      {isLoading ? <Loader size={14} className="admin-spinner" /> : <Plus size={14} />}
+                      Create
+                    </button>
+                  </form>
+                </div>
+
+                {/* T-shirts */}
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <Package size={20} />
+                    <h3>Create T-shirt</h3>
+                  </div>
+                  <form onSubmit={handleTshirtSubmit} className="admin-form">
+                    <div className="admin-form-group">
+                      <label className="admin-label">T-shirt Name</label>
+                      <input
+                        type="text"
+                        name="tshirt_name"
+                        value={tshirtData.tshirt_name}
+                        onChange={handleTshirtChange}
+                        className="admin-input"
+                        required
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Price</label>
+                      <input
+                        type="number"
+                        name="price"
+                        value={tshirtData.price}
+                        onChange={handleTshirtChange}
+                        className="admin-input"
+                        required
+                        step="0.01"
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Image (Optional)</label>
+                      <div className="admin-file-input">
+                        <Upload size={16} />
+                        <input
+                          type="file"
+                          name="image"
+                          onChange={handleTshirtChange}
+                          accept="image/*"
+                        />
+                        <span>Choose image</span>
+                      </div>
+                    </div>
+                    <button type="submit" className="admin-btn admin-btn-primary admin-btn-sm" disabled={isLoading}>
+                      {isLoading ? <Loader size={14} className="admin-spinner" /> : <Plus size={14} />}
+                      Create
+                    </button>
+                  </form>
+                </div>
+
+                {/* Tiles */}
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <Grid size={20} />
+                    <h3>Create Tile</h3>
+                  </div>
+                  <form onSubmit={handleTileSubmit} className="admin-form">
+                    <div className="admin-form-group">
+                      <label className="admin-label">Tile Name</label>
+                      <input
+                        type="text"
+                        name="tile_name"
+                        value={tileData.tile_name}
+                        onChange={handleTileChange}
+                        className="admin-input"
+                        required
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Price</label>
+                      <input
+                        type="number"
+                        name="price"
+                        value={tileData.price}
+                        onChange={handleTileChange}
+                        className="admin-input"
+                        required
+                        step="0.01"
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Image (Optional)</label>
+                      <div className="admin-file-input">
+                        <Upload size={16} />
+                        <input
+                          type="file"
+                          name="image"
+                          onChange={handleTileChange}
+                          accept="image/*"
+                        />
+                        <span>Choose image</span>
+                      </div>
+                    </div>
+                    <button type="submit" className="admin-btn admin-btn-primary admin-btn-sm" disabled={isLoading}>
+                      {isLoading ? <Loader size={14} className="admin-spinner" /> : <Plus size={14} />}
+                      Create
+                    </button>
+                  </form>
+                </div>
+
+                {/* Pens */}
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <Pen size={20} />
+                    <h3>Create Pen</h3>
+                  </div>
+                  <form onSubmit={handlePenSubmit} className="admin-form">
+                    <div className="admin-form-group">
+                      <label className="admin-label">Pen Name</label>
+                      <input
+                        type="text"
+                        name="pen_name"
+                        value={penData.pen_name}
+                        onChange={handlePenChange}
+                        className="admin-input"
+                        required
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Price</label>
+                      <input
+                        type="number"
+                        name="price"
+                        value={penData.price}
+                        onChange={handlePenChange}
+                        className="admin-input"
+                        required
+                        step="0.01"
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Image (Optional)</label>
+                      <div className="admin-file-input">
+                        <Upload size={16} />
+                        <input
+                          type="file"
+                          name="image"
+                          onChange={handlePenChange}
+                          accept="image/*"
+                        />
+                        <span>Choose image</span>
+                      </div>
+                    </div>
+                    <button type="submit" className="admin-btn admin-btn-primary admin-btn-sm" disabled={isLoading}>
+                      {isLoading ? <Loader size={14} className="admin-spinner" /> : <Plus size={14} />}
+                      Create
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Printing Section */}
+          {activeSection === 'printing' && (
+            <div className="admin-section">
+              <div className="admin-section-header">
+                <Printer size={24} />
+                <h2>Printing Options Management</h2>
+              </div>
+
+              <div className="admin-printing-grid">
+                {/* Print Types */}
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <FileText size={20} />
+                    <h3>Create Print Type</h3>
+                  </div>
+                  <form onSubmit={handlePrintTypeSubmit} className="admin-form">
+                    <div className="admin-form-group">
+                      <label className="admin-label">Print Type Name</label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={printTypeData.name}
+                        onChange={handlePrintTypeChange}
+                        className="admin-input"
+                        required
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Price</label>
+                      <input
+                        type="number"
+                        name="price"
+                        value={printTypeData.price}
+                        onChange={handlePrintTypeChange}
+                        className="admin-input"
+                        required
+                        step="0.01"
+                      />
+                    </div>
+                    <button type="submit" className="admin-btn admin-btn-primary admin-btn-sm" disabled={isLoading}>
+                      {isLoading ? <Loader size={14} className="admin-spinner" /> : <Plus size={14} />}
+                      Create
+                    </button>
+                  </form>
+                </div>
+
+                {/* Print Sizes */}
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <Maximize2 size={20} />
+                    <h3>Create Print Size</h3>
+                  </div>
+                  <form onSubmit={handlePrintSizeSubmit} className="admin-form">
+                    <div className="admin-form-group">
+                      <label className="admin-label">Print Size Name</label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={printSizeData.name}
+                        onChange={handlePrintSizeChange}
+                        className="admin-input"
+                        required
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Price</label>
+                      <input
+                        type="number"
+                        name="price"
+                        value={printSizeData.price}
+                        onChange={handlePrintSizeChange}
+                        className="admin-input"
+                        required
+                        step="0.01"
+                      />
+                    </div>
+                    <button type="submit" className="admin-btn admin-btn-primary admin-btn-sm" disabled={isLoading}>
+                      {isLoading ? <Loader size={14} className="admin-spinner" /> : <Plus size={14} />}
+                      Create
+                    </button>
+                  </form>
+                </div>
+
+                {/* Paper Types */}
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <FileText size={20} />
+                    <h3>Create Paper Type</h3>
+                  </div>
+                  <form onSubmit={handlePaperTypeSubmit} className="admin-form">
+                    <div className="admin-form-group">
+                      <label className="admin-label">Paper Type Name</label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={paperTypeData.name}
+                        onChange={handlePaperTypeChange}
+                        className="admin-input"
+                        required
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Price</label>
+                      <input
+                        type="number"
+                        name="price"
+                        value={paperTypeData.price}
+                        onChange={handlePaperTypeChange}
+                        className="admin-input"
+                        required
+                        step="0.01"
+                      />
+                    </div>
+                    <button type="submit" className="admin-btn admin-btn-primary admin-btn-sm" disabled={isLoading}>
+                      {isLoading ? <Loader size={14} className="admin-spinner" /> : <Plus size={14} />}
+                      Create
+                    </button>
+                  </form>
+                </div>
+
+                {/* Lamination Types */}
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <Shield size={20} />
+                    <h3>Create Lamination Type</h3>
+                  </div>
+                  <form onSubmit={handleLaminationTypeSubmit} className="admin-form">
+                    <div className="admin-form-group">
+                      <label className="admin-label">Lamination Type Name</label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={laminationTypeData.name}
+                        onChange={handleLaminationTypeChange}
+                        className="admin-input"
+                        required
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">Price</label>
+                      <input
+                        type="number"
+                        name="price"
+                        value={laminationTypeData.price}
+                        onChange={handleLaminationTypeChange}
+                        className="admin-input"
+                        required
+                        step="0.01"
+                      />
+                    </div>
+                    <button type="submit" className="admin-btn admin-btn-primary admin-btn-sm" disabled={isLoading}>
+                      {isLoading ? <Loader size={14} className="admin-spinner" /> : <Plus size={14} />}
+                      Create
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

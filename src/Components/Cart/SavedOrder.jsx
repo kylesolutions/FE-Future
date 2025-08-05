@@ -141,7 +141,7 @@ function SavedOrder() {
                         </div>
                       ) : (
                         <img
-                          src={getImageUrl(item.adjusted_image || item.cropped_image || item.uploaded_image || item.original_image)}
+                          src={getImageUrl(item.adjusted_image || item.cropped_image || item.preview_image || item.original_image)}
                           alt="Order item"
                           style={{ height: '100px', width: '100px', objectFit: 'cover' }}
                           onError={(e) => { e.target.src = 'https://via.placeholder.com/100x100?text=Image+Not+Found'; }}

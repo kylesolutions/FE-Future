@@ -108,7 +108,7 @@ function Payment() {
       const orderDetails = savedOrders.map((item) => {
   const imageUrl = item.type === 'document' 
     ? getImageUrl(item.file) 
-    : getImageUrl(item.adjusted_image || item.cropped_image || item.uploaded_image || item.original_image);
+    : getImageUrl(item.adjusted_image || item.cropped_image || item.preview_image || item.original_image);
 
   if (item.type === 'gift') {
     return {
@@ -273,7 +273,7 @@ function Payment() {
                     <td>
                       ${item.type === 'document' ? 
                         (item.file ? `<a href="${getImageUrl(item.file)}" target="_blank">View Document</a>` : 'No File') :
-                        `<img src="${getImageUrl(item.adjusted_image || item.cropped_image || item.uploaded_image || item.original_image)}" alt="Item" style="width: 50px; height: 50px; object-fit: cover;" />`
+                        `<img src="${getImageUrl(item.adjusted_image || item.cropped_image || item.preview_image || item.original_image)}" alt="Item" style="width: 50px; height: 50px; object-fit: cover;" />`
                       }
                     </td>
                     <td>
@@ -366,7 +366,7 @@ function Payment() {
                   </div>
                 ) : (
                   <img
-                    src={getImageUrl(item.adjusted_image || item.cropped_image || item.uploaded_image || item.original_image)}
+                    src={getImageUrl(item.adjusted_image || item.cropped_image || item.preview_image || item.original_image)}
                     alt="Item"
                     style={{ height: '80px', width: '80px', objectFit: 'cover', marginRight: '15px' }}
                     onError={(e) => { e.target.src = 'https://via.placeholder.com/80x80?text=Image+Not+Found'; }}

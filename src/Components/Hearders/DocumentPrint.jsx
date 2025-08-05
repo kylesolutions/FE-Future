@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -18,9 +19,12 @@ function DocumentPrint() {
   const [quantity, setQuantity] = useState(1);
   const [paperType, setPaperType] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('Collection');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
   const [lamination, setLamination] = useState('No');
   const [laminationType, setLaminationType] = useState('');
   const [deliveryCharge, setDeliveryCharge] = useState(0);
+  const [subtotal, setSubtotal] = useState(0);
+  const [vat, setVat] = useState(0);
   const [totalPrice, setTotalPrice] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -44,9 +48,6 @@ function DocumentPrint() {
         setPrintSizes(printSizeRes.data);
         setPaperTypes(paperTypeRes.data);
         setLaminationTypes(laminationTypeRes.data);
-        if (printTypeRes.data.length > 0) setPrintType(printTypeRes.data[0].id.toString());
-        if (printSizeRes.data.length > 0) setPrintSize(printSizeRes.data[0].id.toString());
-        if (paperTypeRes.data.length > 0) setPaperType(paperTypeRes.data[0].id.toString());
         if (printTypeRes.data.length === 0 || printSizeRes.data.length === 0 || paperTypeRes.data.length === 0) {
           setError('Required printing options are not available. Please contact support.');
         } else {
@@ -73,24 +74,34 @@ function DocumentPrint() {
   useEffect(() => {
     const calculateTotalPrice = () => {
       let price = 0;
-      const selectedPrintType = printTypes.find(pt => pt.id === parseInt(printType));
-      const selectedPrintSize = printSizes.find(ps => ps.id === parseInt(printSize));
-      const selectedPaperType = paperTypes.find(pt => pt.id === parseInt(paperType));
-      const selectedLaminationType = laminationTypes.find(lt => lt.id === parseInt(laminationType));
+      const selectedPrintType = printType ? printTypes.find(pt => pt.id === parseInt(printType)) : null;
+      const selectedPrintSize = printSize ? printSizes.find(ps => ps.id === parseInt(printSize)) : null;
+      const selectedPaperType = paperType ? paperTypes.find(pt => pt.id === parseInt(paperType)) : null;
+      const selectedLaminationType = laminationType ? laminationTypes.find(lt => lt.id === parseInt(laminationType)) : null;
       
-      if (selectedPrintType) price += parseFloat(selectedPrintType.price || 0);
-      if (selectedPrintSize) price += parseFloat(selectedPrintSize.price || 0);
-      if (selectedPaperType) price += parseFloat(selectedPaperType.price || 0);
-      if (lamination === 'Yes' && selectedLaminationType) price += parseFloat(selectedLaminationType.price || 0);
-      price *= quantity;
-      price += deliveryCharge;
-      setTotalPrice(round(price, 2));
+      // Safely parse prices, default to 0 if invalid
+      if (selectedPrintType) price += parseFloat(selectedPrintType.price) || 0;
+      if (selectedPrintSize) price += parseFloat(selectedPrintSize.price) || 0;
+      if (selectedPaperType) price += parseFloat(selectedPaperType.price) || 0;
+      if (lamination === 'Yes' && selectedLaminationType) price += parseFloat(selectedLaminationType.price) || 0;
+      
+      const subtotalPrice = price * quantity;
+      const vatAmount = subtotalPrice * 0.05; // 5% VAT
+      const total = subtotalPrice + vatAmount + deliveryCharge;
+      
+      setSubtotal(round(subtotalPrice, 2));
+      setVat(round(vatAmount, 2));
+      setTotalPrice(round(total, 2));
     };
     calculateTotalPrice();
   }, [printType, printSize, paperType, lamination, laminationType, quantity, deliveryCharge, printTypes, printSizes, paperTypes, laminationTypes]);
 
   const round = (value, decimals) => {
     return Number(Math.round(value + 'e' + decimals) + 'e-' + decimals);
+  };
+
+  const getSafePrice = (price) => {
+    return parseFloat(price) || 0;
   };
 
   const handleFileChange = (event) => {
@@ -105,21 +116,25 @@ function DocumentPrint() {
     const method = e.target.value;
     setDeliveryMethod(method);
     setDeliveryCharge(method === 'Delivery' ? 10 : 0);
+    setDeliveryAddress(method === 'Collection' ? '' : deliveryAddress);
+    setError(null);
+  };
+
+  const handleAddressChange = (e) => {
+    setDeliveryAddress(e.target.value);
     setError(null);
   };
 
   const handleLaminationChange = (e) => {
     const value = e.target.value;
     setLamination(value);
-    setLaminationType(''); // Always reset laminationType
-    console.log('Lamination changed:', value, 'LaminationType:', '');
+    setLaminationType('');
     setError(null);
   };
 
   const handleLaminationTypeChange = (e) => {
     const value = e.target.value;
     setLaminationType(value);
-    console.log('LaminationType changed:', value);
     setError(null);
   };
 
@@ -142,6 +157,10 @@ function DocumentPrint() {
     }
     if (!paperType || isNaN(parseInt(paperType))) {
       setError('Please select a valid paper type.');
+      return;
+    }
+    if (deliveryMethod === 'Delivery' && !deliveryAddress.trim()) {
+      setError('Please provide a delivery address.');
       return;
     }
 
@@ -200,6 +219,9 @@ function DocumentPrint() {
     if (lamination === 'Yes' && laminationType && laminationType !== '') {
       formData.append('lamination_type', laminationType);
     }
+    if (deliveryMethod === 'Delivery') {
+      formData.append('address', deliveryAddress);
+    }
 
     try {
       console.log('Sending FormData:', [...formData.entries()]);
@@ -212,14 +234,18 @@ function DocumentPrint() {
 
       alert('Print order saved successfully!');
       setFile(null);
-      setPrintType(printTypes.length > 0 ? printTypes[0].id.toString() : '');
-      setPrintSize(printSizes.length > 0 ? printSizes[0].id.toString() : '');
+      setPrintType('');
+      setPrintSize('');
       setQuantity(1);
-      setPaperType(paperTypes.length > 0 ? paperTypes[0].id.toString() : '');
+      setPaperType('');
       setDeliveryMethod('Collection');
+      setDeliveryAddress('');
       setLamination('No');
       setLaminationType('');
       setDeliveryCharge(0);
+      setSubtotal(0);
+      setVat(0);
+      setTotalPrice(0);
       navigate('/savedorder');
     } catch (error) {
       console.error('Error saving print order:', error.response?.data || error.message);
@@ -237,14 +263,18 @@ function DocumentPrint() {
           });
           alert('Print order saved successfully!');
           setFile(null);
-          setPrintType(printTypes.length > 0 ? printTypes[0].id.toString() : '');
-          setPrintSize(printSizes.length > 0 ? printSizes[0].id.toString() : '');
+          setPrintType('');
+          setPrintSize('');
           setQuantity(1);
-          setPaperType(paperTypes.length > 0 ? paperTypes[0].id.toString() : '');
+          setPaperType('');
           setDeliveryMethod('Collection');
+          setDeliveryAddress('');
           setLamination('No');
           setLaminationType('');
           setDeliveryCharge(0);
+          setSubtotal(0);
+          setVat(0);
+          setTotalPrice(0);
           navigate('/savedorder');
         } catch (refreshError) {
           console.error('Token refresh failed:', refreshError);
@@ -353,7 +383,7 @@ function DocumentPrint() {
                     <option value="">Select Print Type</option>
                     {printTypes.map((type) => (
                       <option key={type.id} value={type.id}>
-                        {type.name} (AED {parseFloat(type.price).toFixed(2)})
+                        {type.name}
                       </option>
                     ))}
                   </select>
@@ -372,7 +402,7 @@ function DocumentPrint() {
                     <option value="">Select Print Size</option>
                     {printSizes.map((size) => (
                       <option key={size.id} value={size.id}>
-                        {size.name} (AED {parseFloat(size.price).toFixed(2)})
+                        {size.name}
                       </option>
                     ))}
                   </select>
@@ -405,7 +435,7 @@ function DocumentPrint() {
                     <option value="">Select Paper Type</option>
                     {paperTypes.map((type) => (
                       <option key={type.id} value={type.id}>
-                        {type.name} (AED {parseFloat(type.price).toFixed(2)})
+                        {type.name}
                       </option>
                     ))}
                   </select>
@@ -432,6 +462,18 @@ function DocumentPrint() {
                     <option value="Collection">Collection (AED 0)</option>
                     <option value="Delivery">Delivery (AED 10)</option>
                   </select>
+                  {deliveryMethod === 'Delivery' && (
+                    <div className="document-form-group-nested">
+                      <label className="document-label">Delivery Address</label>
+                      <textarea
+                        value={deliveryAddress}
+                        onChange={handleAddressChange}
+                        className="document-textarea"
+                        placeholder="Enter your delivery address"
+                        rows="4"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="document-form-group">
@@ -447,26 +489,24 @@ function DocumentPrint() {
                     <option value="No">No</option>
                     <option value="Yes">Yes</option>
                   </select>
+                  {lamination === 'Yes' && (
+                    <div className="document-form-group-nested">
+                      <label className="document-label">Lamination Type (Optional)</label>
+                      <select
+                        value={laminationType}
+                        onChange={handleLaminationTypeChange}
+                        className="document-select"
+                      >
+                        <option value="">Select Lamination Type</option>
+                        {laminationTypes.map((type) => (
+                          <option key={type.id} value={type.id}>
+                            {type.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
-
-                {lamination === 'Yes' && (
-                  <div className="document-form-group document-form-group-full">
-                    <label className="document-label">Lamination Type (Optional)</label>
-                    <small className="text-muted">Select a lamination type or leave as 'No Lamination Type'.</small>
-                    <select
-                      value={laminationType}
-                      onChange={handleLaminationTypeChange}
-                      className="document-select"
-                    >
-                      <option value="">No Lamination Type</option>
-                      {laminationTypes.map((type) => (
-                        <option key={type.id} value={type.id}>
-                          {type.name} (AED {parseFloat(type.price).toFixed(2)})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -477,11 +517,41 @@ function DocumentPrint() {
               </div>
               <div className="document-price-summary">
                 <div className="document-price-breakdown">
+                  {printType && printTypes.find(pt => pt.id === parseInt(printType)) && (
+                    <div className="document-price-item">
+                      <span>Print Type ({printTypes.find(pt => pt.id === parseInt(printType)).name}):</span>
+                      <span>AED {getSafePrice(printTypes.find(pt => pt.id === parseInt(printType)).price).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {printSize && printSizes.find(ps => ps.id === parseInt(printSize)) && (
+                    <div className="document-price-item">
+                      <span>Print Size ({printSizes.find(ps => ps.id === parseInt(printSize)).name}):</span>
+                      <span>AED {getSafePrice(printSizes.find(ps => ps.id === parseInt(printSize)).price).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {paperType && paperTypes.find(pt => pt.id === parseInt(paperType)) && (
+                    <div className="document-price-item">
+                      <span>Paper Type ({paperTypes.find(pt => pt.id === parseInt(paperType)).name}):</span>
+                      <span>AED {getSafePrice(paperTypes.find(pt => pt.id === parseInt(paperType)).price).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {lamination === 'Yes' && laminationType && laminationTypes.find(lt => lt.id === parseInt(laminationType)) && (
+                    <div className="document-price-item">
+                      <span>Lamination Type ({laminationTypes.find(lt => lt.id === parseInt(laminationType)).name}):</span>
+                      <span>AED {getSafePrice(laminationTypes.find(lt => lt.id === parseInt(laminationType)).price).toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="document-price-item">
-                    <span>Base Price:</span>
-                    <span>
-                      AED {quantity > 0 ? ((totalPrice - deliveryCharge) / quantity).toFixed(2) : '0.00'} × {quantity}
-                    </span>
+                    <span>Quantity:</span>
+                    <span>× {quantity}</span>
+                  </div>
+                  <div className="document-price-item">
+                    <span>Subtotal:</span>
+                    <span>AED {subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="document-price-item">
+                    <span>VAT (5%):</span>
+                    <span>AED {vat.toFixed(2)}</span>
                   </div>
                   {deliveryCharge > 0 && (
                     <div className="document-price-item">
@@ -500,7 +570,7 @@ function DocumentPrint() {
             <div className="document-actions">
               <button
                 onClick={handleSave}
-                disabled={loading || !file || !printType || !printSize || !paperType}
+                disabled={loading || !file || !printType || !printSize || !paperType || (deliveryMethod === 'Delivery' && !deliveryAddress.trim())}
                 className="document-save-btn"
               >
                 {loading ? (

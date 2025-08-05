@@ -123,13 +123,6 @@ function GiftOrdersView() {
     }
   };
 
-  // Handle submitting orders to payment (non-admins only)
-  const handleSubmitOrder = () => {
-    if (!isAdmin) {
-      navigate('/payment', { state: { selectedOrders: filteredOrders } });
-    }
-  };
-
   // Construct image URLs
   const getImageUrl = (path) => {
     if (!path) return 'https://via.placeholder.com/50x50?text=Image+Not+Found';
@@ -189,6 +182,7 @@ function GiftOrdersView() {
           <thead className="table-dark">
             <tr>
               <th>Image</th>
+              <th>Preview Image</th>
               <th>User</th>
               <th>Item Type</th>
               <th>Item ID</th>
@@ -209,6 +203,17 @@ function GiftOrdersView() {
                 <td>
                   <img
                     src={getImageUrl(order.uploaded_image)}
+                    alt="Order Image"
+                    style={{ height: '50px', width: '50px', objectFit: 'cover' }}
+                    onError={(e) => {
+                      console.log('Image failed to load:', e.target.src);
+                      e.target.src = 'https://via.placeholder.com/50x50?text=Image+Not+Found';
+                    }}
+                  />
+                </td>
+                <td>
+                  <img
+                    src={getImageUrl(order.preview_image)}
                     alt="Order Image"
                     style={{ height: '50px', width: '50px', objectFit: 'cover' }}
                     onError={(e) => {

@@ -1,4 +1,4 @@
-/* Document Print Workspace Styles */
+
 .document-print-workspace {
   min-height: 100vh;
   background: linear-gradient(135deg, #f1eedd 0%, #e7d98a 100%);
@@ -97,7 +97,7 @@
   width: 40px;
   height: 40px;
   border: 4px solid rgba(102, 126, 234, 0.2);
-  border-top: 4px solid  #e7d98a;
+  border-top: 4px solid #e7d98a;
   border-radius: 50%;
   animation: documentSpin 1s linear infinite;
 }
@@ -170,18 +170,18 @@
   justify-content: center;
   gap: 12px;
   padding: 40px 20px;
-  border: 2px dashed  #e7d98a;
+  border: 2px dashed #e7d98a;
   border-radius: 16px;
   background: rgba(102, 126, 234, 0.05);
   cursor: pointer;
   transition: all 0.2s ease;
-  color:  #e7d98a;
+  color: #e7d98a;
   text-align: center;
 }
 
 .document-upload-label:hover {
   background: rgba(102, 126, 234, 0.1);
-  border-color:  #e7d98a;
+  border-color: #e7d98a;
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
 }
@@ -223,8 +223,8 @@
   gap: 8px;
 }
 
-.document-form-group-full {
-  grid-column: 1 / -1;
+.document-form-group-nested {
+  margin-top: 12px;
 }
 
 .document-label {
@@ -251,7 +251,7 @@
 .document-input:focus,
 .document-select:focus {
   outline: none;
-  border-color:  #e7d98a;
+  border-color: #e7d98a;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
   transform: translateY(-1px);
 }
@@ -306,7 +306,7 @@
   justify-content: center;
   gap: 12px;
   padding: 16px 32px;
-  background: linear-gradient(135deg,#f1eedd 0%, #e7d98a 100%);
+  background: linear-gradient(135deg, #f1eedd 0%, #e7d98a 100%);
   border: none;
   border-radius: 16px;
   color: white;
@@ -454,4 +454,14 @@
 
 .document-print-workspace * {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.document-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+.document-textarea:focus {
+  outline: none;
+  border-color: #e7d98a;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  transform: translateY(-1px);
 }

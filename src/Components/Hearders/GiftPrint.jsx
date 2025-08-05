@@ -62,11 +62,15 @@ function GiftPrint() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [orderFeedback, setOrderFeedback] = useState(null);
+  const [tshirtSize, setTshirtSize] = useState('');
   const imageRef = useRef(null);
   const transformerRef = useRef(null);
   const containerRef = useRef(null);
   const fileInputRef = useRef(null);
   const stageRef = useRef(null);
+
+  // T-shirt size options
+  const tshirtSizes = ['S', 'M', 'L', 'XL', 'XXL'];
 
   // Calculate canvas size based on container
   useEffect(() => {
@@ -110,9 +114,8 @@ function GiftPrint() {
         };
         setGiftItems(fetchedItems);
         console.log('Fetched gift items:', fetchedItems);
-        // Log IDs to verify
         Object.keys(fetchedItems).forEach((category) => {
-          console.log(`${category} IDs:`, fetchedItems[category].map(item => item.id));
+          console.log(`${category} IDs:`, fetchedItems[category].map((item) => item.id));
         });
         setError(null);
       } catch (error) {
@@ -154,6 +157,66 @@ function GiftPrint() {
     }
   };
 
+  // Generate preview image
+  const generatePreviewImage = async () => {
+    if (!stageRef.current || !giftImage || !userImage) {
+      console.error('Missing required elements for preview generation:', {
+        stage: !!stageRef.current,
+        giftImage: !!giftImage,
+        userImage: !!userImage,
+      });
+      return null;
+    }
+
+    const stage = stageRef.current.getStage();
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasSize.width;
+    canvas.height = canvasSize.height;
+    const ctx = canvas.getContext('2d');
+
+    // Draw gift item image
+    const giftWidth =
+      giftImage.width *
+      Math.min(canvasSize.width / giftImage.width, canvasSize.height / giftImage.height, 1);
+    const giftHeight =
+      giftImage.height *
+      Math.min(canvasSize.width / giftImage.width, canvasSize.height / giftImage.height, 1);
+    const giftX = (canvasSize.width - giftWidth) / 2;
+    const giftY = (canvasSize.height - giftHeight) / 2;
+    try {
+      ctx.drawImage(giftImage, giftX, giftY, giftWidth, giftHeight);
+    } catch (e) {
+      console.error('Error drawing gift image:', e);
+      setOrderFeedback({ type: 'error', message: 'Failed to draw gift image due to a security restriction.' });
+      return null;
+    }
+
+    // Draw user-uploaded image with transformations
+    ctx.save();
+    ctx.translate(imagePosition.x, imagePosition.y);
+    ctx.rotate((imageRotation * Math.PI) / 180);
+    ctx.scale(imageScale.x, imageScale.y);
+    try {
+      ctx.drawImage(userImage, 0, 0, userImage.width, userImage.height);
+    } catch (e) {
+      console.error('Error drawing user image:', e);
+      setOrderFeedback({ type: 'error', message: 'Failed to draw user image due to a security restriction.' });
+      return null;
+    }
+    ctx.restore();
+
+    try {
+      return canvas.toDataURL('image/png');
+    } catch (e) {
+      console.error('Error exporting canvas:', e);
+      setOrderFeedback({
+        type: 'error',
+        message: 'Failed to generate preview due to a security error. Ensure images are served with CORS.',
+      });
+      return null;
+    }
+  };
+
   // Handle save order
   const handleSaveOrder = async () => {
     if (!selectedItem || !uploadedImage) {
@@ -161,7 +224,11 @@ function GiftPrint() {
       return;
     }
 
-    // Validate selectedItem.id
+    if (selectedCategory === 'tshirts' && !tshirtSize) {
+      setOrderFeedback({ type: 'error', message: 'Please select a T-shirt size.' });
+      return;
+    }
+
     if (!selectedItem.id || isNaN(parseInt(selectedItem.id)) || parseInt(selectedItem.id) <= 0) {
       console.error('Invalid selectedItem.id:', selectedItem.id);
       console.log('Current selectedItem:', selectedItem);
@@ -176,25 +243,38 @@ function GiftPrint() {
         return;
       }
 
-      // Convert base64 uploadedImage to a File object
-      const response = await fetch(uploadedImage);
-      const blob = await response.blob();
-      const file = new File([blob], 'custom_image.png', { type: 'image/png' });
+      // Convert base64 images to File objects
+      const uploadedResponse = await fetch(uploadedImage);
+      const uploadedBlob = await uploadedResponse.blob();
+      const uploadedFile = new File([uploadedBlob], 'custom_image.png', { type: 'image/png' });
+
+      const previewImage = await generatePreviewImage();
+      if (!previewImage) {
+        setOrderFeedback({ type: 'error', message: 'Failed to generate preview image.' });
+        return;
+      }
+      const previewResponse = await fetch(previewImage);
+      const previewBlob = await previewResponse.blob();
+      const previewFile = new File([previewBlob], 'preview_image.png', { type: 'image/png' });
 
       // Prepare form data
       const formData = new FormData();
-      const contentType = selectedCategory.slice(0, -1); // e.g., 'mug'
+      const contentType = selectedCategory.slice(0, -1);
       formData.append('content_type', contentType);
-      formData.append('object_id', parseInt(selectedItem.id).toString()); // Ensure integer as string
-      formData.append('uploaded_image', file);
+      formData.append('object_id', parseInt(selectedItem.id).toString());
+      formData.append('uploaded_image', uploadedFile);
+      formData.append('preview_image', previewFile);
       formData.append('image_position_x', imagePosition.x.toString());
       formData.append('image_position_y', imagePosition.y.toString());
       formData.append('image_scale_x', imageScale.x.toString());
       formData.append('image_scale_y', imageScale.y.toString());
       formData.append('image_rotation', imageRotation.toString());
       formData.append('total_price', (selectedItem.price || 0).toString());
+      if (selectedCategory === 'tshirts') {
+        formData.append('size', tshirtSize);
+      }
 
-      // Log FormData contents for debugging
+      // Log FormData contents
       for (let [key, value] of formData.entries()) {
         console.log(`FormData: ${key}=${value}`);
       }
@@ -209,22 +289,39 @@ function GiftPrint() {
 
       setOrderFeedback({ type: 'success', message: 'Order saved successfully!' });
       console.log('Order saved:', result.data);
+      setUploadedImage(null);
+      setSelectedItem(null);
+      setTshirtSize('');
+      setImagePosition({ x: 0, y: 0 });
+      setImageScale({ x: 1, y: 1 });
+      setImageRotation(0);
+      setIsImageSelected(false);
+      setIsCropping(false);
     } catch (error) {
       console.error('Error saving order:', error);
       console.error('Server response:', error.response?.data);
       setOrderFeedback({
         type: 'error',
-        message: error.response?.data?.detail || JSON.stringify(error.response?.data) || 'Failed to save order. Please try again.',
+        message:
+          Object.keys(error.response?.data || {})
+            .map((key) => error.response.data[key].join(', '))
+            .join(' ') || 'Failed to save order. Please try again.',
       });
     }
 
-    // Clear feedback after 5 seconds
     setTimeout(() => setOrderFeedback(null), 5000);
   };
 
   // Load images for Konva
-  const [giftImage] = useImage(selectedItem?.image ? (selectedItem.image.startsWith('http') ? selectedItem.image : `${BASE_URL}${selectedItem.image}`) : '');
-  const [userImage] = useImage(uploadedImage || '');
+  const [giftImage] = useImage(
+    selectedItem?.image
+      ? selectedItem.image.startsWith('http')
+        ? selectedItem.image
+        : `${BASE_URL}${selectedItem.image}`
+      : '',
+    'anonymous'
+  );
+  const [userImage] = useImage(uploadedImage || '', 'anonymous');
 
   // Update transformer for image
   useEffect(() => {
@@ -264,7 +361,7 @@ function GiftPrint() {
     });
   };
 
-  // Handle transform for image (resize and rotate)
+  // Handle transform for image
   const handleTransformEnd = (e) => {
     const node = imageRef.current;
     if (node) {
@@ -355,20 +452,26 @@ function GiftPrint() {
 
       const img = new window.Image();
       img.src = uploadedImage;
+      img.crossOrigin = 'anonymous'; // Add for consistency
       img.onload = () => {
         const canvas = document.createElement('canvas');
         canvas.width = cropWidth;
         canvas.height = cropHeight;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
-        setUploadedImage(canvas.toDataURL());
+        try {
+          setUploadedImage(canvas.toDataURL('image/png'));
+        } catch (e) {
+          console.error('Error exporting cropped image:', e);
+          setOrderFeedback({ type: 'error', message: 'Failed to crop image due to a security error.' });
+        }
         setIsCropping(false);
         setIsImageSelected(true);
       };
     }
   };
 
-  // Handle crop rectangle resizing via handles with mug-specific constraints
+  // Handle crop rectangle resizing
   const handleCropHandleDrag = (handle, e) => {
     const newCropRect = { ...cropRect };
     const { x, y } = e.target.position();
@@ -456,14 +559,20 @@ function GiftPrint() {
 
       switch (side) {
         case 'left':
-          newScale.x = Math.max(minSize / (userImage.width || 100), (imagePosition.x + imageScale.x * (userImage.width || 100) - x) / (userImage.width || 100));
+          newScale.x = Math.max(
+            minSize / (userImage.width || 100),
+            (imagePosition.x + imageScale.x * (userImage.width || 100) - x) / (userImage.width || 100)
+          );
           newPosition.x = x;
           break;
         case 'right':
           newScale.x = Math.max(minSize / (userImage.width || 100), (x - imagePosition.x) / (userImage.width || 100));
           break;
         case 'top':
-          newScale.y = Math.max(minSize / (userImage.height || 100), (imagePosition.y + imageScale.y * (userImage.height || 100) - y) / (userImage.height || 100));
+          newScale.y = Math.max(
+            minSize / (userImage.height || 100),
+            (imagePosition.y + imageScale.y * (userImage.height || 100) - y) / (userImage.height || 100)
+          );
           newPosition.y = y;
           break;
         case 'bottom':
@@ -553,6 +662,7 @@ function GiftPrint() {
                     onClick={() => {
                       setSelectedCategory(category);
                       setSelectedItem(null);
+                      setTshirtSize('');
                     }}
                   >
                     <Icon size={20} />
@@ -576,9 +686,11 @@ function GiftPrint() {
                               <img
                                 src={item.image.startsWith('http') ? item.image : `${BASE_URL}${item.image}`}
                                 alt={item[`${category.slice(0, -1)}_name`] || item.name || 'Item'}
+                                crossOrigin="anonymous" // Add for sidebar images
                                 onError={(e) => {
                                   console.log('Image failed to load:', e.target.src);
-                                  e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0zNSA2NUw1MCA0NUw2NSA2NUgzNVoiIGZpbGw9IiNEMUQ1REIiLz4KPGNpcmNsZSBjeD0iNDAiIGN5PSIzNSIgcj0iNSIgZmlsbD0iI0QxRDVEQiIvPgo8L3N2Zz4K';
+                                  e.target.src =
+                                    'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0zNSA2NUw1MCA0NUw2NSA2NUgzNVoiIGZpbGw9IiNEMUQ1REIiLz4KPGNpcmNsZSBjeD0iNDAiIGN5PSIzNSIgcj0iNSIgZmlsbD0iI0QxRDVEQiIvPgo8L3N2Zz4K';
                                 }}
                               />
                             </div>
@@ -612,6 +724,23 @@ function GiftPrint() {
                 style={{ display: 'none' }}
               />
             </div>
+
+            {selectedCategory === 'tshirts' && selectedItem && (
+              <div className="gift-control-group">
+                <select
+                  value={tshirtSize}
+                  onChange={(e) => setTshirtSize(e.target.value)}
+                  className="gift-size-select"
+                >
+                  <option value="">Select T-shirt Size</option>
+                  {tshirtSizes.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {uploadedImage && (
               <div className="gift-control-group">
@@ -784,6 +913,7 @@ function GiftPrint() {
             <div className="status-bar">
               <div className="selected-item-info">
                 <span>Selected: {selectedItem[`${selectedCategory.slice(0, -1)}_name`] || selectedItem.name || 'Unnamed Item'}</span>
+                {selectedCategory === 'tshirts' && tshirtSize && <span>Size: {tshirtSize}</span>}
                 {selectedItem.price && <span className="price">Price: ${selectedItem.price}</span>}
               </div>
             </div>
