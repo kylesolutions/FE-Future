@@ -85,7 +85,7 @@ function Admin() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [colorVariantData, setColorVariantData] = useState({ mack_board_id: '', color_name: '', image: null });
+  const [colorVariantData, setColorVariantData] = useState({ mack_board: '', color_name: '', image: null });
   const [activeSection, setActiveSection] = useState('frames');
 
 
@@ -464,8 +464,8 @@ function Admin() {
 
       setSuccess(
         tshirtMode === 'create' ? 'T-shirt and variants created successfully!' :
-        tshirtMode === 'edit' ? 'T-shirt updated successfully!' :
-        'Variants added successfully!'
+          tshirtMode === 'edit' ? 'T-shirt updated successfully!' :
+            'Variants added successfully!'
       );
 
       setTshirtData({ tshirt_name: '', image: null });
@@ -491,14 +491,13 @@ function Admin() {
       } else {
         const errorMessage = error.response?.data
           ? Object.keys(error.response.data)
-              .map((key) =>
-                `${key}: ${
-                  Array.isArray(error.response.data[key])
-                    ? error.response.data[key].join(', ')
-                    : error.response.data[key]
-                }`
-              )
-              .join('; ')
+            .map((key) =>
+              `${key}: ${Array.isArray(error.response.data[key])
+                ? error.response.data[key].join(', ')
+                : error.response.data[key]
+              }`
+            )
+            .join('; ')
           : error.message;
         setError(`Failed to submit: ${errorMessage}`);
       }
@@ -575,14 +574,14 @@ function Admin() {
         const isFormData = data instanceof FormData || Object.values(data).some((value) => value instanceof File);
         const requestData = isFormData
           ? (() => {
-              const formData = new FormData();
-              Object.entries(data).forEach(([key, value]) => {
-                if (value !== null && value !== '') {
-                  formData.append(key, value);
-                }
-              });
-              return formData;
-            })()
+            const formData = new FormData();
+            Object.entries(data).forEach(([key, value]) => {
+              if (value !== null && value !== '') {
+                formData.append(key, value);
+              }
+            });
+            return formData;
+          })()
           : data;
 
         const config = {
@@ -620,14 +619,13 @@ function Admin() {
         } else {
           const errorMessage = error.response?.data
             ? Object.keys(error.response.data)
-                .map((key) =>
-                  `${key}: ${
-                    Array.isArray(error.response.data[key])
-                      ? error.response.data[key].join(', ')
-                      : error.response.data[key]
-                  }`
-                )
-                .join('; ')
+              .map((key) =>
+                `${key}: ${Array.isArray(error.response.data[key])
+                  ? error.response.data[key].join(', ')
+                  : error.response.data[key]
+                }`
+              )
+              .join('; ')
             : error.message;
           setError(`Failed to submit: ${errorMessage}`);
         }
@@ -708,12 +706,12 @@ function Admin() {
     () => setLaminationTypeData({ name: '', price: '', image: null })
   );
 
-  const handleColorVariantSubmit = createSubmitHandler(
-    '/mack_board_color_variants/',
-    colorVariantData,
-    'Color variant created successfully!',
-    () => setColorVariantData({ mack_board_id: '', color_name: '', image: null })
-  );
+ const handleColorVariantSubmit = createSubmitHandler(
+  '/mack_board_color_variants/',
+  colorVariantData,
+  'Color variant created successfully!',
+  () => setColorVariantData({ mack_board: '', color_name: '', image: null })
+);
 
   // Frame submission handler
   const handleSubmit = async (e) => {
@@ -862,14 +860,13 @@ function Admin() {
       } else {
         const errorMessage = error.response?.data
           ? Object.keys(error.response.data)
-              .map((key) =>
-                `${key}: ${
-                  Array.isArray(error.response.data[key])
-                    ? error.response.data[key].join(', ')
-                    : error.response.data[key]
-                }`
-              )
-              .join('; ')
+            .map((key) =>
+              `${key}: ${Array.isArray(error.response.data[key])
+                ? error.response.data[key].join(', ')
+                : error.response.data[key]
+              }`
+            )
+            .join('; ')
           : error.message;
         setError(`Failed to submit: ${errorMessage}`);
       }
@@ -914,7 +911,7 @@ function Admin() {
   }
 
   const selectedFrameName = frames.find((f) => f.id === Number(selectedFrameId))?.name || '';
-    const selectedTshirtName = tshirts.find((t) => t.id === Number(selectedTshirtId))?.tshirt_name || '';
+  const selectedTshirtName = tshirts.find((t) => t.id === Number(selectedTshirtId))?.tshirt_name || '';
 
   const sectionIcons = {
     frames: Hash,
@@ -1401,8 +1398,8 @@ function Admin() {
                     <div className="admin-form-group">
                       <label className="admin-label">Select MatBoard</label>
                       <select
-                        name="mack_board_id"
-                        value={colorVariantData.mack_board_id}
+                        name="mack_board"
+                        value={colorVariantData.mack_board}
                         onChange={handleColorVariantDataChange}
                         className="admin-select"
                         required
