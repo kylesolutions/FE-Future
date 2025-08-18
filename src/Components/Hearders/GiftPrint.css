@@ -604,3 +604,52 @@
   border-color: #667eea;
   box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
 }
+.variants-grid {
+  padding: 10px;
+  margin-top: 10px;
+}
+
+.variant-card {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  margin: 5px 0;
+  background: #f8f9fa;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.variant-card.selected {
+  border-color: #667eea;
+  background: #edf2ff;
+}
+
+.variant-card:hover {
+  background: #e2e8f0;
+}
+
+.variant-image {
+  width: 50px;
+  height: 50px;
+  margin-right: 10px;
+}
+
+.variant-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.variant-info {
+  flex: 1;
+}
+
+.variant-info p {
+  margin: 2px 0;
+  font-size: 14px;
+  color: #2d3748;
+}
+

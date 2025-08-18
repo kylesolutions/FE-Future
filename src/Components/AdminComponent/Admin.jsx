@@ -2,18 +2,18 @@ import axios from 'axios';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { 
-  Settings, 
-  Plus, 
-  Edit, 
-  Package, 
-  Coffee, 
-  Crown, 
-  Grid, 
-  Pen, 
-  FileText, 
-  Printer, 
-  Layers, 
+import {
+  Settings,
+  Plus,
+  Edit,
+  Package,
+  Coffee,
+  Crown,
+  Grid,
+  Pen,
+  FileText,
+  Printer,
+  Layers,
   Shield,
   Hash,
   Palette,
@@ -34,7 +34,8 @@ const BASE_URL = 'http://82.180.146.4:8001';
 function Admin() {
   const navigate = useNavigate();
   const user = useSelector((state) => state.user);
-  const [mode, setMode] = useState('create'); // 'create', 'add_variants', or 'edit'
+  const [mode, setMode] = useState('create'); // 'create', 'add_variants', or 'edit' for frames
+  const [tshirtMode, setTshirtMode] = useState('create'); // 'create', 'edit', or 'add_variants' for tshirts
   const [frames, setFrames] = useState([]);
   const [categories, setCategories] = useState([]);
   const [mackBoards, setMackBoards] = useState([]);
@@ -48,6 +49,7 @@ function Admin() {
   const [paperTypes, setPaperTypes] = useState([]);
   const [laminationTypes, setLaminationTypes] = useState([]);
   const [selectedFrameId, setSelectedFrameId] = useState('');
+  const [selectedTshirtId, setSelectedTshirtId] = useState('');
   const [frameData, setFrameData] = useState({
     name: '',
     price: '',
@@ -61,7 +63,13 @@ function Admin() {
   const [mackBoardData, setMackBoardData] = useState({ board_name: '', image: null, price: '' });
   const [mugData, setMugData] = useState({ mug_name: '', price: '', image: null });
   const [capData, setCapData] = useState({ cap_name: '', price: '', image: null });
-  const [tshirtData, setTshirtData] = useState({ tshirt_name: '', price: '', image: null });
+  const [tshirtData, setTshirtData] = useState({ tshirt_name: '', image: null });
+  const [colorVariants, setColorVariants] = useState([
+    { color_name: '', price: '', image: null, image_key: `color_0_${Date.now()}` }
+  ]);
+  const [sizeVariants, setSizeVariants] = useState([
+    { size_name: '', inner_width: '', inner_height: '', price: '', image: null, image_key: `size_0_${Date.now()}` }
+  ]);
   const [tileData, setTileData] = useState({ tile_name: '', price: '', image: null });
   const [penData, setPenData] = useState({ pen_name: '', price: '', image: null });
   const [printTypeData, setPrintTypeData] = useState({ name: '', price: '', image: null });
@@ -79,6 +87,7 @@ function Admin() {
   const [success, setSuccess] = useState(null);
   const [colorVariantData, setColorVariantData] = useState({ mack_board_id: '', color_name: '', image: null });
   const [activeSection, setActiveSection] = useState('frames');
+
 
   // Redirect if not admin
   useEffect(() => {
@@ -198,6 +207,42 @@ function Admin() {
     setTshirtData({ ...tshirtData, [name]: files ? files[0] : value });
   };
 
+  const handleColorVariantChange = (index, e) => {
+    const { name, value, files } = e.target;
+    const newVariants = [...colorVariants];
+    newVariants[index] = { ...newVariants[index], [name]: files ? files[0] : value };
+    setColorVariants(newVariants);
+  };
+
+  const handleSizeVariantChange = (index, e) => {
+    const { name, value, files } = e.target;
+    const newVariants = [...sizeVariants];
+    newVariants[index] = { ...newVariants[index], [name]: files ? files[0] : value };
+    setSizeVariants(newVariants);
+  };
+
+  const addColorVariant = () => {
+    setColorVariants([
+      ...colorVariants,
+      { color_name: '', price: '', image: null, image_key: `color_${colorVariants.length}_${Date.now()}` }
+    ]);
+  };
+
+  const addSizeVariant = () => {
+    setSizeVariants([
+      ...sizeVariants,
+      { size_name: '', inner_width: '', inner_height: '', price: '', image: null, image_key: `size_${sizeVariants.length}_${Date.now()}` }
+    ]);
+  };
+
+  const removeColorVariant = (index) => {
+    setColorVariants(colorVariants.filter((_, i) => i !== index));
+  };
+
+  const removeSizeVariant = (index) => {
+    setSizeVariants(sizeVariants.filter((_, i) => i !== index));
+  };
+
   const handleTileChange = (e) => {
     const { name, value, files } = e.target;
     setTileData({ ...tileData, [name]: files ? files[0] : value });
@@ -256,9 +301,259 @@ function Admin() {
     setVariants(newVariants);
   };
 
-  const handleColorVariantChange = (e) => {
+  const handleColorVariantDataChange = (e) => {
     const { name, value, files } = e.target;
     setColorVariantData({ ...colorVariantData, [name]: files ? files[0] : value });
+  };
+
+  // T-shirt submit handler
+  const handleTshirtSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      let token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+
+      if (tshirtMode === 'create' || tshirtMode === 'edit') {
+        if (!tshirtData.tshirt_name) {
+          setError('T-shirt name is required.');
+          return;
+        }
+      }
+
+      let tshirtId;
+
+      if (tshirtMode === 'create') {
+        const formData = new FormData();
+        formData.append('tshirt_name', tshirtData.tshirt_name);
+        if (tshirtData.image) formData.append('image', tshirtData.image);
+        const response = await axios.post(`${BASE_URL}/tshirts/`, formData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        tshirtId = response.data.id;
+        setTshirts([...tshirts, response.data]);
+      } else if (tshirtMode === 'edit') {
+        tshirtId = selectedTshirtId;
+        if (!tshirtId) {
+          setError('Please select a T-shirt to edit.');
+          return;
+        }
+        const formData = new FormData();
+        formData.append('tshirt_name', tshirtData.tshirt_name);
+        if (tshirtData.image) formData.append('image', tshirtData.image);
+        const response = await axios.put(`${BASE_URL}/tshirts/${tshirtId}/`, formData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        setTshirts(tshirts.map((t) => (t.id === tshirtId ? response.data : t)));
+      } else {
+        tshirtId = selectedTshirtId;
+        if (!tshirtId) {
+          setError('Please select a T-shirt to add variants.');
+          return;
+        }
+      }
+
+      // Handle variants
+      const validColorVariants = colorVariants.filter(v => v.color_name && v.price && !isNaN(parseFloat(v.price)));
+      const validSizeVariants = sizeVariants.filter(v => v.size_name && v.inner_width && v.inner_height && v.price && !isNaN(parseFloat(v.price)));
+
+      // Check duplicates for colors
+      const colorNames = validColorVariants.map(v => v.color_name);
+      if (new Set(colorNames).size !== colorNames.length) {
+        setError('Duplicate color names are not allowed.');
+        return;
+      }
+
+      // Check duplicates for sizes
+      const sizeNames = validSizeVariants.map(v => v.size_name);
+      if (new Set(sizeNames).size !== sizeNames.length) {
+        setError('Duplicate size names are not allowed.');
+        return;
+      }
+
+      if (tshirtMode === 'create' && (validColorVariants.length === 0 || validSizeVariants.length === 0)) {
+        setError('At least one color and one size variant are required for creation.');
+        return;
+      }
+
+      // Update existing variants if in edit mode
+      if (tshirtMode === 'edit') {
+        for (const variant of colorVariants.filter(v => v.id)) {
+          const formData = new FormData();
+          formData.append('color_name', variant.color_name);
+          formData.append('price', variant.price);
+          if (variant.image instanceof File) formData.append('image', variant.image);
+          await axios.put(`${BASE_URL}/tshirt_color_variants/${variant.id}/`, formData, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+        }
+
+        for (const variant of sizeVariants.filter(v => v.id)) {
+          const formData = new FormData();
+          formData.append('size_name', variant.size_name);
+          formData.append('inner_width', variant.inner_width);
+          formData.append('inner_height', variant.inner_height);
+          formData.append('price', variant.price);
+          if (variant.image instanceof File) formData.append('image', variant.image);
+          await axios.put(`${BASE_URL}/tshirt_size_variants/${variant.id}/`, formData, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+        }
+      }
+
+      // Add new variants
+      const newColorVariants = (tshirtMode === 'edit' ? colorVariants.filter(v => !v.id) : validColorVariants);
+      const newSizeVariants = (tshirtMode === 'edit' ? sizeVariants.filter(v => !v.id) : validSizeVariants);
+
+      if (newColorVariants.length > 0 || newSizeVariants.length > 0) {
+        const variantsData = [
+          ...newColorVariants.map(v => ({
+            variant_type: 'color',
+            color_name: v.color_name,
+            price: v.price,
+            image_key: v.image_key,
+          })),
+          ...newSizeVariants.map(v => ({
+            variant_type: 'size',
+            size_name: v.size_name,
+            inner_width: v.inner_width,
+            inner_height: v.inner_height,
+            price: v.price,
+            image_key: v.image_key,
+          })),
+        ];
+
+        const variantFormData = new FormData();
+        variantFormData.append('variants', JSON.stringify(variantsData));
+
+        variantsData.forEach((v) => {
+          const allVariants = v.variant_type === 'color' ? colorVariants : sizeVariants;
+          const entry = allVariants.find(entry => entry.image_key === v.image_key);
+          if (entry.image instanceof File) {
+            variantFormData.append(v.image_key, entry.image);
+          }
+        });
+
+        const response = await axios.post(`${BASE_URL}/tshirts/${tshirtId}/variants/`, variantFormData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        // Optionally update state with created variants
+      }
+
+      setSuccess(
+        tshirtMode === 'create' ? 'T-shirt and variants created successfully!' :
+        tshirtMode === 'edit' ? 'T-shirt updated successfully!' :
+        'Variants added successfully!'
+      );
+
+      setTshirtData({ tshirt_name: '', image: null });
+      setColorVariants([{ color_name: '', price: '', image: null, image_key: `color_0_${Date.now()}` }]);
+      setSizeVariants([{ size_name: '', inner_width: '', inner_height: '', price: '', image: null, image_key: `size_0_${Date.now()}` }]);
+      setSelectedTshirtId('');
+      setTshirtMode('create');
+
+      // Refresh T-shirts list
+      const token2 = localStorage.getItem('token');
+      const tshirtsResponse = await axios.get(`${BASE_URL}/tshirts/`, { headers: { Authorization: `Bearer ${token2}` } });
+      setTshirts(tshirtsResponse.data);
+    } catch (error) {
+      console.error('T-shirt submission error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (!newToken) {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+        }
+      } else if (error.response?.status === 403) {
+        setError('Only admins can perform this action.');
+      } else {
+        const errorMessage = error.response?.data
+          ? Object.keys(error.response.data)
+              .map((key) =>
+                `${key}: ${
+                  Array.isArray(error.response.data[key])
+                    ? error.response.data[key].join(', ')
+                    : error.response.data[key]
+                }`
+              )
+              .join('; ')
+          : error.message;
+        setError(`Failed to submit: ${errorMessage}`);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEditTshirt = async (tshirtId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${BASE_URL}/tshirts/${tshirtId}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setTshirtData({ tshirt_name: response.data.tshirt_name, image: null });
+      setColorVariants(response.data.color_variants.map((v, i) => ({
+        id: v.id,
+        color_name: v.color_name,
+        price: v.price,
+        image: null,
+        image_key: `color_${i}_${Date.now()}`
+      })));
+      setSizeVariants(response.data.size_variants.map((v, i) => ({
+        id: v.id,
+        size_name: v.size_name,
+        inner_width: v.inner_width,
+        inner_height: v.inner_height,
+        price: v.price,
+        image: null,
+        image_key: `size_${i}_${Date.now()}`
+      })));
+      setSelectedTshirtId(tshirtId);
+      setTshirtMode('edit');
+    } catch (error) {
+      console.error('Error fetching T-shirt:', error);
+      setError('Failed to load T-shirt data.');
+    }
+  };
+
+  const handleDeleteVariant = async (variantId, variantType) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${BASE_URL}/tshirt_${variantType}_variants/${variantId}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (variantType === 'color') {
+        setColorVariants(colorVariants.filter((v) => v.id !== variantId));
+      } else {
+        setSizeVariants(sizeVariants.filter((v) => v.id !== variantId));
+      }
+      setSuccess(`${variantType.charAt(0).toUpperCase() + variantType.slice(1)} variant deleted successfully!`);
+    } catch (error) {
+      console.error('Error deleting variant:', error);
+      setError('Failed to delete variant.');
+    }
   };
 
   // Generic submit handler
@@ -268,7 +563,7 @@ function Admin() {
       setIsLoading(true);
       setError(null);
       setSuccess(null);
-      
+
       try {
         const token = localStorage.getItem('token');
         if (!token) {
@@ -277,16 +572,18 @@ function Admin() {
           return;
         }
 
-        const isFormData = data instanceof FormData || Object.values(data).some(value => value instanceof File);
-        const requestData = isFormData ? (() => {
-          const formData = new FormData();
-          Object.entries(data).forEach(([key, value]) => {
-            if (value !== null && value !== '') {
-              formData.append(key, value);
-            }
-          });
-          return formData;
-        })() : data;
+        const isFormData = data instanceof FormData || Object.values(data).some((value) => value instanceof File);
+        const requestData = isFormData
+          ? (() => {
+              const formData = new FormData();
+              Object.entries(data).forEach(([key, value]) => {
+                if (value !== null && value !== '') {
+                  formData.append(key, value);
+                }
+              });
+              return formData;
+            })()
+          : data;
 
         const config = {
           headers: {
@@ -298,20 +595,18 @@ function Admin() {
         const response = await axios.post(`${BASE_URL}${endpoint}`, requestData, config);
         setSuccess(successMessage);
         resetData();
-        
+
         // Update state based on endpoint
-        if (endpoint.includes('categories')) setCategories(prev => [...prev, response.data]);
-        else if (endpoint.includes('mack_boards')) setMackBoards(prev => [...prev, response.data]);
-        else if (endpoint.includes('mugs')) setMugs(prev => [...prev, response.data]);
-        else if (endpoint.includes('caps')) setCaps(prev => [...prev, response.data]);
-        else if (endpoint.includes('tshirts')) setTshirts(prev => [...prev, response.data]);
-        else if (endpoint.includes('tiles')) setTiles(prev => [...prev, response.data]);
-        else if (endpoint.includes('pens')) setPens(prev => [...prev, response.data]);
-        else if (endpoint.includes('print-types')) setPrintTypes(prev => [...prev, response.data]);
-        else if (endpoint.includes('print-sizes')) setPrintSizes(prev => [...prev, response.data]);
-        else if (endpoint.includes('paper-types')) setPaperTypes(prev => [...prev, response.data]);
-        else if (endpoint.includes('lamination-types')) setLaminationTypes(prev => [...prev, response.data]);
-        
+        if (endpoint.includes('categories')) setCategories((prev) => [...prev, response.data]);
+        else if (endpoint.includes('mack_boards')) setMackBoards((prev) => [...prev, response.data]);
+        else if (endpoint.includes('mugs')) setMugs((prev) => [...prev, response.data]);
+        else if (endpoint.includes('caps')) setCaps((prev) => [...prev, response.data]);
+        else if (endpoint.includes('tiles')) setTiles((prev) => [...prev, response.data]);
+        else if (endpoint.includes('pens')) setPens((prev) => [...prev, response.data]);
+        else if (endpoint.includes('print-types')) setPrintTypes((prev) => [...prev, response.data]);
+        else if (endpoint.includes('print-sizes')) setPrintSizes((prev) => [...prev, response.data]);
+        else if (endpoint.includes('paper-types')) setPaperTypes((prev) => [...prev, response.data]);
+        else if (endpoint.includes('lamination-types')) setLaminationTypes((prev) => [...prev, response.data]);
       } catch (error) {
         console.error('Submission error:', error.response?.data || error.message);
         if (error.response?.status === 401) {
@@ -323,7 +618,18 @@ function Admin() {
         } else if (error.response?.status === 403) {
           setError('Only admins can perform this action.');
         } else {
-          setError('Failed to submit: ' + (error.response?.data?.detail || error.message));
+          const errorMessage = error.response?.data
+            ? Object.keys(error.response.data)
+                .map((key) =>
+                  `${key}: ${
+                    Array.isArray(error.response.data[key])
+                      ? error.response.data[key].join(', ')
+                      : error.response.data[key]
+                  }`
+                )
+                .join('; ')
+            : error.message;
+          setError(`Failed to submit: ${errorMessage}`);
         }
       } finally {
         setIsLoading(false);
@@ -331,7 +637,7 @@ function Admin() {
     };
   };
 
-  // Submit handlers
+  // Submit handlers for other sections
   const handleCategorySubmit = createSubmitHandler(
     '/categories/',
     categoryData,
@@ -358,13 +664,6 @@ function Admin() {
     capData,
     'Cap created successfully!',
     () => setCapData({ cap_name: '', price: '', image: null })
-  );
-
-  const handleTshirtSubmit = createSubmitHandler(
-    '/tshirts/',
-    tshirtData,
-    'T-shirt created successfully!',
-    () => setTshirtData({ tshirt_name: '', price: '', image: null })
   );
 
   const handleTileSubmit = createSubmitHandler(
@@ -416,7 +715,7 @@ function Admin() {
     () => setColorVariantData({ mack_board_id: '', color_name: '', image: null })
   );
 
-  // Frame submission handler (more complex)
+  // Frame submission handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -465,7 +764,7 @@ function Admin() {
             'Content-Type': 'multipart/form-data',
           },
         });
-        setFrames(frames.map(f => f.id === Number(frameId) ? frameResponse.data : f));
+        setFrames(frames.map((f) => (f.id === Number(frameId) ? frameResponse.data : f)));
       } else {
         frameId = selectedFrameId;
         if (!frameId) {
@@ -528,11 +827,10 @@ function Admin() {
         mode === 'create'
           ? 'Frame and variants created successfully!'
           : mode === 'edit'
-          ? 'Frame updated successfully!'
-          : 'Variants added successfully!'
+            ? 'Frame updated successfully!'
+            : 'Variants added successfully!'
       );
-      
-      // Reset form
+
       setFrameData({
         name: '',
         price: '',
@@ -562,7 +860,18 @@ function Admin() {
         setError('Only admins can perform this action.');
         navigate('/');
       } else {
-        setError('Failed to submit: ' + (error.response?.data?.detail || error.message));
+        const errorMessage = error.response?.data
+          ? Object.keys(error.response.data)
+              .map((key) =>
+                `${key}: ${
+                  Array.isArray(error.response.data[key])
+                    ? error.response.data[key].join(', ')
+                    : error.response.data[key]
+                }`
+              )
+              .join('; ')
+          : error.message;
+        setError(`Failed to submit: ${errorMessage}`);
       }
     } finally {
       setIsLoading(false);
@@ -605,6 +914,7 @@ function Admin() {
   }
 
   const selectedFrameName = frames.find((f) => f.id === Number(selectedFrameId))?.name || '';
+    const selectedTshirtName = tshirts.find((t) => t.id === Number(selectedTshirtId))?.tshirt_name || '';
 
   const sectionIcons = {
     frames: Hash,
@@ -843,7 +1153,7 @@ function Admin() {
                 {['color', 'size', 'finish', 'hanging'].map((variantType) => {
                   const icons = { color: Palette, size: Maximize2, finish: Sparkles, hanging: Bookmark };
                   const Icon = icons[variantType];
-                  
+
                   return (
                     <div key={variantType} className="admin-card">
                       <div className="admin-variant-header">
@@ -874,7 +1184,7 @@ function Admin() {
                                 <Trash2 size={14} />
                               </button>
                             </div>
-                            
+
                             <div className="admin-variant-fields">
                               <div className="admin-form-group">
                                 <label className="admin-label">
@@ -1093,7 +1403,7 @@ function Admin() {
                       <select
                         name="mack_board_id"
                         value={colorVariantData.mack_board_id}
-                        onChange={handleColorVariantChange}
+                        onChange={handleColorVariantDataChange}
                         className="admin-select"
                         required
                       >
@@ -1111,7 +1421,7 @@ function Admin() {
                         type="text"
                         name="color_name"
                         value={colorVariantData.color_name}
-                        onChange={handleColorVariantChange}
+                        onChange={handleColorVariantDataChange}
                         className="admin-input"
                         required
                       />
@@ -1123,7 +1433,7 @@ function Admin() {
                         <input
                           type="file"
                           name="image"
-                          onChange={handleColorVariantChange}
+                          onChange={handleColorVariantDataChange}
                           accept="image/*"
                         />
                         <span>Choose color image</span>
@@ -1261,51 +1571,285 @@ function Admin() {
 
                 {/* T-shirts */}
                 <div className="admin-card">
-                  <div className="admin-card-header">
+                  <div className="admin-section-header">
                     <Package size={20} />
-                    <h3>Create T-shirt</h3>
+                    <h2>T-shirt Management</h2>
                   </div>
+
+                  <div className="admin-mode-selector">
+                    <div className="admin-form-group">
+                      <label className="admin-label">Mode</label>
+                      <select
+                        className="admin-select"
+                        value={tshirtMode}
+                        onChange={(e) => setTshirtMode(e.target.value)}
+                      >
+                        <option value="create">Create New T-shirt</option>
+                        <option value="edit">Edit Existing T-shirt</option>
+                        <option value="add_variants">Add Variants to Existing T-shirt</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <form onSubmit={handleTshirtSubmit} className="admin-form">
-                    <div className="admin-form-group">
-                      <label className="admin-label">T-shirt Name</label>
-                      <input
-                        type="text"
-                        name="tshirt_name"
-                        value={tshirtData.tshirt_name}
-                        onChange={handleTshirtChange}
-                        className="admin-input"
-                        required
-                      />
-                    </div>
-                    <div className="admin-form-group">
-                      <label className="admin-label">Price</label>
-                      <input
-                        type="number"
-                        name="price"
-                        value={tshirtData.price}
-                        onChange={handleTshirtChange}
-                        className="admin-input"
-                        required
-                        step="0.01"
-                      />
-                    </div>
-                    <div className="admin-form-group">
-                      <label className="admin-label">Image (Optional)</label>
-                      <div className="admin-file-input">
-                        <Upload size={16} />
-                        <input
-                          type="file"
-                          name="image"
-                          onChange={handleTshirtChange}
-                          accept="image/*"
-                        />
-                        <span>Choose image</span>
+                    {(tshirtMode === 'create' || tshirtMode === 'edit') && (
+                      <div className="admin-card">
+                        <h3 className="admin-card-title">T-shirt Details</h3>
+                        <div className="admin-form-group">
+                          <label className="admin-label">T-shirt Name</label>
+                          <input
+                            type="text"
+                            name="tshirt_name"
+                            value={tshirtData.tshirt_name}
+                            onChange={handleTshirtChange}
+                            className="admin-input"
+                            required
+                          />
+                        </div>
+                        <div className="admin-form-group">
+                          <label className="admin-label">Image {tshirtMode === 'edit' ? '(Optional)' : ''}</label>
+                          <div className="admin-file-input">
+                            <Upload size={16} />
+                            <input
+                              type="file"
+                              name="image"
+                              onChange={handleTshirtChange}
+                              accept="image/*"
+                            />
+                            <span>Choose image</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {tshirtMode === 'edit' || tshirtMode === 'add_variants' && (
+                      <div className="admin-card">
+                        <h3 className="admin-card-title">Select T-shirt</h3>
+                        <div className="admin-form-group">
+                          <select
+                            className="admin-select"
+                            value={selectedTshirtId}
+                            onChange={(e) => handleEditTshirt(e.target.value)}
+                            required
+                          >
+                            <option value="">-- Select T-shirt --</option>
+                            {tshirts.map((tshirt) => (
+                              <option key={tshirt.id} value={tshirt.id}>
+                                {tshirt.tshirt_name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {tshirtMode === 'edit' && selectedTshirtId && (
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn-danger admin-btn-sm"
+                            onClick={() => handleDeleteTshirt(selectedTshirtId)}
+                          >
+                            <Trash2 size={14} />
+                            Delete T-shirt
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Color Variants */}
+                    <div className="admin-card">
+                      <div className="admin-variant-header">
+                        <div className="admin-variant-title">
+                          <Palette size={20} />
+                          <h3>Color Variants {selectedTshirtName && `for ${selectedTshirtName}`}</h3>
+                        </div>
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn-secondary"
+                          onClick={addColorVariant}
+                        >
+                          <Plus size={16} />
+                          Add Color Variant
+                        </button>
+                      </div>
+                      <div className="admin-variants-grid">
+                        {colorVariants.map((variant, index) => (
+                          <div key={variant.image_key || variant.id} className="admin-variant-card">
+                            <div className="admin-variant-card-header">
+                              <span>Color Variant #{index + 1}</span>
+                              <button
+                                type="button"
+                                className="admin-btn admin-btn-danger admin-btn-sm"
+                                onClick={() => {
+                                  if (variant.id) {
+                                    handleDeleteVariant(variant.id, 'color');
+                                  } else {
+                                    removeColorVariant(index);
+                                  }
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                            <div className="admin-variant-fields">
+                              <div className="admin-form-group">
+                                <label className="admin-label">Color Name</label>
+                                <input
+                                  type="text"
+                                  name="color_name"
+                                  value={variant.color_name}
+                                  onChange={(e) => handleColorVariantChange(index, e)}
+                                  className="admin-input"
+                                  required
+                                  placeholder="e.g., Red"
+                                />
+                              </div>
+                              <div className="admin-form-group">
+                                <label className="admin-label">Price</label>
+                                <input
+                                  type="number"
+                                  name="price"
+                                  value={variant.price}
+                                  onChange={(e) => handleColorVariantChange(index, e)}
+                                  className="admin-input"
+                                  required
+                                  step="0.01"
+                                  placeholder="e.g., 2.00"
+                                />
+                              </div>
+                              <div className="admin-form-group">
+                                <label className="admin-label">Image (Optional)</label>
+                                <div className="admin-file-input">
+                                  <Upload size={16} />
+                                  <input
+                                    type="file"
+                                    name="image"
+                                    onChange={(e) => handleColorVariantChange(index, e)}
+                                    accept="image/*"
+                                  />
+                                  <span>Choose image</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    <button type="submit" className="admin-btn admin-btn-primary admin-btn-sm" disabled={isLoading}>
-                      {isLoading ? <Loader size={14} className="admin-spinner" /> : <Plus size={14} />}
-                      Create
-                    </button>
+
+                    {/* Size Variants */}
+                    <div className="admin-card">
+                      <div className="admin-variant-header">
+                        <div className="admin-variant-title">
+                          <Maximize2 size={20} />
+                          <h3>Size Variants {selectedTshirtName && `for ${selectedTshirtName}`}</h3>
+                        </div>
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn-secondary"
+                          onClick={addSizeVariant}
+                        >
+                          <Plus size={16} />
+                          Add Size Variant
+                        </button>
+                      </div>
+                      <div className="admin-variants-grid">
+                        {sizeVariants.map((variant, index) => (
+                          <div key={variant.image_key || variant.id} className="admin-variant-card">
+                            <div className="admin-variant-card-header">
+                              <span>Size Variant #{index + 1}</span>
+                              <button
+                                type="button"
+                                className="admin-btn admin-btn-danger admin-btn-sm"
+                                onClick={() => {
+                                  if (variant.id) {
+                                    handleDeleteVariant(variant.id, 'size');
+                                  } else {
+                                    removeSizeVariant(index);
+                                  }
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                            <div className="admin-variant-fields">
+                              <div className="admin-form-group">
+                                <label className="admin-label">Size Name</label>
+                                <select
+                                  name="size_name"
+                                  value={variant.size_name}
+                                  onChange={(e) => handleSizeVariantChange(index, e)}
+                                  className="admin-select"
+                                  required
+                                >
+                                  <option value="">-- Select Size --</option>
+                                  <option value="S">Small</option>
+                                  <option value="M">Medium</option>
+                                  <option value="L">Large</option>
+                                  <option value="XL">Extra Large</option>
+                                  <option value="XXL">Double Extra Large</option>
+                                </select>
+                              </div>
+                              <div className="admin-form-group">
+                                <label className="admin-label">Inner Width</label>
+                                <input
+                                  type="number"
+                                  name="inner_width"
+                                  value={variant.inner_width}
+                                  onChange={(e) => handleSizeVariantChange(index, e)}
+                                  className="admin-input"
+                                  required
+                                  step="0.1"
+                                  placeholder="e.g., 20.0"
+                                />
+                              </div>
+                              <div className="admin-form-group">
+                                <label className="admin-label">Inner Height</label>
+                                <input
+                                  type="number"
+                                  name="inner_height"
+                                  value={variant.inner_height}
+                                  onChange={(e) => handleSizeVariantChange(index, e)}
+                                  className="admin-input"
+                                  required
+                                  step="0.1"
+                                  placeholder="e.g., 30.0"
+                                />
+                              </div>
+                              <div className="admin-form-group">
+                                <label className="admin-label">Price</label>
+                                <input
+                                  type="number"
+                                  name="price"
+                                  value={variant.price}
+                                  onChange={(e) => handleSizeVariantChange(index, e)}
+                                  className="admin-input"
+                                  required
+                                  step="0.01"
+                                  placeholder="e.g., 19.99"
+                                />
+                              </div>
+                              <div className="admin-form-group">
+                                <label className="admin-label">Image (Optional)</label>
+                                <div className="admin-file-input">
+                                  <Upload size={16} />
+                                  <input
+                                    type="file"
+                                    name="image"
+                                    onChange={(e) => handleSizeVariantChange(index, e)}
+                                    accept="image/*"
+                                  />
+                                  <span>Choose image</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="admin-form-actions">
+                      <button type="submit" className="admin-btn admin-btn-primary admin-btn-sm" disabled={isLoading}>
+                        {isLoading ? <Loader size={14} className="admin-spinner" /> : <Plus size={14} />}
+                        {tshirtMode === 'create' ? 'Create' : tshirtMode === 'edit' ? 'Update' : 'Add Variants'}
+                      </button>
+                    </div>
                   </form>
                 </div>
 

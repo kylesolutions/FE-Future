@@ -10,8 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@react-three/fiber": "^9.3.0",
     "@reduxjs/toolkit": "^2.8.2",
-    "axios": "^1.7.7",
+    "axios": "^1.11.0",
     "date-fns": "^4.1.0",
     "formik": "^2.4.6",
     "konva": "^9.3.22",
@@ -26,6 +27,7 @@
     "react-router-dom": "^6.27.0",
     "redux": "^5.0.1",
     "redux-persist": "^6.0.0",
+    "three": "^0.179.1",
     "use-image": "^1.1.4",
     "yup": "^1.6.1"
   },

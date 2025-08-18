@@ -12,6 +12,7 @@ const userSlice = createSlice({
     phone: '',
     type: '',
     is_blocked: false,
+    is_staff: false,
   },
   reducers: {
     updateUser: (state, action) => {
@@ -28,6 +29,7 @@ const userSlice = createSlice({
         phone: '',
         type: '',
         is_blocked: false,
+        is_staff: false,
       };
     });
   },

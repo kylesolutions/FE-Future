@@ -15,10 +15,12 @@ function Navbar() {
     const checkAdmin = async () => {
       try {
         const token = localStorage.getItem('token');
+        console.log('Token:', token); // Debug token
         if (token) {
           const response = await axios.get('http://82.180.146.4:8001/user/', {
             headers: { Authorization: `Bearer ${token}` },
           });
+          console.log('User data:', response.data); // Debug response
           setIsAdmin(response.data.is_staff || false);
         } else {
           setIsAdmin(false);
@@ -26,7 +28,6 @@ function Navbar() {
       } catch (error) {
         console.error('Error checking admin status:', error.response?.data || error.message);
         setIsAdmin(false);
-        // Handle token expiration or invalid token
         if (error.response?.status === 401) {
           localStorage.removeItem('token');
         }
@@ -46,14 +47,20 @@ function Navbar() {
   };
 
   if (isLoading) {
-    return null;
+    return (
+      <div className="text-center p-3">
+        <div className="spinner-border" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
     <nav className="navbar navbar-expand-lg bg-body-tertiary future-nav">
       <div className="container-fluid">
         <Link className="navbar-brand" to="/">
-          <img src="/Images/future_studio_Logo.png" alt="Logo" style={{ width: '120px' }} />
+          <img src="/Images/future_studio_Logo.png" alt="Logo" className="navbar-logo" />
         </Link>
         <button
           className="navbar-toggler"
@@ -69,14 +76,14 @@ function Navbar() {
         <div className="collapse navbar-collapse" id="navbarSupportedContent">
           <ul className="navbar-nav mx-auto mb-2 mb-lg-0">
             <li className="nav-item">
-              <Link className="nav-link active" to="/">Home</Link>
+              <Link className="nav-link" to="/">Home</Link>
             </li>
             <li className="nav-item">
               <Link className="nav-link" to="/" onClick={handleDesignClick}>Design</Link>
             </li>
             <li className="nav-item">
               <Link className="nav-link" to="/savedorder">
-                <i className="bi bi-bag-check me-1"></i>SavedOrder
+                <i className="bi bi-bag-check me-1"></i>Saved Order
               </Link>
             </li>
             {isAdmin && (
@@ -99,7 +106,7 @@ function Navbar() {
               </>
             )}
           </ul>
-          <div className="d-flex align-items-center">
+          <div className="d-flex align-items-center gap-2">
             {user.username ? (
               <div className="dropdown">
                 <button
@@ -108,17 +115,28 @@ function Navbar() {
                   id="profileDropdown"
                   data-bs-toggle="dropdown"
                   aria-expanded="false"
-                  onClick={handleProfileClick}
                 >
                   <i className="bi bi-person-circle me-1"></i>{user.name || user.username}
                 </button>
+                <ul className="dropdown-menu dropdown-menu-end" aria-labelledby="profileDropdown">
+                  <li>
+                    <Link className="dropdown-item" to="/profile" onClick={handleProfileClick}>
+                      Profile
+                    </Link>
+                  </li>
+                  <li>
+                    <Link className="dropdown-item" to="/logout">
+                      Logout
+                    </Link>
+                  </li>
+                </ul>
               </div>
             ) : (
               <div className="d-flex gap-2">
-                <button className="btn btn-outline-primary" onClick={() => navigate('/login')}>
+                <button className="btn btn-outline-primary login-button" onClick={() => navigate('/login')}>
                   Login
                 </button>
-                <button className="btn btn-primary" onClick={() => navigate('/signup')}>
+                <button className="btn btn-primary signup-button" onClick={() => navigate('/signup')}>
                   Signup
                 </button>
               </div>
@@ -131,4 +149,3 @@ function Navbar() {
 }
 
 export default Navbar;
-

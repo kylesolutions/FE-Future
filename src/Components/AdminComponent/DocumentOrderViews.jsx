@@ -5,6 +5,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { Download, Trash2 } from 'lucide-react';
 
 const BASE_URL = 'http://82.180.146.4:8001';
 
@@ -12,6 +13,7 @@ function DocumentOrderViews() {
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(null); // Track which order is being deleted
   const [error, setError] = useState(null);
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
@@ -31,7 +33,7 @@ function DocumentOrderViews() {
           return;
         }
 
-        const response = await axios.get(`${BASE_URL}/api/document-print-orders/`, {
+        const response = await axios.get(`${BASE_URL}/api/orders/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -72,10 +74,11 @@ function DocumentOrderViews() {
 
   // Handle deleting an order
   const handleDeleteOrder = async (orderId) => {
+    setDeleting(orderId);
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Not authenticated');
-      await axios.delete(`${BASE_URL}/api/document-print-orders/${orderId}/`, {
+      await axios.delete(`${BASE_URL}/api/orders/${orderId}/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setOrders((prevOrders) => prevOrders.filter((item) => item.id !== orderId));
@@ -94,6 +97,8 @@ function DocumentOrderViews() {
       } else {
         alert('Failed to delete order: ' + (error.response?.data?.detail || error.message));
       }
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -143,23 +148,456 @@ function DocumentOrderViews() {
 
   // Calculate total cost
   const totalCost = filteredOrders.reduce(
-    (sum, item) => sum + (item.total_price ? parseFloat(item.total_price) : 0),
+    (sum, item) => sum + (item.total_amount ? parseFloat(item.total_amount) : 0),
     0
   );
 
-  if (loading) return <div className="text-center mt-5">Loading...</div>;
-  if (error) return <div className="text-center mt-5 text-danger">{error}</div>;
-  if (filteredOrders.length === 0)
-    return <div className="text-center mt-5">No document orders found for the selected date range</div>;
+  if (loading) {
+    return (
+      <div className="docprint-loading-container">
+        <div className="docprint-loading-content">
+          <div className="docprint-loading-spinner"></div>
+          <p>Loading document orders...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="docprint-error-container">
+        <div className="docprint-error-content">
+          <h3>Error</h3>
+          <p>{error}</p>
+          <button onClick={() => window.location.reload()} className="docprint-retry-btn">
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (filteredOrders.length === 0) {
+    return <div className="docprint-empty-state">No document orders found for the selected date range</div>;
+  }
 
   return (
-    <div className="container mt-5">
-      <h2 className="orders-title">{isAdmin ? 'Document Orders Report' : 'Your Document Orders'}</h2>
-      <h4>{isAdmin ? 'All Users' : `Orders for ${user.username || 'You'}`}</h4>
-      <div className="mb-4">
-        <div className="d-flex gap-3 flex-wrap">
-          <div>
-            <label className="form-label">Start Date</label>
+    <div className="docprint-orders-workspace">
+      <style>{`
+        /* Document Orders Workspace Styles */
+        .docprint-orders-workspace {
+          min-height: 100vh;
+          background: linear-gradient(135deg, #f1eedd 0%, #e7d98a 100%);
+          padding: 20px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* Loading States */
+        .docprint-loading-container {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          background: linear-gradient(135deg, #f1eedd 0%, #e7d98a 100%);
+        }
+
+        .docprint-loading-content {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 20px;
+          padding: 40px;
+          background: rgba(255, 255, 255, 0.95);
+          border-radius: 20px;
+          backdrop-filter: blur(20px);
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+          color: #4a5568;
+        }
+
+        .docprint-loading-spinner {
+          width: 40px;
+          height: 40px;
+          border: 4px solid rgba(102, 126, 234, 0.2);
+          border-top: 4px solid #e7d98a;
+          border-radius: 50%;
+          animation: docprintSpin 1s linear infinite;
+        }
+
+        @keyframes docprintSpin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
+        /* Error Boundary */
+        .docprint-error-container {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .docprint-error-content {
+          text-align: center;
+          padding: 40px;
+          background: white;
+          border-radius: 20px;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+          max-width: 400px;
+        }
+
+        .docprint-error-content h3 {
+          color: #e53e3e;
+          margin-bottom: 16px;
+          font-size: 24px;
+          font-weight: 600;
+        }
+
+        .docprint-error-content p {
+          color: #718096;
+          margin-bottom: 24px;
+          line-height: 1.6;
+        }
+
+        .docprint-retry-btn {
+          padding: 12px 24px;
+          background: linear-gradient(135deg, #FFD700 0%, #998304 100%);
+          color: white;
+          border: none;
+          border-radius: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .docprint-retry-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        /* Main Content */
+        .docprint-main-content {
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 40px;
+          background: rgba(255, 255, 255, 0.95);
+          border-radius: 20px;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+          margin-bottom: 200px; /* Space for potential footer */
+        }
+
+        .docprint-orders-title {
+          color: #2d3748;
+          font-size: 28px;
+          font-weight: 600;
+          margin-bottom: 16px;
+          text-align: center;
+        }
+
+        .docprint-orders-subtitle {
+          color: #718096;
+          font-size: 16px;
+          margin-bottom: 32px;
+          text-align: center;
+        }
+
+        /* Date Filter */
+        .docprint-date-filter {
+          display: flex;
+          gap: 24px;
+          margin-bottom: 32px;
+          flex-wrap: wrap;
+        }
+
+        .docprint-date-group {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .docprint-date-label {
+          font-size: 14px;
+          font-weight: 600;
+          color: #4a5568;
+        }
+
+        .docprint-datepicker {
+          padding: 12px 16px;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          font-size: 14px;
+          background: white;
+          transition: all 0.2s ease;
+          color: #2d3748;
+        }
+
+        .docprint-datepicker:focus {
+          outline: none;
+          border-color: #e7d98a;
+          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+          transform: translateY(-1px);
+        }
+
+        /* Table Styles */
+        .docprint-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: white;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .docprint-table th,
+        .docprint-table td {
+          padding: 16px;
+          text-align: left;
+          border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+        }
+
+        .docprint-table th {
+          background: #2d3748;
+          color: white;
+          font-weight: 600;
+          font-size: 14px;
+        }
+
+        .docprint-table td {
+          font-size: 14px;
+          color: #4a5568;
+        }
+
+        .docprint-table a {
+          color: #e7d98a;
+          text-decoration: none;
+        }
+
+        .docprint-table a:hover {
+          text-decoration: underline;
+        }
+
+        .docprint-table-actions {
+          display: flex;
+          gap: 12px;
+        }
+
+        .docprint-action-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 16px;
+          border: none;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .docprint-action-btn.download {
+          background: #48bb78;
+          color: white;
+        }
+
+        .docprint-action-btn.download:hover {
+          background: #38a169;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(72, 187, 120, 0.3);
+        }
+
+        .docprint-action-btn.delete {
+          background: #e53e3e;
+          color: white;
+        }
+
+        .docprint-action-btn.delete:hover {
+          background: #c53030;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(229, 62, 62, 0.3);
+        }
+
+        .docprint-action-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .docprint-btn-spinner {
+          width: 16px;
+          height: 16px;
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-top: 2px solid white;
+          border-radius: 50%;
+          animation: docprintSpin 1s linear infinite;
+        }
+
+        /* Empty State */
+        .docprint-empty-state {
+          text-align: center;
+          padding: 40px;
+          background: rgba(255, 255, 255, 0.95);
+          border-radius: 20px;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+          color: #4a5568;
+          font-size: 16px;
+          margin: 40px auto;
+          max-width: 500px;
+        }
+
+        /* Total Cost */
+        .docprint-total-cost {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 20px;
+          background: rgba(102, 126, 234, 0.05);
+          border: 1px solid rgba(102, 126, 234, 0.1);
+          border-radius: 12px;
+          margin-top: 24px;
+          font-size: 18px;
+          font-weight: 600;
+          color: #2d3748;
+        }
+
+        .docprint-total-cost span {
+          color: #e7d98a;
+        }
+
+        .docprint-submit-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 24px;
+          background: #48bb78;
+          color: white;
+          border: none;
+          border-radius: 12px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          margin-top: 16px;
+        }
+
+        .docprint-submit-btn:hover {
+          background: #38a169;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(72, 187, 120, 0.3);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+          .docprint-orders-workspace {
+            padding: 15px;
+          }
+
+          .docprint-main-content {
+            padding: 24px;
+            margin-bottom: 250px;
+          }
+
+          .docprint-orders-title {
+            font-size: 24px;
+          }
+
+          .docprint-orders-subtitle {
+            font-size: 14px;
+          }
+
+          .docprint-date-filter {
+            gap: 16px;
+            flex-direction: column;
+          }
+
+          .docprint-table th,
+          .docprint-table td {
+            padding: 12px;
+            font-size: 13px;
+          }
+
+          .docprint-action-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .docprint-orders-workspace {
+            padding: 10px;
+          }
+
+          .docprint-main-content {
+            padding: 16px;
+          }
+
+          .docprint-orders-title {
+            font-size: 20px;
+          }
+
+          .docprint-date-filter {
+            gap: 12px;
+          }
+
+          .docprint-datepicker {
+            font-size: 13px;
+          }
+
+          .docprint-table th,
+          .docprint-table td {
+            padding: 8px;
+            font-size: 12px;
+          }
+
+          .docprint-action-btn {
+            padding: 5px 10px;
+            font-size: 11px;
+          }
+
+          .docprint-total-cost {
+            font-size: 16px;
+          }
+
+          .docprint-submit-btn {
+            padding: 10px 20px;
+            font-size: 13px;
+          }
+        }
+
+        /* Smooth Animations */
+        * {
+          box-sizing: border-box;
+        }
+
+        .docprint-orders-workspace * {
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Custom Scrollbar */
+        .docprint-main-content::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .docprint-main-content::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.1);
+        }
+
+        .docprint-main-content::-webkit-scrollbar-thumb {
+          background: rgba(102, 126, 234, 0.3);
+          border-radius: 3px;
+        }
+
+        .docprint-main-content::-webkit-scrollbar-thumb:hover {
+          background: rgba(102, 126, 234, 0.5);
+        }
+      `}</style>
+      <div className="docprint-main-content">
+        <h2 className="docprint-orders-title">{isAdmin ? 'Document Orders Report' : 'Your Document Orders'}</h2>
+        <h4 className="docprint-orders-subtitle">{isAdmin ? 'All Users' : `Orders for ${user.username || 'You'}`}</h4>
+        <div className="docprint-date-filter">
+          <div className="docprint-date-group">
+            <label className="docprint-date-label">Start Date</label>
             <DatePicker
               selected={startDate}
               onChange={(date) => setStartDate(date)}
@@ -167,13 +605,13 @@ function DocumentOrderViews() {
               startDate={startDate}
               endDate={endDate}
               dateFormat="MM/dd/yyyy"
-              className="form-control"
+              className="docprint-datepicker"
               placeholderText="Select start date"
               isClearable
             />
           </div>
-          <div>
-            <label className="form-label">End Date</label>
+          <div className="docprint-date-group">
+            <label className="docprint-date-label">End Date</label>
             <DatePicker
               selected={endDate}
               onChange={(date) => setEndDate(date)}
@@ -182,94 +620,106 @@ function DocumentOrderViews() {
               endDate={endDate}
               minDate={startDate}
               dateFormat="MM/dd/yyyy"
-              className="form-control"
+              className="docprint-datepicker"
               placeholderText="Select end date"
               isClearable
             />
           </div>
         </div>
-      </div>
-      <div className="table-responsive">
-        <table className="table table-striped table-bordered">
-          <thead className="table-dark">
-            <tr>
-              <th>File</th>
-              <th>User</th>
-              <th>Print Type</th>
-              <th>Print Size</th>
-              <th>Paper Type</th>
-              <th>Quantity</th>
-              <th>Lamination</th>
-              <th>Lamination Type</th>
-              <th>Delivery Method</th>
-              <th>Delivery Charge</th>
-              <th>Price</th>
-              <th>Status</th>
-              <th>Created At</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredOrders.map((order) => (
-              <tr key={`document-${order.id}`}>
-                <td>
-                  {order.file ? (
-                    <a
-                      href={getFileUrl(order.file)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleDownloadFile(order.file);
-                      }}
-                    >
-                      {order.file.split('/').pop() || 'View File'}
-                    </a>
-                  ) : (
-                    'No File'
-                  )}
-                </td>
-                <td>{order.username || order.user || 'Unknown'}</td>
-                <td>{order.print_type_name || 'N/A'}</td>
-                <td>{order.print_size_name || 'N/A'}</td>
-                <td>{order.paper_type_name || 'N/A'}</td>
-                <td>{order.quantity || 'N/A'}</td>
-                <td>{order.lamination ? 'Yes' : 'No'}</td>
-                <td>{order.lamination_type_name || 'N/A'}</td>
-                <td>{order.delivery_method || 'N/A'}</td>
-                <td>${parseFloat(order.delivery_charge || 0).toFixed(2)}</td>
-                <td>${parseFloat(order.total_price).toFixed(2)}</td>
-                <td>{order.status || 'Pending'}</td>
-                <td>{format(new Date(order.created_at), 'MM/dd/yyyy HH:mm:ss')}</td>
-                <td>
-                  <div className="d-flex gap-2">
-                    {(isAdmin || order.user_id === user.id) && order.file && (
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => handleDownloadFile(order.file)}
-                      >
-                        <i className="bi bi-download"></i> Download
-                      </button>
-                    )}
-                    {(isAdmin || order.user_id === user.id) && (
-                      <button
-                        className="btn btn-danger btn-sm"
-                        onClick={() => handleDeleteOrder(order.id)}
-                      >
-                        <i className="bi bi-trash"></i> Delete
-                      </button>
-                    )}
-                  </div>
-                </td>
+        <div className="table-responsive">
+          <table className="docprint-table">
+            <thead>
+              <tr>
+                <th>File(s)</th>
+                <th>User</th>
+                <th>Print Type</th>
+                <th>Print Size</th>
+                <th>Paper Type</th>
+                <th>Quantity</th>
+                <th>Lamination</th>
+                <th>Lamination Type</th>
+                <th>Delivery Option</th>
+                <th>Address</th>
+                <th>Price</th>
+                <th>Created At</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="mt-3">
-        <p><strong>Total Cost:</strong> ${totalCost.toFixed(2)}</p>
+            </thead>
+            <tbody>
+              {filteredOrders.map((order) => (
+                <tr key={`document-${order.id}`}>
+                  <td>
+                    {order.files_data?.length > 0 ? (
+                      order.files_data.map((f, idx) => (
+                        <div key={idx}>
+                          <a
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleDownloadFile(f.file);
+                            }}
+                          >
+                            {f.file.split('/').pop()}
+                          </a>
+                        </div>
+                      ))
+                    ) : (
+                      'No Files'
+                    )}
+                  </td>
+                  <td>{order.user || 'Unknown'}</td>
+                  <td>{order.print_type_name || 'N/A'}</td>
+                  <td>{order.print_size_name || 'N/A'}</td>
+                  <td>{order.paper_type_name || 'N/A'}</td>
+                  <td>{order.quantity || 'N/A'}</td>
+                  <td>{order.lamination ? 'Yes' : 'No'}</td>
+                  <td>{order.lamination_type_name || 'N/A'}</td>
+                  <td>{order.delivery_option || 'N/A'}</td>
+                  <td>
+                    {order.delivery_option === 'delivery'
+                      ? `${order.address_house_name || ''}, ${order.address_city || ''}, ${order.address_pin || ''}`
+                      : 'N/A'}
+                  </td>
+                  <td>${order.total_amount ? parseFloat(order.total_amount).toFixed(2) : '0.00'}</td>
+                  <td>{format(new Date(order.created_at), 'MM/dd/yyyy HH:mm:ss')}</td>
+                  <td className="docprint-table-actions">
+                    {(isAdmin || order.user === user.username) && order.files_data?.length > 0 && (
+                      <button
+                        className="docprint-action-btn download"
+                        onClick={() => handleDownloadFile(order.files_data[0].file)} // Download first file as example
+                      >
+                        <Download size={16} />
+                        Download
+                      </button>
+                    )}
+                    {(isAdmin || order.user === user.username) && (
+                      <button
+                        className="docprint-action-btn delete"
+                        onClick={() => handleDeleteOrder(order.id)}
+                        disabled={deleting === order.id}
+                      >
+                        {deleting === order.id ? (
+                          <div className="docprint-btn-spinner"></div>
+                        ) : (
+                          <>
+                            <Trash2 size={16} />
+                            Delete
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="docprint-total-cost">
+          <span>Total Cost:</span>
+          <span>${totalCost.toFixed(2)}</span>
+        </div>
         {!isAdmin && filteredOrders.length > 0 && (
-          <button className="btn btn-success" onClick={handleSubmitOrder}>
+          <button className="docprint-submit-btn" onClick={handleSubmitOrder}>
             Submit Order
           </button>
         )}
