@@ -33,6 +33,10 @@ class ErrorBoundary extends React.Component {
 
 function SavedOrder() {
   const [savedOrders, setSavedOrders] = useState([]);
+  const [printTypes, setPrintTypes] = useState([]);
+  const [printSizes, setPrintSizes] = useState([]);
+  const [paperTypes, setPaperTypes] = useState([]);
+  const [laminationTypes, setLaminationTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
@@ -44,7 +48,15 @@ function SavedOrder() {
         const token = localStorage.getItem('token');
         if (!token) throw new Error('Not authenticated');
 
-        const [savedItemsResponse, giftOrdersResponse, simpleDocumentOrdersResponse] = await Promise.all([
+        const [
+          savedItemsResponse,
+          giftOrdersResponse,
+          simpleDocumentOrdersResponse,
+          printTypesResponse,
+          printSizesResponse,
+          paperTypesResponse,
+          laminationTypesResponse,
+        ] = await Promise.all([
           axios.get(`${BASE_URL}/save-items/`, {
             headers: { Authorization: `Bearer ${token}` },
           }).catch((err) => {
@@ -57,20 +69,51 @@ function SavedOrder() {
             console.error('GiftOrders error:', err);
             return { data: [] };
           }),
-         
           axios.get(`${BASE_URL}/api/orders/`, {
             headers: { Authorization: `Bearer ${token}` },
           }).catch((err) => {
             console.error('SimpleDocumentOrders error:', err);
             return { data: [] };
           }),
+          axios.get(`${BASE_URL}/api/print-types/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch((err) => {
+            console.error('PrintTypes error:', err);
+            return { data: [] };
+          }),
+          axios.get(`${BASE_URL}/api/print-sizes/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch((err) => {
+            console.error('PrintSizes error:', err);
+            return { data: [] };
+          }),
+          axios.get(`${BASE_URL}/api/paper-types/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch((err) => {
+            console.error('PaperTypes error:', err);
+            return { data: [] };
+          }),
+          axios.get(`${BASE_URL}/api/lamination-types/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch((err) => {
+            console.error('LaminationTypes error:', err);
+            return { data: [] };
+          }),
         ]);
 
         console.log('Raw SavedItems response:', savedItemsResponse.data);
         console.log('Raw GiftOrders response:', giftOrdersResponse.data);
-       
         console.log('Raw SimpleDocumentOrders response:', simpleDocumentOrdersResponse.data);
+        console.log('Raw PrintTypes response:', printTypesResponse.data);
+        console.log('Raw PrintSizes response:', printSizesResponse.data);
+        console.log('Raw PaperTypes response:', paperTypesResponse.data);
+        console.log('Raw LaminationTypes response:', laminationTypesResponse.data);
         console.log('Authenticated user:', user);
+
+        setPrintTypes(printTypesResponse.data);
+        setPrintSizes(printSizesResponse.data);
+        setPaperTypes(paperTypesResponse.data);
+        setLaminationTypes(laminationTypesResponse.data);
 
         const savedItems = savedItemsResponse.data
           .filter(item => (item.status || 'pending').trim().toLowerCase() === 'pending')
@@ -83,7 +126,14 @@ function SavedOrder() {
           .map(item => ({ ...item, type: 'gift' }));
         const simpleDocumentOrders = simpleDocumentOrdersResponse.data
           .filter(item => (item.status || 'pending').trim().toLowerCase() === 'pending')
-          .map(item => ({ ...item, type: 'simple_document' }));
+          .map(item => ({
+            ...item,
+            type: 'simple_document',
+            print_type: printTypesResponse.data.find(pt => pt.id === item.print_type) || { name: 'N/A' },
+            print_size: printSizesResponse.data.find(ps => ps.id === item.print_size) || { name: 'N/A' },
+            paper_type: paperTypesResponse.data.find(pt => pt.id === item.paper_type) || { name: 'N/A' },
+            lamination_type: item.lamination ? (laminationTypesResponse.data.find(lt => lt.id === item.lamination_type) || { name: 'N/A' }) : null,
+          }));
         const orders = [...savedItems, ...giftOrders, ...simpleDocumentOrders];
         console.log('Processed orders:', orders);
 
@@ -112,7 +162,7 @@ function SavedOrder() {
       if (itemType === 'gift') {
         endpoint = `${BASE_URL}/gift-orders/${itemId}/`;
       } else if (itemType === 'simple_document') {
-        endpoint = `${BASE_URL}/api/orders/${itemId}/`;  // Assuming DELETE is added to OrderView
+        endpoint = `${BASE_URL}/api/orders/${itemId}/`;
       } else {
         endpoint = `${BASE_URL}/save-items/${itemId}/`;
       }
@@ -206,7 +256,6 @@ function SavedOrder() {
                           {item.color && <p><strong>Color:</strong> {item.color}</p>}
                           {item.size && <p><strong>Size:</strong> {item.size}</p>}
                         </>
-            
                       ) : item.type === 'simple_document' ? (
                         <>
                           <p><strong>Order Type:</strong> Simple Document Print</p>

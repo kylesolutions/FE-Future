@@ -123,12 +123,7 @@ function Navbar() {
                     <Link className="dropdown-item" to="/profile" onClick={handleProfileClick}>
                       Profile
                     </Link>
-                  </li>
-                  <li>
-                    <Link className="dropdown-item" to="/logout">
-                      Logout
-                    </Link>
-                  </li>
+                    </li>
                 </ul>
               </div>
             ) : (

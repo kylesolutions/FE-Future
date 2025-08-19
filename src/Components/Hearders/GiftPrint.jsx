@@ -48,11 +48,10 @@ function Mug3D({ textureUrl, canvasSize }) {
 
   useFrame(({ clock }) => {
     if (meshRef.current) {
-      meshRef.current.rotation.y = clock.getElapsedTime() * 0.5; // Rotate mug for better viewing
+      meshRef.current.rotation.y = clock.getElapsedTime() * 0.5;
     }
   });
 
-  // Simple cylindrical mug geometry
   const radius = 1;
   const height = 2;
   const radialSegments = 32;
@@ -85,11 +84,12 @@ function GiftPrint() {
   const [isImageSelected, setIsImageSelected] = useState(false);
   const [cropRect, setCropRect] = useState({ x: 100, y: 100, width: 150, height: 150 });
   const [canvasSize, setCanvasSize] = useState({ width: 500, height: 500 });
+  const [printableArea, setPrintableArea] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [orderFeedback, setOrderFeedback] = useState(null);
-  const [is3DView, setIs3DView] = useState(false); // State for toggling 2D/3D view
+  const [is3DView, setIs3DView] = useState(false);
   const imageRef = useRef(null);
   const transformerRef = useRef(null);
   const containerRef = useRef(null);
@@ -104,19 +104,29 @@ function GiftPrint() {
     }
   }, [selectedCategory, selectedItem]);
 
-  // Calculate canvas size based on container
+  // Calculate canvas size and printable area
   useEffect(() => {
     const updateCanvasSize = () => {
       if (containerRef.current) {
         const containerWidth = containerRef.current.offsetWidth;
         const newSize = Math.min(containerWidth - 40, window.innerHeight * 0.6, 600);
         setCanvasSize({ width: newSize, height: newSize });
+        // Set printable area for T-shirts
+        if (selectedCategory === 'tshirts' && selectedItem) {
+          const areaWidth = newSize * 0.6; // 60% of canvas width
+          const areaHeight = newSize * 0.6; // 60% of canvas height
+          const areaX = (newSize - areaWidth) / 2; // Center horizontally
+          const areaY = (newSize - areaHeight) / 2; // Center vertically
+          setPrintableArea({ x: areaX, y: areaY, width: areaWidth, height: areaHeight });
+        } else {
+          setPrintableArea(null);
+        }
       }
     };
     updateCanvasSize();
     window.addEventListener('resize', updateCanvasSize);
     return () => window.removeEventListener('resize', updateCanvasSize);
-  }, []);
+  }, [selectedCategory, selectedItem]);
 
   // Fetch gift items from backend
   useEffect(() => {
@@ -145,11 +155,9 @@ function GiftPrint() {
           pens: responses[4].data,
         };
         setGiftItems(fetchedItems);
-        console.log('Fetched gift items:', fetchedItems);
         setError(null);
       } catch (error) {
         console.error('Error fetching gift items:', error);
-        console.error('Server response:', error.response?.data);
         setError(`Failed to load gift items: ${error.response?.statusText || error.message}`);
       } finally {
         setLoading(false);
@@ -196,13 +204,19 @@ function GiftPrint() {
         img.onload = () => {
           const maxDimension = canvasSize.width * 0.5;
           const scale = Math.min(maxDimension / img.width, maxDimension / img.height, 1);
+          let initialX = canvasSize.width * 0.25;
+          let initialY = canvasSize.height * 0.25;
+          if (selectedCategory === 'tshirts' && printableArea) {
+            initialX = printableArea.x + printableArea.width * 0.25;
+            initialY = printableArea.y + printableArea.height * 0.25;
+          }
           setUploadedImage(reader.result);
-          setImagePosition({ x: canvasSize.width * 0.25, y: canvasSize.height * 0.25 });
+          setImagePosition({ x: initialX, y: initialY });
           setImageScale({ x: scale, y: scale });
           setImageRotation(0);
           setCropRect({
-            x: canvasSize.width * 0.25,
-            y: canvasSize.height * 0.25,
+            x: initialX,
+            y: initialY,
             width: maxDimension * 0.5,
             height: maxDimension * 0.5,
           });
@@ -216,11 +230,7 @@ function GiftPrint() {
   // Generate preview image for 2D view
   const generatePreviewImage = async () => {
     if (!stageRef.current || !giftImage || !userImage) {
-      console.error('Missing required elements for preview generation:', {
-        stage: !!stageRef.current,
-        giftImage: !!giftImage,
-        userImage: !!userImage,
-      });
+      console.error('Missing required elements for preview generation');
       return null;
     }
 
@@ -260,6 +270,15 @@ function GiftPrint() {
         setOrderFeedback({ type: 'error', message: 'Failed to draw gift image due to a security restriction.' });
         return null;
       }
+    }
+
+    // Draw printable area for T-shirts
+    if (selectedCategory === 'tshirts' && printableArea) {
+      ctx.strokeStyle = '#0d6efd';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.strokeRect(printableArea.x, printableArea.y, printableArea.width, printableArea.height);
+      ctx.setLineDash([]);
     }
 
     // Draw user-uploaded image with transformations
@@ -307,14 +326,12 @@ function GiftPrint() {
         return;
       }
 
-      // Convert base64 images to File objects
       const uploadedResponse = await fetch(uploadedImage);
       const uploadedBlob = await uploadedResponse.blob();
       const uploadedFile = new File([uploadedBlob], 'custom_image.png', { type: 'image/png' });
 
       let previewImage;
       if (selectedCategory === 'mugs' && is3DView) {
-        // For 3D view, use the uploaded image directly as the preview (simplified)
         previewImage = uploadedImage;
       } else {
         previewImage = await generatePreviewImage();
@@ -328,48 +345,27 @@ function GiftPrint() {
       const previewBlob = await previewResponse.blob();
       const previewFile = new File([previewBlob], 'preview_image.png', { type: 'image/png' });
 
-      // Prepare form data
       const formData = new FormData();
       formData.append(`${selectedCategory.slice(0, -1)}`, selectedItem.id);
       if (selectedCategory === 'tshirts') {
         formData.append('tshirt_color_variant', selectedColorVariant.id);
         formData.append('tshirt_size_variant', selectedSizeVariant.id);
         formData.append('total_price', (Number(selectedColorVariant.price) + Number(selectedSizeVariant.price)).toString());
+        // Adjust image position relative to printable area
+        formData.append('image_position_x', (imagePosition.x - (printableArea?.x || 0)).toString());
+        formData.append('image_position_y', (imagePosition.y - (printableArea?.y || 0)).toString());
       } else {
         formData.append('total_price', selectedItem.price.toString());
+        formData.append('image_position_x', imagePosition.x.toString());
+        formData.append('image_position_y', imagePosition.y.toString());
       }
-      formData.append('uploaded_image', uploadedFile);
-      formData.append('preview_image', previewFile);
-      formData.append('image_position_x', imagePosition.x.toString());
-      formData.append('image_position_y', imagePosition.y.toString());
       formData.append('image_scale_x', imageScale.x.toString());
       formData.append('image_scale_y', imageScale.y.toString());
       formData.append('image_rotation', imageRotation.toString());
+      formData.append('uploaded_image', uploadedFile);
+      formData.append('preview_image', previewFile);
       formData.append('status', 'pending');
 
-      // Log FormData contents
-      console.log('Saving order with state:', {
-        selectedCategory,
-        selectedItem: selectedItem
-          ? {
-              id: selectedItem.id,
-              name:
-                selectedItem.tshirt_name ||
-                selectedItem.mug_name ||
-                selectedItem.cap_name ||
-                selectedItem.tile_name ||
-                selectedItem.pen_name,
-            }
-          : null,
-        selectedColorVariant: selectedColorVariant ? { id: selectedColorVariant.id, color: selectedColorVariant.color_name } : null,
-        selectedSizeVariant: selectedSizeVariant ? { id: selectedSizeVariant.id, size: selectedSizeVariant.size_name } : null,
-      });
-      console.log('FormData entries:');
-      for (let [key, value] of formData.entries()) {
-        console.log(`FormData: ${key}=${typeof value === 'object' ? value.name : value}`);
-      }
-
-      // Send POST request
       const result = await axios.post(`${BASE_URL}/gift-orders/`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -377,7 +373,6 @@ function GiftPrint() {
         },
       });
 
-      console.log('Order saved:', result.data);
       setOrderFeedback({ type: 'success', message: `Order saved successfully! ID: ${result.data.id}` });
       setUploadedImage(null);
       setSelectedItem(null);
@@ -389,9 +384,9 @@ function GiftPrint() {
       setIsImageSelected(false);
       setIsCropping(false);
       setIs3DView(false);
+      setPrintableArea(null);
     } catch (error) {
       console.error('Error saving order:', error);
-      console.error('Server response:', error.response?.data);
       let errorMessage = 'Failed to save order. Please try again.';
       if (error.response?.data) {
         if (typeof error.response.data === 'object' && !Array.isArray(error.response.data)) {
@@ -430,26 +425,43 @@ function GiftPrint() {
     setIsImageSelected(false);
   };
 
-  // Handle drag for image
+  // Handle drag for image with printable area constraints
   const handleDragEnd = (e) => {
-    setImagePosition({
-      x: e.target.x(),
-      y: e.target.y(),
-    });
+    let newX = e.target.x();
+    let newY = e.target.y();
+    if (selectedCategory === 'tshirts' && printableArea) {
+      const imgWidth = (userImage?.width || 100) * imageScale.x;
+      const imgHeight = (userImage?.height || 100) * imageScale.y;
+      newX = Math.max(printableArea.x, Math.min(newX, printableArea.x + printableArea.width - imgWidth));
+      newY = Math.max(printableArea.y, Math.min(newY, printableArea.y + printableArea.height - imgHeight));
+      e.target.x(newX);
+      e.target.y(newY);
+    }
+    setImagePosition({ x: newX, y: newY });
   };
 
-  // Handle transform for image
+  // Handle transform for image with printable area constraints
   const handleTransformEnd = (e) => {
     const node = imageRef.current;
     if (node) {
-      setImageScale({
-        x: node.scaleX(),
-        y: node.scaleY(),
-      });
-      setImagePosition({
-        x: node.x(),
-        y: node.y(),
-      });
+      let newScaleX = node.scaleX();
+      let newScaleY = node.scaleY();
+      let newX = node.x();
+      let newY = node.y();
+      if (selectedCategory === 'tshirts' && printableArea) {
+        const imgWidth = (userImage?.width || 100) * newScaleX;
+        const imgHeight = (userImage?.height || 100) * newScaleY;
+        newScaleX = Math.min(newScaleX, printableArea.width / (userImage?.width || 100));
+        newScaleY = Math.min(newScaleY, printableArea.height / (userImage?.height || 100));
+        newX = Math.max(printableArea.x, Math.min(newX, printableArea.x + printableArea.width - imgWidth));
+        newY = Math.max(printableArea.y, Math.min(newY, printableArea.y + printableArea.height - imgHeight));
+        node.scaleX(newScaleX);
+        node.scaleY(newScaleY);
+        node.x(newX);
+        node.y(newY);
+      }
+      setImageScale({ x: newScaleX, y: newScaleY });
+      setImagePosition({ x: newX, y: newY });
       setImageRotation(node.rotation());
     }
   };
@@ -668,6 +680,9 @@ function GiftPrint() {
       if (selectedCategory === 'mugs') {
         const maxWidth = canvasSize.width * 0.8;
         newScale.x = Math.min(newScale.x, maxWidth / (userImage.width || 100));
+      } else if (selectedCategory === 'tshirts' && printableArea) {
+        newScale.x = Math.min(newScale.x, printableArea.width / (userImage.width || 100));
+        newScale.y = Math.min(newScale.y, printableArea.height / (userImage.height || 100));
       }
 
       setImageScale(newScale);
@@ -754,7 +769,8 @@ function GiftPrint() {
                       setSelectedItem(null);
                       setSelectedColorVariant(null);
                       setSelectedSizeVariant(null);
-                      setIs3DView(category === 'mugs' ? is3DView : false); // Reset 3D view for non-mug categories
+                      setIs3DView(category === 'mugs' ? is3DView : false);
+                      setPrintableArea(null);
                     }}
                   >
                     <Icon size={20} className="me-2" />
@@ -772,7 +788,6 @@ function GiftPrint() {
                             setSelectedColorVariant(null);
                             setSelectedSizeVariant(null);
                             setIsSidebarOpen(false);
-                            console.log('Selected item:', item);
                           }}
                           style={{ cursor: 'pointer' }}
                         >
@@ -784,7 +799,6 @@ function GiftPrint() {
                                 className="img-fluid"
                                 crossOrigin="anonymous"
                                 onError={(e) => {
-                                  console.log('Image failed to load:', e.target.src);
                                   e.target.src =
                                     'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0zNSA2NUw1MCA0NUw2NSA2NUgzNVoiIGZpbGw9IiNEMUQ1REIiLz4KPGNpcmNsZSBjeD0iNDAiIGN5PSIzNSIgcj0iNSIgZmlsbD0iI0QxRDVEQiIvPgo8L3N2Zz4K';
                                 }}
@@ -829,7 +843,6 @@ function GiftPrint() {
                   onChange={(e) => {
                     const variant = selectedItem.color_variants.find((v) => v.id === parseInt(e.target.value));
                     setSelectedColorVariant(variant || null);
-                    console.log('Selected color variant:', variant);
                   }}
                   className="form-select"
                 >
@@ -845,7 +858,6 @@ function GiftPrint() {
                   onChange={(e) => {
                     const variant = selectedItem.size_variants.find((v) => v.id === parseInt(e.target.value));
                     setSelectedSizeVariant(variant || null);
-                    console.log('Selected size variant:', variant);
                   }}
                   className="form-select"
                 >
@@ -972,6 +984,18 @@ function GiftPrint() {
                         />
                       );
                     })()}
+                    {selectedCategory === 'tshirts' && printableArea && (
+                      <Rect
+                        x={printableArea.x}
+                        y={printableArea.y}
+                        width={printableArea.width}
+                        height={printableArea.height}
+                        stroke="#0d6efd"
+                        strokeWidth={2}
+                        dash={[5, 5]}
+                        draggable={false}
+                      />
+                    )}
                     {userImage && (
                       <Group
                         clipX={isCropping ? cropRect.x : undefined}
@@ -1097,3 +1121,4 @@ function GiftPrint() {
 }
 
 export default GiftPrint;
+

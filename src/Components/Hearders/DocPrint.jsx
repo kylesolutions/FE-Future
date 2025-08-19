@@ -5,6 +5,7 @@ axios.defaults.baseURL = 'http://82.180.146.4:8001';
 
 function DocPrint() {
   const [files, setFiles] = useState([]);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [printTypes, setPrintTypes] = useState([]);
   const [printSizes, setPrintSizes] = useState([]);
   const [paperTypes, setPaperTypes] = useState([]);
@@ -48,7 +49,6 @@ function DocPrint() {
   }, []);
 
   useEffect(() => {
-    // Calculate total amount
     let total = 0;
     const selectedPrintType = printTypes.find(pt => pt.id === parseInt(formData.printType));
     const selectedPrintSize = printSizes.find(ps => ps.id === parseInt(formData.printSize));
@@ -58,14 +58,24 @@ function DocPrint() {
     if (selectedPrintSize) total += parseFloat(selectedPrintSize.price);
     if (selectedPaperType) total += parseFloat(selectedPaperType.price);
     if (formData.lamination && selectedLaminationType) total += parseFloat(selectedLaminationType.price);
-    if (formData.deliveryOption === 'delivery') total += 5.00; // Delivery charge
+    if (formData.deliveryOption === 'delivery') total += 5.00;
     total *= formData.quantity;
     setTotalAmount(total.toFixed(2));
   }, [formData, printTypes, printSizes, paperTypes, laminationTypes]);
 
   const handleFileChange = (e) => {
-    setFiles([...e.target.files]);
+    const newFiles = [...e.target.files];
+    setFiles([...files, ...newFiles]);
+    setSelectedFiles([...selectedFiles, ...newFiles.map(file => ({ file, selected: false }))]);
     setError('');
+  };
+
+  const handleFileSelection = (index) => {
+    setSelectedFiles(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], selected: !updated[index].selected };
+      return updated;
+    });
   };
 
   const handleFormChange = (e) => {
@@ -92,8 +102,9 @@ function DocPrint() {
       setError('Please login');
       return;
     }
-    if (files.length === 0) {
-      setError('Please upload at least one file');
+    const selectedFilesList = selectedFiles.filter(sf => sf.selected).map(sf => sf.file);
+    if (selectedFilesList.length === 0) {
+      setError('Please select at least one file');
       return;
     }
     if (!formData.printType || !formData.printSize || !formData.paperType || (formData.lamination && !formData.laminationType)) {
@@ -106,7 +117,7 @@ function DocPrint() {
     }
     setLoading(true);
     const orderData = new FormData();
-    files.forEach((file) => {
+    selectedFilesList.forEach((file) => {
       orderData.append('files', file);
     });
     orderData.append('print_type', formData.printType);
@@ -123,13 +134,17 @@ function DocPrint() {
     }
     try {
       const response = await axios.post('/api/orders/', orderData, {
-        headers: { 
+        headers: {
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${token}`
         },
       });
       alert('Order saved successfully!');
-      setFiles([]);
+      // Remove selected files from the lists
+      const remainingFiles = files.filter(file => !selectedFilesList.includes(file));
+      const remainingSelectedFiles = selectedFiles.filter(sf => !sf.selected);
+      setFiles(remainingFiles);
+      setSelectedFiles(remainingSelectedFiles);
       setFormData({
         printType: '',
         printSize: '',
@@ -164,7 +179,6 @@ function DocPrint() {
   return (
     <div className="docprint-workspace">
       <style>{`
-        /* Document Print Workspace Styles */
         .docprint-workspace {
           min-height: 100vh;
           background: linear-gradient(135deg, #f1eedd 0%, #e7d98a 100%);
@@ -174,7 +188,6 @@ function DocPrint() {
           flex-direction: column;
         }
 
-        /* Loading States */
         .docprint-loading-container {
           display: flex;
           align-items: center;
@@ -210,7 +223,6 @@ function DocPrint() {
           100% { transform: rotate(360deg); }
         }
 
-        /* Error Boundary */
         .docprint-error-boundary {
           display: flex;
           align-items: center;
@@ -257,7 +269,6 @@ function DocPrint() {
           box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
         }
 
-        /* Header Styles */
         .docprint-header {
           background: rgba(255, 255, 255, 0.95);
           backdrop-filter: blur(20px);
@@ -305,12 +316,11 @@ function DocPrint() {
           line-height: 1.5;
         }
 
-        /* Form Container */
         .docprint-form-container {
           display: flex;
           justify-content: center;
           flex: 1;
-          padding-bottom: 200px; /* Ensures content is not hidden by footer */
+          padding-bottom: 200px;
         }
 
         .docprint-form-card {
@@ -324,7 +334,6 @@ function DocPrint() {
           max-width: 700px;
         }
 
-        /* Error Alert */
         .docprint-error-alert {
           background: rgba(229, 62, 62, 0.1);
           border: 1px solid rgba(229, 62, 62, 0.2);
@@ -336,7 +345,6 @@ function DocPrint() {
           line-height: 1.5;
         }
 
-        /* Section Styles */
         .docprint-section {
           margin-bottom: 30px;
           padding-bottom: 30px;
@@ -363,7 +371,6 @@ function DocPrint() {
           font-weight: 600;
         }
 
-        /* Upload Area */
         .docprint-upload-area {
           position: relative;
         }
@@ -408,7 +415,29 @@ function DocPrint() {
           opacity: 0.8;
         }
 
-        /* Form Elements */
+        .docprint-file-list {
+          margin-top: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .docprint-file-selected {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px;
+          background: rgba(102, 126, 234, 0.05);
+          border-radius: 8px;
+          border: 1px solid rgba(102, 126, 234, 0.1);
+        }
+
+        .docprint-file-selected input[type="checkbox"] {
+          width: 20px;
+          height: 20px;
+          cursor: pointer;
+        }
+
         .docprint-options-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -470,7 +499,6 @@ function DocPrint() {
           cursor: pointer;
         }
 
-        /* Price Summary */
         .docprint-price-summary {
           background: rgba(102, 126, 234, 0.05);
           border: 1px solid rgba(102, 126, 234, 0.1);
@@ -503,7 +531,6 @@ function DocPrint() {
           color: #2d3748;
         }
 
-        /* Action Button */
         .docprint-actions {
           display: flex;
           justify-content: center;
@@ -552,7 +579,6 @@ function DocPrint() {
           animation: docprintSpin 1s linear infinite;
         }
 
-        /* Responsive Design */
         @media (max-width: 768px) {
           .docprint-workspace {
             padding: 15px;
@@ -611,7 +637,7 @@ function DocPrint() {
           }
 
           .docprint-form-container {
-            padding-bottom: 250px; /* Adjusted for mobile */
+            padding-bottom: 250px;
           }
         }
 
@@ -661,7 +687,6 @@ function DocPrint() {
           }
         }
 
-        /* Smooth Animations */
         * {
           box-sizing: border-box;
         }
@@ -719,12 +744,17 @@ function DocPrint() {
                     <span>Choose Files</span>
                     <small>PDF, DOC, DOCX, JPG, PNG</small>
                   </label>
-                  {files.length > 0 && (
+                  {selectedFiles.length > 0 && (
                     <div className="docprint-file-list">
-                      {files.map((file, index) => (
+                      {selectedFiles.map((sf, index) => (
                         <div key={index} className="docprint-file-selected">
+                          <input
+                            type="checkbox"
+                            checked={sf.selected}
+                            onChange={() => handleFileSelection(index)}
+                          />
                           <FileText size={16} />
-                          <span>{file.name}</span>
+                          <span>{sf.file.name}</span>
                         </div>
                       ))}
                     </div>
@@ -747,7 +777,7 @@ function DocPrint() {
                     >
                       <option value="">Select Print Type</option>
                       {printTypes.map(pt => (
-                        <option key={pt.id} value={pt.id}>{pt.name} - ${pt.price}</option>
+                        <option key={pt.id} value={pt.id}>{pt.name}</option>
                       ))}
                     </select>
                   </div>
@@ -761,7 +791,7 @@ function DocPrint() {
                     >
                       <option value="">Select Print Size</option>
                       {printSizes.map(ps => (
-                        <option key={ps.id} value={ps.id}>{ps.name} - ${ps.price}</option>
+                        <option key={ps.id} value={ps.id}>{ps.name}</option>
                       ))}
                     </select>
                   </div>
@@ -775,7 +805,7 @@ function DocPrint() {
                     >
                       <option value="">Select Paper Type</option>
                       {paperTypes.map(pt => (
-                        <option key={pt.id} value={pt.id}>{pt.name} - ${pt.price}</option>
+                        <option key={pt.id} value={pt.id}>{pt.name}</option>
                       ))}
                     </select>
                   </div>
@@ -801,7 +831,7 @@ function DocPrint() {
                         >
                           <option value="">Select Lamination Type</option>
                           {laminationTypes.map(lt => (
-                            <option key={lt.id} value={lt.id}>{lt.name} - ${lt.price}</option>
+                            <option key={lt.id} value={lt.id}>{lt.name}</option>
                           ))}
                         </select>
                       </div>
@@ -829,8 +859,8 @@ function DocPrint() {
                       onChange={handleFormChange}
                       className="docprint-select"
                     >
-                      <option value="collection">Collection ($0.00)</option>
-                      <option value="delivery">Delivery ($5.00)</option>
+                      <option value="collection">Collection</option>
+                      <option value="delivery">Delivery</option>
                     </select>
                   </div>
                 </div>
