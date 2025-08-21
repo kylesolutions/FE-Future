@@ -41,26 +41,115 @@ const categoryIcons = {
 };
 
 function Mug3D({ textureUrl, canvasSize }) {
-  const meshRef = useRef();
+  const mugRef = useRef();
+  const handleRef = useRef();
   const texture = useLoader(THREE.TextureLoader, textureUrl, (loader) => {
     loader.crossOrigin = 'anonymous';
   });
 
+  useEffect(() => {
+    if (texture) {
+      console.log('Texture loaded successfully:', textureUrl);
+    } else {
+      console.error('Texture failed to load:', textureUrl);
+    }
+  }, [texture, textureUrl]);
+
   useFrame(({ clock }) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y = clock.getElapsedTime() * 0.5;
+    if (mugRef.current && handleRef.current) {
+      mugRef.current.rotation.y = clock.getElapsedTime() * 0.3;
+      handleRef.current.rotation.y = clock.getElapsedTime() * 0.3;
     }
   });
 
   const radius = 1;
-  const height = 2;
-  const radialSegments = 32;
+  const height = 2.5;
+  const radialSegments = 64;
+
+  const mugGeometry = new THREE.CylinderGeometry(radius, radius, height, radialSegments, 1, false, 0, 2 * Math.PI);
+
+  const uvAttribute = mugGeometry.attributes.uv;
+  const marginFraction = 0.02 / height;
+  for (let i = 0; i < uvAttribute.count; i++) {
+    const v = uvAttribute.getY(i);
+    uvAttribute.setY(i, marginFraction + (1 - 2 * marginFraction) * v);
+  }
+  uvAttribute.needsUpdate = true;
+
+  const handleTube = 0.1;
+  const handleRadius = 0.5;
+
+  const angle0 = 0;
+  const topAttach = new THREE.Vector3(
+    radius * Math.cos(angle0),
+    height * 0.3,
+    radius * Math.sin(angle0)
+  );
+  const bottomAttach = new THREE.Vector3(
+    radius * Math.cos(angle0),
+    -height * 0.3,
+    radius * Math.sin(angle0)
+  );
+  const handleMidpoint = new THREE.Vector3(
+    radius + handleRadius,
+    0,
+    0
+  );
+
+  console.log('Handle attachment points:', {
+    topAttach: { x: topAttach.x.toFixed(4), y: topAttach.y.toFixed(4), z: topAttach.z.toFixed(4) },
+    bottomAttach: { x: bottomAttach.x.toFixed(4), y: bottomAttach.y.toFixed(4), z: bottomAttach.z.toFixed(4) },
+    handleMidpoint: { x: handleMidpoint.x.toFixed(4), y: handleMidpoint.y.toFixed(4), z: handleMidpoint.z.toFixed(4) }
+  });
+
+  const handlePath = new THREE.CatmullRomCurve3([
+    topAttach,
+    handleMidpoint,
+    bottomAttach
+  ], false, 'catmullrom', 0.5);
+
+  const handleGeometry = new THREE.TubeGeometry(handlePath, 32, handleTube, 16, false);
+
+  const mugMaterial = new THREE.MeshStandardMaterial({
+    map: texture,
+    color: 'white',
+    side: THREE.FrontSide,
+    metalness: 0.1,
+    roughness: 0.8,
+  });
+
+  const handleMaterial = new THREE.MeshStandardMaterial({
+    color: 'white',
+    side: THREE.FrontSide,
+    metalness: 0.1,
+    roughness: 0.8,
+  });
+
+  const debugMaterial = new THREE.MeshBasicMaterial({ color: 'red' });
 
   return (
-    <mesh ref={meshRef} position={[0, 0, 0]}>
-      <cylinderGeometry args={[radius, radius, height, radialSegments]} />
-      <meshStandardMaterial map={texture} />
-    </mesh>
+    <group>
+      <mesh ref={mugRef} position={[0, 0, 0]}>
+        <primitive object={mugGeometry} attach="geometry" />
+        <primitive object={mugMaterial} attach="material" />
+      </mesh>
+      <mesh ref={handleRef} position={[0, 0, 0]} rotation={[0, 0, 0]}>
+        <primitive object={handleGeometry} attach="geometry" />
+        <primitive object={handleMaterial} attach="material" />
+      </mesh>
+      <mesh position={[0, 0, 0]} rotation={[0, 0, 0]}>
+        <cylinderGeometry args={[radius * 0.95, radius * 0.95, height * 0.95, radialSegments, 1, false]} />
+        <meshStandardMaterial color="white" side={THREE.BackSide} metalness={0.1} roughness={0.8} />
+      </mesh>
+      <mesh position={topAttach}>
+        <sphereGeometry args={[0.05, 16, 16]} />
+        <primitive object={debugMaterial} attach="material" />
+      </mesh>
+      <mesh position={bottomAttach}>
+        <sphereGeometry args={[0.05, 16, 16]} />
+        <primitive object={debugMaterial} attach="material" />
+      </mesh>
+    </group>
   );
 }
 
@@ -96,7 +185,6 @@ function GiftPrint() {
   const fileInputRef = useRef(null);
   const stageRef = useRef(null);
 
-  // Clear variants for non-T-shirt categories or when no item is selected
   useEffect(() => {
     if (selectedCategory !== 'tshirts' || !selectedItem) {
       setSelectedColorVariant(null);
@@ -104,19 +192,17 @@ function GiftPrint() {
     }
   }, [selectedCategory, selectedItem]);
 
-  // Calculate canvas size and printable area
   useEffect(() => {
     const updateCanvasSize = () => {
       if (containerRef.current) {
         const containerWidth = containerRef.current.offsetWidth;
         const newSize = Math.min(containerWidth - 40, window.innerHeight * 0.6, 600);
         setCanvasSize({ width: newSize, height: newSize });
-        // Set printable area for T-shirts
         if (selectedCategory === 'tshirts' && selectedItem) {
-          const areaWidth = newSize * 0.6; // 60% of canvas width
-          const areaHeight = newSize * 0.6; // 60% of canvas height
-          const areaX = (newSize - areaWidth) / 2; // Center horizontally
-          const areaY = (newSize - areaHeight) / 2; // Center vertically
+          const areaWidth = newSize * 0.6;
+          const areaHeight = newSize * 0.6;
+          const areaX = (newSize - areaWidth) / 2;
+          const areaY = (newSize - areaHeight) / 2;
           setPrintableArea({ x: areaX, y: areaY, width: areaWidth, height: areaHeight });
         } else {
           setPrintableArea(null);
@@ -128,7 +214,6 @@ function GiftPrint() {
     return () => window.removeEventListener('resize', updateCanvasSize);
   }, [selectedCategory, selectedItem]);
 
-  // Fetch gift items from backend
   useEffect(() => {
     const fetchGiftItems = async () => {
       setLoading(true);
@@ -166,7 +251,6 @@ function GiftPrint() {
     fetchGiftItems();
   }, []);
 
-  // Load images for Konva
   const [giftImage] = useImage(
     selectedCategory === 'tshirts' && selectedColorVariant?.image
       ? selectedColorVariant.image.startsWith('http')
@@ -179,9 +263,8 @@ function GiftPrint() {
       : '',
     'anonymous'
   );
-  const [userImage] = useImage(uploadedImage || '', 'anonymous');
+  const [userImageImage] = useImage(uploadedImage || '', 'anonymous');
 
-  // Update transformer for image
   useEffect(() => {
     if (imageRef.current && transformerRef.current && isImageSelected && !isCropping && uploadedImage && !is3DView) {
       transformerRef.current.nodes([imageRef.current]);
@@ -192,7 +275,6 @@ function GiftPrint() {
     }
   }, [uploadedImage, isCropping, isImageSelected, is3DView]);
 
-  // Handle image upload
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -202,13 +284,17 @@ function GiftPrint() {
         img.src = reader.result;
         img.crossOrigin = 'anonymous';
         img.onload = () => {
-          const maxDimension = canvasSize.width * 0.5;
+          const maxDimension = Math.min(canvasSize.width, canvasSize.height) * 0.5;
           const scale = Math.min(maxDimension / img.width, maxDimension / img.height, 1);
-          let initialX = canvasSize.width * 0.25;
-          let initialY = canvasSize.height * 0.25;
+          let initialX, initialY;
           if (selectedCategory === 'tshirts' && printableArea) {
-            initialX = printableArea.x + printableArea.width * 0.25;
-            initialY = printableArea.y + printableArea.height * 0.25;
+            const imgWidth = img.width * scale;
+            const imgHeight = img.height * scale;
+            initialX = printableArea.x + (printableArea.width - imgWidth) / 2;
+            initialY = printableArea.y + (printableArea.height - imgHeight) / 2;
+          } else {
+            initialX = canvasSize.width * 0.25;
+            initialY = canvasSize.height * 0.25;
           }
           setUploadedImage(reader.result);
           setImagePosition({ x: initialX, y: initialY });
@@ -227,9 +313,38 @@ function GiftPrint() {
     }
   };
 
-  // Generate preview image for 2D view
+  const applyCrop = () => {
+    if (!userImageImage || !uploadedImage) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = cropRect.width;
+    canvas.height = cropRect.height;
+    const ctx = canvas.getContext('2d');
+
+    const scaleX = userImageImage.width / (userImageImage.width * imageScale.x);
+    const scaleY = userImageImage.height / (userImageImage.height * imageScale.y);
+
+    ctx.translate(-cropRect.x + imagePosition.x, -cropRect.y + imagePosition.y);
+    ctx.rotate((imageRotation * Math.PI) / 180);
+    ctx.scale(imageScale.x, imageScale.y);
+
+    try {
+      ctx.drawImage(userImageImage, 0, 0);
+      const croppedImage = canvas.toDataURL('image/png');
+      setUploadedImage(croppedImage);
+      setImagePosition({ x: cropRect.x, y: cropRect.y });
+      setImageScale({ x: 1, y: 1 });
+      setImageRotation(0);
+      setIsCropping(false);
+      setIsImageSelected(true);
+    } catch (e) {
+      console.error('Error applying crop:', e);
+      setOrderFeedback({ type: 'error', message: 'Failed to crop image due to a security restriction.' });
+    }
+  };
+
   const generatePreviewImage = async () => {
-    if (!stageRef.current || !giftImage || !userImage) {
+    if (!stageRef.current || !giftImage || !userImageImage) {
       console.error('Missing required elements for preview generation');
       return null;
     }
@@ -240,7 +355,6 @@ function GiftPrint() {
     canvas.height = canvasSize.height;
     const ctx = canvas.getContext('2d');
 
-    // Draw gift item or variant image
     const selectedImage = selectedCategory === 'tshirts' && selectedColorVariant?.image ? selectedColorVariant.image : selectedItem?.image;
     const imgSrc = selectedImage
       ? selectedImage.startsWith('http')
@@ -272,7 +386,6 @@ function GiftPrint() {
       }
     }
 
-    // Draw printable area for T-shirts
     if (selectedCategory === 'tshirts' && printableArea) {
       ctx.strokeStyle = '#0d6efd';
       ctx.lineWidth = 2;
@@ -281,13 +394,12 @@ function GiftPrint() {
       ctx.setLineDash([]);
     }
 
-    // Draw user-uploaded image with transformations
     ctx.save();
     ctx.translate(imagePosition.x, imagePosition.y);
     ctx.rotate((imageRotation * Math.PI) / 180);
     ctx.scale(imageScale.x, imageScale.y);
     try {
-      ctx.drawImage(userImage, 0, 0, userImage.width, userImage.height);
+      ctx.drawImage(userImageImage, 0, 0, userImageImage.width, userImageImage.height);
     } catch (e) {
       console.error('Error drawing user image:', e);
       setOrderFeedback({ type: 'error', message: 'Failed to draw user image due to a security restriction.' });
@@ -307,7 +419,6 @@ function GiftPrint() {
     }
   };
 
-  // Handle save order
   const handleSaveOrder = async () => {
     if (!selectedItem || !uploadedImage) {
       setOrderFeedback({ type: 'error', message: 'Please select an item and upload an image.' });
@@ -351,7 +462,6 @@ function GiftPrint() {
         formData.append('tshirt_color_variant', selectedColorVariant.id);
         formData.append('tshirt_size_variant', selectedSizeVariant.id);
         formData.append('total_price', (Number(selectedColorVariant.price) + Number(selectedSizeVariant.price)).toString());
-        // Adjust image position relative to printable area
         formData.append('image_position_x', (imagePosition.x - (printableArea?.x || 0)).toString());
         formData.append('image_position_y', (imagePosition.y - (printableArea?.y || 0)).toString());
       } else {
@@ -406,32 +516,28 @@ function GiftPrint() {
     setTimeout(() => setOrderFeedback(null), 5000);
   };
 
-  // Handle image click to show transformer
   const handleImageClick = () => {
     if (!isCropping && uploadedImage && !is3DView) {
       setIsImageSelected(true);
     }
   };
 
-  // Handle stage click to hide transformer
   const handleStageClick = (e) => {
     if (e.target === stageRef.current?.getStage() && !isCropping && !is3DView) {
       setIsImageSelected(false);
     }
   };
 
-  // Handle save button
   const handleSave = () => {
     setIsImageSelected(false);
   };
 
-  // Handle drag for image with printable area constraints
   const handleDragEnd = (e) => {
     let newX = e.target.x();
     let newY = e.target.y();
-    if (selectedCategory === 'tshirts' && printableArea) {
-      const imgWidth = (userImage?.width || 100) * imageScale.x;
-      const imgHeight = (userImage?.height || 100) * imageScale.y;
+    if (selectedCategory === 'tshirts' && printableArea && userImageImage) {
+      const imgWidth = (userImageImage.width || 100) * imageScale.x;
+      const imgHeight = (userImageImage.height || 100) * imageScale.y;
       newX = Math.max(printableArea.x, Math.min(newX, printableArea.x + printableArea.width - imgWidth));
       newY = Math.max(printableArea.y, Math.min(newY, printableArea.y + printableArea.height - imgHeight));
       e.target.x(newX);
@@ -440,19 +546,18 @@ function GiftPrint() {
     setImagePosition({ x: newX, y: newY });
   };
 
-  // Handle transform for image with printable area constraints
   const handleTransformEnd = (e) => {
     const node = imageRef.current;
-    if (node) {
+    if (node && userImageImage) {
       let newScaleX = node.scaleX();
       let newScaleY = node.scaleY();
       let newX = node.x();
       let newY = node.y();
       if (selectedCategory === 'tshirts' && printableArea) {
-        const imgWidth = (userImage?.width || 100) * newScaleX;
-        const imgHeight = (userImage?.height || 100) * newScaleY;
-        newScaleX = Math.min(newScaleX, printableArea.width / (userImage?.width || 100));
-        newScaleY = Math.min(newScaleY, printableArea.height / (userImage?.height || 100));
+        const imgWidth = (userImageImage.width || 100) * newScaleX;
+        const imgHeight = (userImageImage.height || 100) * newScaleY;
+        newScaleX = Math.min(newScaleX, printableArea.width / (userImageImage.width || 100));
+        newScaleY = Math.min(newScaleY, printableArea.height / (userImageImage.height || 100));
         newX = Math.max(printableArea.x, Math.min(newX, printableArea.x + printableArea.width - imgWidth));
         newY = Math.max(printableArea.y, Math.min(newY, printableArea.y + printableArea.height - imgHeight));
         node.scaleX(newScaleX);
@@ -466,13 +571,12 @@ function GiftPrint() {
     }
   };
 
-  // Handle crop toggle
   const handleCrop = () => {
     if (isCropping) {
       setIsCropping(false);
       setCropRect({
-        x: canvasSize.width * 0.25,
-        y: canvasSize.height * 0.25,
+        x: printableArea ? printableArea.x + printableArea.width * 0.25 : canvasSize.width * 0.25,
+        y: printableArea ? printableArea.y + printableArea.height * 0.25 : canvasSize.height * 0.25,
         width: canvasSize.width * 0.5,
         height: canvasSize.width * 0.5,
       });
@@ -480,136 +584,69 @@ function GiftPrint() {
     } else {
       setIsCropping(true);
       setIsImageSelected(false);
-      if (userImage) {
+      if (userImageImage) {
         const maxDimension = canvasSize.width * 0.5;
         setCropRect({
           x: imagePosition.x,
           y: imagePosition.y,
-          width: (userImage.width || 100) * imageScale.x * 0.5,
-          height: (userImage.height || 100) * imageScale.y * 0.5,
+          width: (userImageImage.width || 100) * imageScale.x * 0.5,
+          height: (userImageImage.height || 100) * imageScale.y * 0.5,
         });
       }
     }
   };
 
-  // Apply crop with mug-specific logic
-  const applyCrop = () => {
-    if (userImage && selectedCategory === 'mugs') {
-      const imgWidth = userImage.width * imageScale.x;
-      const imgHeight = userImage.height * imageScale.y;
-      const cropX = (cropRect.x - imagePosition.x) / imageScale.x;
-      const cropY = (cropRect.y - imagePosition.y) / imageScale.y;
-      const cropWidth = cropRect.width / imageScale.x;
-      const cropHeight = cropRect.height / imageScale.y;
-
-      const mugMaxWidth = canvasSize.width * 0.8;
-      const adjustedCropWidth = Math.min(cropWidth, mugMaxWidth / imageScale.x);
-
-      setImagePosition({ x: cropRect.x, y: cropRect.y });
-      setImageScale({
-        x: cropRect.width / (userImage.width || 100),
-        y: cropRect.height / (userImage.height || 100),
-      });
-      setImageRotation(0);
-
-      const img = new window.Image();
-      img.src = uploadedImage;
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = adjustedCropWidth;
-        canvas.height = cropHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, cropX, cropY, adjustedCropWidth, cropHeight, 0, 0, adjustedCropWidth, cropHeight);
-        try {
-          setUploadedImage(canvas.toDataURL('image/png'));
-        } catch (e) {
-          console.error('Error exporting cropped image:', e);
-          setOrderFeedback({ type: 'error', message: 'Failed to crop image due to a security error.' });
-        }
-        setIsCropping(false);
-        setIsImageSelected(true);
-      };
-    } else if (userImage) {
-      const imgWidth = userImage.width * imageScale.x;
-      const imgHeight = userImage.height * imageScale.y;
-      const cropX = (cropRect.x - imagePosition.x) / imageScale.x;
-      const cropY = (cropRect.y - imagePosition.y) / imageScale.y;
-      const cropWidth = cropRect.width / imageScale.x;
-      const cropHeight = cropRect.height / imageScale.y;
-
-      setImagePosition({ x: cropRect.x, y: cropRect.y });
-      setImageScale({
-        x: cropRect.width / (userImage.width || 100),
-        y: cropRect.height / (userImage.height || 100),
-      });
-      setImageRotation(0);
-
-      const img = new window.Image();
-      img.src = uploadedImage;
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = cropWidth;
-        canvas.height = cropHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
-        try {
-          setUploadedImage(canvas.toDataURL('image/png'));
-        } catch (e) {
-          console.error('Error exporting cropped image:', e);
-          setOrderFeedback({ type: 'error', message: 'Failed to crop image due to a security error.' });
-        }
-        setIsCropping(false);
-        setIsImageSelected(true);
-      };
-    }
-  };
-
-  // Handle crop rectangle resizing
   const handleCropHandleDrag = (handle, e) => {
     const newCropRect = { ...cropRect };
     const { x, y } = e.target.position();
 
     const minSize = 20;
-    const maxX = canvasSize.width - minSize;
-    const maxY = canvasSize.height - minSize;
-    const mugMaxWidth = selectedCategory === 'mugs' ? canvasSize.width * 0.8 : canvasSize.width;
+    let maxX = canvasSize.width - minSize;
+    let maxY = canvasSize.height - minSize;
+    let maxWidth = canvasSize.width;
+
+    if (selectedCategory === 'tshirts' && printableArea) {
+      maxX = printableArea.x + printableArea.width - minSize;
+      maxY = printableArea.y + printableArea.height - minSize;
+      maxWidth = printableArea.width;
+    } else if (selectedCategory === 'mugs') {
+      maxWidth = canvasSize.width * 0.8;
+    }
 
     switch (handle) {
       case 'top-left':
-        newCropRect.x = Math.max(0, Math.min(x, newCropRect.x + newCropRect.width - minSize));
-        newCropRect.y = Math.max(0, Math.min(y, newCropRect.y + newCropRect.height - minSize));
-        newCropRect.width = Math.max(minSize, Math.min(newCropRect.width + (newCropRect.x - x), mugMaxWidth));
+        newCropRect.x = Math.max(printableArea ? printableArea.x : 0, Math.min(x, newCropRect.x + newCropRect.width - minSize));
+        newCropRect.y = Math.max(printableArea ? printableArea.y : 0, Math.min(y, newCropRect.y + newCropRect.height - minSize));
+        newCropRect.width = Math.max(minSize, Math.min(newCropRect.width + (newCropRect.x - x), maxWidth));
         newCropRect.height = Math.max(minSize, newCropRect.height + (newCropRect.y - y));
         break;
       case 'top-right':
-        newCropRect.y = Math.max(0, Math.min(y, newCropRect.y + newCropRect.height - minSize));
-        newCropRect.width = Math.max(minSize, Math.min(x - newCropRect.x, mugMaxWidth));
+        newCropRect.y = Math.max(printableArea ? printableArea.y : 0, Math.min(y, newCropRect.y + newCropRect.height - minSize));
+        newCropRect.width = Math.max(minSize, Math.min(x - newCropRect.x, maxWidth));
         newCropRect.height = Math.max(minSize, newCropRect.height + (newCropRect.y - y));
         break;
       case 'bottom-left':
-        newCropRect.x = Math.max(0, Math.min(x, newCropRect.x + newCropRect.width - minSize));
-        newCropRect.width = Math.max(minSize, Math.min(newCropRect.width + (newCropRect.x - x), mugMaxWidth));
+        newCropRect.x = Math.max(printableArea ? printableArea.x : 0, Math.min(x, newCropRect.x + newCropRect.width - minSize));
+        newCropRect.width = Math.max(minSize, Math.min(newCropRect.width + (newCropRect.x - x), maxWidth));
         newCropRect.height = Math.max(minSize, y - newCropRect.y);
         break;
       case 'bottom-right':
-        newCropRect.width = Math.max(minSize, Math.min(x - newCropRect.x, mugMaxWidth));
+        newCropRect.width = Math.max(minSize, Math.min(x - newCropRect.x, maxWidth));
         newCropRect.height = Math.max(minSize, y - newCropRect.y);
         break;
       case 'top':
-        newCropRect.y = Math.max(0, Math.min(y, newCropRect.y + newCropRect.height - minSize));
+        newCropRect.y = Math.max(printableArea ? printableArea.y : 0, Math.min(y, newCropRect.y + newCropRect.height - minSize));
         newCropRect.height = Math.max(minSize, newCropRect.height + (newCropRect.y - y));
         break;
       case 'bottom':
         newCropRect.height = Math.max(minSize, y - newCropRect.y);
         break;
       case 'left':
-        newCropRect.x = Math.max(0, Math.min(x, newCropRect.x + newCropRect.width - minSize));
-        newCropRect.width = Math.max(minSize, Math.min(newCropRect.width + (newCropRect.x - x), mugMaxWidth));
+        newCropRect.x = Math.max(printableArea ? printableArea.x : 0, Math.min(x, newCropRect.x + newCropRect.width - minSize));
+        newCropRect.width = Math.max(minSize, Math.min(newCropRect.width + (newCropRect.x - x), maxWidth));
         break;
       case 'right':
-        newCropRect.width = Math.max(minSize, Math.min(x - newCropRect.x, mugMaxWidth));
+        newCropRect.width = Math.max(minSize, Math.min(x - newCropRect.x, maxWidth));
         break;
       default:
         break;
@@ -619,7 +656,6 @@ function GiftPrint() {
     e.target.position(getHandlePosition(handle, newCropRect));
   };
 
-  // Calculate handle positions
   const getHandlePosition = (handle, rect) => {
     switch (handle) {
       case 'top-left':
@@ -643,55 +679,66 @@ function GiftPrint() {
     }
   };
 
-  // Handle flexible side dragging for image
   const handleSideDrag = (side, e) => {
     const node = imageRef.current;
-    if (node) {
+    if (node && userImageImage) {
       const newScale = { ...imageScale };
       const newPosition = { ...imagePosition };
       const { x, y } = e.target.position();
       const minSize = 20;
 
+      let maxWidth = canvasSize.width;
+      let minX = 0;
+      let minY = 0;
+
+      if (selectedCategory === 'tshirts' && printableArea) {
+        maxWidth = printableArea.width;
+        minX = printableArea.x;
+        minY = printableArea.y;
+      } else if (selectedCategory === 'mugs') {
+        maxWidth = canvasSize.width * 0.8;
+      }
+
       switch (side) {
         case 'left':
           newScale.x = Math.max(
-            minSize / (userImage.width || 100),
-            (imagePosition.x + imageScale.x * (userImage.width || 100) - x) / (userImage.width || 100)
+            minSize / (userImageImage.width || 100),
+            (imagePosition.x + imageScale.x * (userImageImage.width || 100) - x) / (userImageImage.width || 100)
           );
           newPosition.x = x;
           break;
         case 'right':
-          newScale.x = Math.max(minSize / (userImage.width || 100), (x - imagePosition.x) / (userImage.width || 100));
+          newScale.x = Math.max(minSize / (userImageImage.width || 100), (x - imagePosition.x) / (userImageImage.width || 100));
           break;
         case 'top':
           newScale.y = Math.max(
-            minSize / (userImage.height || 100),
-            (imagePosition.y + imageScale.y * (userImage.height || 100) - y) / (userImage.height || 100)
+            minSize / (userImageImage.height || 100),
+            (imagePosition.y + imageScale.y * (userImageImage.height || 100) - y) / (userImageImage.height || 100)
           );
           newPosition.y = y;
           break;
         case 'bottom':
-          newScale.y = Math.max(minSize / (userImage.height || 100), (y - imagePosition.y) / (userImage.height || 100));
+          newScale.y = Math.max(minSize / (userImageImage.height || 100), (y - imagePosition.y) / (userImageImage.height || 100));
           break;
         default:
           break;
       }
 
-      if (selectedCategory === 'mugs') {
-        const maxWidth = canvasSize.width * 0.8;
-        newScale.x = Math.min(newScale.x, maxWidth / (userImage.width || 100));
-      } else if (selectedCategory === 'tshirts' && printableArea) {
-        newScale.x = Math.min(newScale.x, printableArea.width / (userImage.width || 100));
-        newScale.y = Math.min(newScale.y, printableArea.height / (userImage.height || 100));
+      if (selectedCategory === 'tshirts' && printableArea) {
+        newScale.x = Math.min(newScale.x, printableArea.width / (userImageImage.width || 100));
+        newScale.y = Math.min(newScale.y, printableArea.height / (userImageImage.height || 100));
+        newPosition.x = Math.max(minX, Math.min(newPosition.x, minX + printableArea.width - (userImageImage.width || 100) * newScale.x));
+        newPosition.y = Math.max(minY, Math.min(newPosition.y, minY + printableArea.height - (userImageImage.height || 100) * newScale.y));
+      } else if (selectedCategory === 'mugs') {
+        newScale.x = Math.min(newScale.x, maxWidth / (userImageImage.width || 100));
       }
 
       setImageScale(newScale);
       setImagePosition(newPosition);
-      e.target.position(getSideHandlePosition(side, newPosition, newScale, userImage));
+      e.target.position(getSideHandlePosition(side, newPosition, newScale, userImageImage));
     }
   };
 
-  // Calculate side handle positions
   const getSideHandlePosition = (side, position, scale, image) => {
     const imgWidth = (image.width || 100) * scale.x;
     const imgHeight = (image.height || 100) * scale.y;
@@ -709,12 +756,10 @@ function GiftPrint() {
     }
   };
 
-  // Toggle sidebar for mobile
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
-  // Toggle between 2D and 3D view
   const toggleView = () => {
     setIs3DView(!is3DView);
     setIsImageSelected(false);
@@ -763,7 +808,7 @@ function GiftPrint() {
               return (
                 <div key={category} className="mb-3">
                   <button
-                    className={`btn btn-outline-primary w-100 text-start mb-2 ${selectedCategory === category ? 'active' : ''}`}
+                    className={`btn btn-outline w-100 text-start mb-2 ${selectedCategory === category ? 'active' : ''}`}
                     onClick={() => {
                       setSelectedCategory(category);
                       setSelectedItem(null);
@@ -900,7 +945,6 @@ function GiftPrint() {
                       {isCropping ? <X size={18} className="me-2" /> : <Crop size={18} className="me-2" />}
                       {isCropping ? 'Cancel Crop' : 'Crop Image'}
                     </button>
-
                     {isCropping && (
                       <button className="btn btn-success" onClick={applyCrop}>
                         <Check size={18} className="me-2" />
@@ -936,10 +980,11 @@ function GiftPrint() {
               {selectedCategory === 'mugs' && is3DView && uploadedImage ? (
                 <Canvas
                   style={{ width: canvasSize.width, height: canvasSize.height }}
-                  camera={{ position: [0, 0, 5], fov: 50 }}
+                  camera={{ position: [0, 0, 4], fov: 50 }}
                 >
-                  <ambientLight intensity={0.5} />
-                  <pointLight position={[10, 10, 10]} intensity={1} />
+                  <ambientLight intensity={0.6} />
+                  <pointLight position={[10, 10, 10]} intensity={1.2} />
+                  <pointLight position={[-10, -10, -10]} intensity={0.8} />
                   <Mug3D textureUrl={uploadedImage} canvasSize={canvasSize} />
                 </Canvas>
               ) : (
@@ -996,15 +1041,15 @@ function GiftPrint() {
                         draggable={false}
                       />
                     )}
-                    {userImage && (
+                    {userImageImage && (
                       <Group
-                        clipX={isCropping ? cropRect.x : undefined}
-                        clipY={isCropping ? cropRect.y : undefined}
-                        clipWidth={isCropping ? cropRect.width : undefined}
-                        clipHeight={isCropping ? cropRect.height : undefined}
+                        clipX={isCropping && selectedCategory === 'tshirts' ? printableArea?.x : isCropping ? cropRect.x : undefined}
+                        clipY={isCropping && selectedCategory === 'tshirts' ? printableArea?.y : isCropping ? cropRect.y : undefined}
+                        clipWidth={isCropping && selectedCategory === 'tshirts' ? printableArea?.width : isCropping ? cropRect.width : undefined}
+                        clipHeight={isCropping && selectedCategory === 'tshirts' ? printableArea?.height : isCropping ? cropRect.height : undefined}
                       >
                         <KonvaImage
-                          image={userImage}
+                          image={userImageImage}
                           x={imagePosition.x}
                           y={imagePosition.y}
                           scaleX={imageScale.x}
@@ -1048,13 +1093,13 @@ function GiftPrint() {
                         )}
                       </>
                     )}
-                    {!isCropping && userImage && isImageSelected && (
+                    {!isCropping && userImageImage && isImageSelected && (
                       <>
                         {['left', 'right', 'top', 'bottom'].map((side) => (
                           <Circle
                             key={side}
-                            x={getSideHandlePosition(side, imagePosition, imageScale, userImage).x}
-                            y={getSideHandlePosition(side, imagePosition, imageScale, userImage).y}
+                            x={getSideHandlePosition(side, imagePosition, imageScale, userImageImage).x}
+                            y={getSideHandlePosition(side, imagePosition, imageScale, userImageImage).y}
                             radius={8}
                             fill="white"
                             stroke="#0d6efd"
@@ -1066,12 +1111,27 @@ function GiftPrint() {
                         ))}
                       </>
                     )}
-                    {userImage && !isCropping && isImageSelected && (
+                    {userImageImage && !isCropping && isImageSelected && (
                       <Transformer
                         ref={transformerRef}
                         boundBoxFunc={(oldBox, newBox) => {
                           if (newBox.width < 20 || newBox.height < 20) {
                             return oldBox;
+                          }
+                          if (selectedCategory === 'tshirts' && printableArea && userImageImage) {
+                            const scaleX = newBox.width / (userImageImage.width || 100);
+                            const scaleY = newBox.height / (userImageImage.height || 100);
+                            const imgWidth = (userImageImage.width || 100) * scaleX;
+                            const imgHeight = (userImageImage.height || 100) * scaleY;
+                            const newX = Math.max(printableArea.x, Math.min(newBox.x, printableArea.x + printableArea.width - imgWidth));
+                            const newY = Math.max(printableArea.y, Math.min(newBox.y, printableArea.y + printableArea.height - imgHeight));
+                            return {
+                              ...newBox,
+                              x: newX,
+                              y: newY,
+                              width: Math.min(newBox.width, printableArea.width),
+                              height: Math.min(newBox.height, printableArea.height),
+                            };
                           }
                           return newBox;
                         }}
@@ -1121,4 +1181,3 @@ function GiftPrint() {
 }
 
 export default GiftPrint;
-
