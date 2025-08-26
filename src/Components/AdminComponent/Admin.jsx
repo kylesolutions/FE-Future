@@ -61,7 +61,7 @@ function Admin() {
   });
   const [categoryData, setCategoryData] = useState({ frameCategory: '' });
   const [mackBoardData, setMackBoardData] = useState({ board_name: '', image: null, price: '' });
-  const [mugData, setMugData] = useState({ mug_name: '', price: '', image: null });
+  const [mugData, setMugData] = useState({ mug_name: '', price: '', image: null, glb_file: null });
   const [capData, setCapData] = useState({ cap_name: '', price: '', image: null });
   const [tshirtData, setTshirtData] = useState({ tshirt_name: '', image: null });
   const [colorVariants, setColorVariants] = useState([
@@ -87,8 +87,6 @@ function Admin() {
   const [success, setSuccess] = useState(null);
   const [colorVariantData, setColorVariantData] = useState({ mack_board: '', color_name: '', image: null });
   const [activeSection, setActiveSection] = useState('frames');
-
-
   // Redirect if not admin
   useEffect(() => {
     if (!user.username || user.type !== 'admin') {
@@ -96,7 +94,6 @@ function Admin() {
       navigate('/login');
     }
   }, [user, navigate]);
-
   // Fetch all data
   useEffect(() => {
     const fetchData = async () => {
@@ -147,7 +144,6 @@ function Admin() {
     };
     fetchData();
   }, [navigate]);
-
   // Clear messages after 5 seconds
   useEffect(() => {
     if (error || success) {
@@ -158,7 +154,6 @@ function Admin() {
       return () => clearTimeout(timer);
     }
   }, [error, success]);
-
   // Refresh token function
   const refreshToken = async () => {
     try {
@@ -175,104 +170,85 @@ function Admin() {
       return null;
     }
   };
-
   // Handlers for form changes
   const handleFrameChange = (e) => {
     const { name, value, files } = e.target;
     setFrameData({ ...frameData, [name]: files ? files[0] : value });
   };
-
   const handleCategoryChange = (e) => {
     const { name, value } = e.target;
     setCategoryData({ ...categoryData, [name]: value });
   };
-
   const handleMackBoardChange = (e) => {
     const { name, value, files } = e.target;
     setMackBoardData({ ...mackBoardData, [name]: files ? files[0] : value });
   };
-
   const handleMugChange = (e) => {
     const { name, value, files } = e.target;
     setMugData({ ...mugData, [name]: files ? files[0] : value });
   };
-
   const handleCapChange = (e) => {
     const { name, value, files } = e.target;
     setCapData({ ...capData, [name]: files ? files[0] : value });
   };
-
   const handleTshirtChange = (e) => {
     const { name, value, files } = e.target;
     setTshirtData({ ...tshirtData, [name]: files ? files[0] : value });
   };
-
   const handleColorVariantChange = (index, e) => {
     const { name, value, files } = e.target;
     const newVariants = [...colorVariants];
     newVariants[index] = { ...newVariants[index], [name]: files ? files[0] : value };
     setColorVariants(newVariants);
   };
-
   const handleSizeVariantChange = (index, e) => {
     const { name, value, files } = e.target;
     const newVariants = [...sizeVariants];
     newVariants[index] = { ...newVariants[index], [name]: files ? files[0] : value };
     setSizeVariants(newVariants);
   };
-
   const addColorVariant = () => {
     setColorVariants([
       ...colorVariants,
       { color_name: '', price: '', image: null, image_key: `color_${colorVariants.length}_${Date.now()}` }
     ]);
   };
-
   const addSizeVariant = () => {
     setSizeVariants([
       ...sizeVariants,
       { size_name: '', inner_width: '', inner_height: '', price: '', image: null, image_key: `size_${sizeVariants.length}_${Date.now()}` }
     ]);
   };
-
   const removeColorVariant = (index) => {
     setColorVariants(colorVariants.filter((_, i) => i !== index));
   };
-
   const removeSizeVariant = (index) => {
     setSizeVariants(sizeVariants.filter((_, i) => i !== index));
   };
-
   const handleTileChange = (e) => {
     const { name, value, files } = e.target;
     setTileData({ ...tileData, [name]: files ? files[0] : value });
   };
-
   const handlePenChange = (e) => {
     const { name, value, files } = e.target;
     setPenData({ ...penData, [name]: files ? files[0] : value });
   };
-
   const handlePrintTypeChange = (e) => {
     const { name, value, files } = e.target;
     setPrintTypeData({ ...printTypeData, [name]: files ? files[0] : value });
   };
-
   const handlePrintSizeChange = (e) => {
     const { name, value, files } = e.target;
     setPrintSizeData({ ...printSizeData, [name]: files ? files[0] : value });
   };
-
   const handlePaperTypeChange = (e) => {
     const { name, value, files } = e.target;
     setPaperTypeData({ ...paperTypeData, [name]: files ? files[0] : value });
   };
-
   const handleLaminationTypeChange = (e) => {
     const { name, value, files } = e.target;
     setLaminationTypeData({ ...laminationTypeData, [name]: files ? files[0] : value });
   };
-
   const handleVariantChange = (variantType, index, e) => {
     const { name, value, files } = e.target;
     const newVariants = { ...variants };
@@ -282,7 +258,6 @@ function Admin() {
     };
     setVariants(newVariants);
   };
-
   const addVariant = (variantType) => {
     const newVariants = { ...variants };
     const timestamp = Date.now();
@@ -294,25 +269,21 @@ function Admin() {
     });
     setVariants(newVariants);
   };
-
   const removeVariant = (variantType, index) => {
     const newVariants = { ...variants };
     newVariants[variantType].splice(index, 1);
     setVariants(newVariants);
   };
-
   const handleColorVariantDataChange = (e) => {
     const { name, value, files } = e.target;
     setColorVariantData({ ...colorVariantData, [name]: files ? files[0] : value });
   };
-
   // T-shirt submit handler
   const handleTshirtSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
     setSuccess(null);
-
     try {
       let token = localStorage.getItem('token');
       if (!token) {
@@ -320,16 +291,13 @@ function Admin() {
         navigate('/login');
         return;
       }
-
       if (tshirtMode === 'create' || tshirtMode === 'edit') {
         if (!tshirtData.tshirt_name) {
           setError('T-shirt name is required.');
           return;
         }
       }
-
       let tshirtId;
-
       if (tshirtMode === 'create') {
         const formData = new FormData();
         formData.append('tshirt_name', tshirtData.tshirt_name);
@@ -365,30 +333,25 @@ function Admin() {
           return;
         }
       }
-
       // Handle variants
       const validColorVariants = colorVariants.filter(v => v.color_name && v.price && !isNaN(parseFloat(v.price)));
       const validSizeVariants = sizeVariants.filter(v => v.size_name && v.inner_width && v.inner_height && v.price && !isNaN(parseFloat(v.price)));
-
       // Check duplicates for colors
       const colorNames = validColorVariants.map(v => v.color_name);
       if (new Set(colorNames).size !== colorNames.length) {
         setError('Duplicate color names are not allowed.');
         return;
       }
-
       // Check duplicates for sizes
       const sizeNames = validSizeVariants.map(v => v.size_name);
       if (new Set(sizeNames).size !== sizeNames.length) {
         setError('Duplicate size names are not allowed.');
         return;
       }
-
       if (tshirtMode === 'create' && (validColorVariants.length === 0 || validSizeVariants.length === 0)) {
         setError('At least one color and one size variant are required for creation.');
         return;
       }
-
       // Update existing variants if in edit mode
       if (tshirtMode === 'edit') {
         for (const variant of colorVariants.filter(v => v.id)) {
@@ -403,7 +366,6 @@ function Admin() {
             },
           });
         }
-
         for (const variant of sizeVariants.filter(v => v.id)) {
           const formData = new FormData();
           formData.append('size_name', variant.size_name);
@@ -419,11 +381,9 @@ function Admin() {
           });
         }
       }
-
       // Add new variants
       const newColorVariants = (tshirtMode === 'edit' ? colorVariants.filter(v => !v.id) : validColorVariants);
       const newSizeVariants = (tshirtMode === 'edit' ? sizeVariants.filter(v => !v.id) : validSizeVariants);
-
       if (newColorVariants.length > 0 || newSizeVariants.length > 0) {
         const variantsData = [
           ...newColorVariants.map(v => ({
@@ -441,10 +401,8 @@ function Admin() {
             image_key: v.image_key,
           })),
         ];
-
         const variantFormData = new FormData();
         variantFormData.append('variants', JSON.stringify(variantsData));
-
         variantsData.forEach((v) => {
           const allVariants = v.variant_type === 'color' ? colorVariants : sizeVariants;
           const entry = allVariants.find(entry => entry.image_key === v.image_key);
@@ -452,7 +410,6 @@ function Admin() {
             variantFormData.append(v.image_key, entry.image);
           }
         });
-
         const response = await axios.post(`${BASE_URL}/tshirts/${tshirtId}/variants/`, variantFormData, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -461,19 +418,16 @@ function Admin() {
         });
         // Optionally update state with created variants
       }
-
       setSuccess(
         tshirtMode === 'create' ? 'T-shirt and variants created successfully!' :
           tshirtMode === 'edit' ? 'T-shirt updated successfully!' :
             'Variants added successfully!'
       );
-
       setTshirtData({ tshirt_name: '', image: null });
       setColorVariants([{ color_name: '', price: '', image: null, image_key: `color_0_${Date.now()}` }]);
       setSizeVariants([{ size_name: '', inner_width: '', inner_height: '', price: '', image: null, image_key: `size_0_${Date.now()}` }]);
       setSelectedTshirtId('');
       setTshirtMode('create');
-
       // Refresh T-shirts list
       const token2 = localStorage.getItem('token');
       const tshirtsResponse = await axios.get(`${BASE_URL}/tshirts/`, { headers: { Authorization: `Bearer ${token2}` } });
@@ -562,7 +516,6 @@ function Admin() {
       setIsLoading(true);
       setError(null);
       setSuccess(null);
-
       try {
         const token = localStorage.getItem('token');
         if (!token) {
@@ -570,7 +523,6 @@ function Admin() {
           navigate('/login');
           return;
         }
-
         const isFormData = data instanceof FormData || Object.values(data).some((value) => value instanceof File);
         const requestData = isFormData
           ? (() => {
@@ -583,18 +535,15 @@ function Admin() {
             return formData;
           })()
           : data;
-
         const config = {
           headers: {
             Authorization: `Bearer ${token}`,
             ...(isFormData && { 'Content-Type': 'multipart/form-data' }),
           },
         };
-
         const response = await axios.post(`${BASE_URL}${endpoint}`, requestData, config);
         setSuccess(successMessage);
         resetData();
-
         // Update state based on endpoint
         if (endpoint.includes('categories')) setCategories((prev) => [...prev, response.data]);
         else if (endpoint.includes('mack_boards')) setMackBoards((prev) => [...prev, response.data]);
@@ -634,7 +583,6 @@ function Admin() {
       }
     };
   };
-
   // Submit handlers for other sections
   const handleCategorySubmit = createSubmitHandler(
     '/categories/',
@@ -642,77 +590,66 @@ function Admin() {
     'Category created successfully!',
     () => setCategoryData({ frameCategory: '' })
   );
-
   const handleMackBoardSubmit = createSubmitHandler(
     '/mack_boards/',
     mackBoardData,
     'MatBoard created successfully!',
     () => setMackBoardData({ board_name: '', image: null, price: '' })
   );
-
   const handleMugSubmit = createSubmitHandler(
     '/mugs/',
     mugData,
     'Mug created successfully!',
-    () => setMugData({ mug_name: '', price: '', image: null })
+    () => setMugData({ mug_name: '', price: '', image: null, glb_file: null })
   );
-
   const handleCapSubmit = createSubmitHandler(
     '/caps/',
     capData,
     'Cap created successfully!',
     () => setCapData({ cap_name: '', price: '', image: null })
   );
-
   const handleTileSubmit = createSubmitHandler(
     '/tiles/',
     tileData,
     'Tile created successfully!',
     () => setTileData({ tile_name: '', price: '', image: null })
   );
-
   const handlePenSubmit = createSubmitHandler(
     '/pens/',
     penData,
     'Pen created successfully!',
     () => setPenData({ pen_name: '', price: '', image: null })
   );
-
   const handlePrintTypeSubmit = createSubmitHandler(
     '/api/print-types/',
     printTypeData,
     'Print Type created successfully!',
     () => setPrintTypeData({ name: '', price: '', image: null })
   );
-
   const handlePrintSizeSubmit = createSubmitHandler(
     '/api/print-sizes/',
     printSizeData,
     'Print Size created successfully!',
     () => setPrintSizeData({ name: '', price: '', image: null })
   );
-
   const handlePaperTypeSubmit = createSubmitHandler(
     '/api/paper-types/',
     paperTypeData,
     'Paper Type created successfully!',
     () => setPaperTypeData({ name: '', price: '', image: null })
   );
-
   const handleLaminationTypeSubmit = createSubmitHandler(
     '/api/lamination-types/',
     laminationTypeData,
     'Lamination Type created successfully!',
     () => setLaminationTypeData({ name: '', price: '', image: null })
   );
-
  const handleColorVariantSubmit = createSubmitHandler(
   '/mack_board_color_variants/',
   colorVariantData,
   'Color variant created successfully!',
   () => setColorVariantData({ mack_board: '', color_name: '', image: null })
 );
-
   // Frame submission handler
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -720,7 +657,6 @@ function Admin() {
     setError(null);
     setSuccess(null);
     let frameId;
-
     try {
       let token = localStorage.getItem('token');
       if (!token) {
@@ -728,7 +664,6 @@ function Admin() {
         navigate('/login');
         return;
       }
-
       if (mode === 'create') {
         const formData = new FormData();
         for (const key in frameData) {
@@ -770,7 +705,6 @@ function Admin() {
           return;
         }
       }
-
       const variantsData = [];
       for (const variantType in variants) {
         variants[variantType].forEach((variant, index) => {
@@ -793,7 +727,6 @@ function Admin() {
           variantsData.push(variantData);
         });
       }
-
       if (variantsData.length > 0) {
         const variantFormData = new FormData();
         variantFormData.append('variants', JSON.stringify(variantsData));
@@ -808,7 +741,6 @@ function Admin() {
             variantFormData.append(`${variant.image_key}_corner`, variantEntry.corner_image);
           }
         });
-
         await axios.post(
           `${BASE_URL}/frames/${frameId}/variants/`,
           variantFormData,
@@ -820,7 +752,6 @@ function Admin() {
           }
         );
       }
-
       setSuccess(
         mode === 'create'
           ? 'Frame and variants created successfully!'
@@ -828,7 +759,6 @@ function Admin() {
             ? 'Frame updated successfully!'
             : 'Variants added successfully!'
       );
-
       setFrameData({
         name: '',
         price: '',
@@ -942,7 +872,6 @@ function Admin() {
           </div>
         </div>
       </div>
-
       {/* Alerts */}
       {error && (
         <div className="admin-alert admin-alert-error">
@@ -950,14 +879,12 @@ function Admin() {
           <span>{error}</span>
         </div>
       )}
-
       {success && (
         <div className="admin-alert admin-alert-success">
           <CheckCircle size={20} />
           <span>{success}</span>
         </div>
       )}
-
       <div className="admin-container">
         {/* Sidebar Navigation */}
         <div className="admin-sidebar">
@@ -974,7 +901,6 @@ function Admin() {
             ))}
           </div>
         </div>
-
         {/* Main Content */}
         <div className="admin-main-content">
           {/* Frames Section */}
@@ -984,7 +910,6 @@ function Admin() {
                 <Hash size={24} />
                 <h2>Frame Management</h2>
               </div>
-
               <div className="admin-mode-selector">
                 <div className="admin-form-group">
                   <label className="admin-label">Mode</label>
@@ -999,7 +924,6 @@ function Admin() {
                   </select>
                 </div>
               </div>
-
               <form onSubmit={handleSubmit} className="admin-form">
                 {(mode === 'create' || mode === 'edit') && (
                   <div className="admin-card">
@@ -1103,7 +1027,6 @@ function Admin() {
                     </div>
                   </div>
                 )}
-
                 {mode === 'edit' && (
                   <div className="admin-card">
                     <h3 className="admin-card-title">Select Frame to Edit</h3>
@@ -1124,7 +1047,6 @@ function Admin() {
                     </div>
                   </div>
                 )}
-
                 {mode === 'add_variants' && (
                   <div className="admin-card">
                     <h3 className="admin-card-title">Select Frame</h3>
@@ -1145,12 +1067,10 @@ function Admin() {
                     </div>
                   </div>
                 )}
-
                 {/* Variants Sections */}
                 {['color', 'size', 'finish', 'hanging'].map((variantType) => {
                   const icons = { color: Palette, size: Maximize2, finish: Sparkles, hanging: Bookmark };
                   const Icon = icons[variantType];
-
                   return (
                     <div key={variantType} className="admin-card">
                       <div className="admin-variant-header">
@@ -1167,7 +1087,6 @@ function Admin() {
                           Add {variantType.charAt(0).toUpperCase() + variantType.slice(1)}
                         </button>
                       </div>
-
                       <div className="admin-variants-grid">
                         {variants[variantType].map((variant, index) => (
                           <div key={variant.image_key} className="admin-variant-card">
@@ -1181,7 +1100,6 @@ function Admin() {
                                 <Trash2 size={14} />
                               </button>
                             </div>
-
                             <div className="admin-variant-fields">
                               <div className="admin-form-group">
                                 <label className="admin-label">
@@ -1195,7 +1113,6 @@ function Admin() {
                                   className="admin-input"
                                 />
                               </div>
-
                               {variantType === 'size' && (
                                 <>
                                   <div className="admin-form-group">
@@ -1222,7 +1139,6 @@ function Admin() {
                                   </div>
                                 </>
                               )}
-
                               <div className="admin-form-group">
                                 <label className="admin-label">Price</label>
                                 <input
@@ -1234,7 +1150,6 @@ function Admin() {
                                   step="0.01"
                                 />
                               </div>
-
                               <div className="admin-form-group">
                                 <label className="admin-label">{variantType.charAt(0).toUpperCase() + variantType.slice(1)} Image</label>
                                 <div className="admin-file-input">
@@ -1248,7 +1163,6 @@ function Admin() {
                                   <span>Choose image</span>
                                 </div>
                               </div>
-
                               {variantType !== 'hanging' && (
                                 <div className="admin-form-group">
                                   <label className="admin-label">Corner Image</label>
@@ -1271,7 +1185,6 @@ function Admin() {
                     </div>
                   );
                 })}
-
                 <div className="admin-form-actions">
                   <button type="submit" className="admin-btn admin-btn-primary" disabled={isLoading}>
                     {isLoading ? (
@@ -1290,7 +1203,6 @@ function Admin() {
               </form>
             </div>
           )}
-
           {/* Categories Section */}
           {activeSection === 'categories' && (
             <div className="admin-section">
@@ -1298,7 +1210,6 @@ function Admin() {
                 <Layers size={24} />
                 <h2>Category Management</h2>
               </div>
-
               <div className="admin-card">
                 <h3 className="admin-card-title">Create Category</h3>
                 <form onSubmit={handleCategorySubmit} className="admin-form">
@@ -1330,7 +1241,6 @@ function Admin() {
                   </div>
                 </form>
               </div>
-
               {/* MatBoard Section */}
               <div className="admin-card">
                 <h3 className="admin-card-title">Create MatBoard</h3>
@@ -1389,7 +1299,6 @@ function Admin() {
                   </div>
                 </form>
               </div>
-
               {/* MatBoard Color Variant Section */}
               <div className="admin-card">
                 <h3 className="admin-card-title">Create MatBoard Color Variant</h3>
@@ -1456,7 +1365,6 @@ function Admin() {
               </div>
             </div>
           )}
-
           {/* Gifts Section */}
           {activeSection === 'gifts' && (
             <div className="admin-section">
@@ -1464,7 +1372,6 @@ function Admin() {
                 <Package size={24} />
                 <h2>Gift Items Management</h2>
               </div>
-
               <div className="admin-gifts-grid">
                 {/* Mugs */}
                 <div className="admin-card">
@@ -1509,13 +1416,25 @@ function Admin() {
                         <span>Choose image</span>
                       </div>
                     </div>
+                    <div className="admin-form-group">
+                      <label className="admin-label">3D Model (GLB) (Optional)</label>
+                      <div className="admin-file-input">
+                        <Upload size={16} />
+                        <input
+                          type="file"
+                          name="glb_file"
+                          onChange={handleMugChange}
+                          accept=".glb"
+                        />
+                        <span>Choose GLB file</span>
+                      </div>
+                    </div>
                     <button type="submit" className="admin-btn admin-btn-primary admin-btn-sm" disabled={isLoading}>
                       {isLoading ? <Loader size={14} className="admin-spinner" /> : <Plus size={14} />}
                       Create
                     </button>
                   </form>
                 </div>
-
                 {/* Caps */}
                 <div className="admin-card">
                   <div className="admin-card-header">
@@ -1565,14 +1484,12 @@ function Admin() {
                     </button>
                   </form>
                 </div>
-
                 {/* T-shirts */}
                 <div className="admin-card">
                   <div className="admin-section-header">
                     <Package size={20} />
                     <h2>T-shirt Management</h2>
                   </div>
-
                   <div className="admin-mode-selector">
                     <div className="admin-form-group">
                       <label className="admin-label">Mode</label>
@@ -1587,7 +1504,6 @@ function Admin() {
                       </select>
                     </div>
                   </div>
-
                   <form onSubmit={handleTshirtSubmit} className="admin-form">
                     {(tshirtMode === 'create' || tshirtMode === 'edit') && (
                       <div className="admin-card">
@@ -1618,7 +1534,6 @@ function Admin() {
                         </div>
                       </div>
                     )}
-
                     {tshirtMode === 'edit' || tshirtMode === 'add_variants' && (
                       <div className="admin-card">
                         <h3 className="admin-card-title">Select T-shirt</h3>
@@ -1649,7 +1564,6 @@ function Admin() {
                         )}
                       </div>
                     )}
-
                     {/* Color Variants */}
                     <div className="admin-card">
                       <div className="admin-variant-header">
@@ -1729,7 +1643,6 @@ function Admin() {
                         ))}
                       </div>
                     </div>
-
                     {/* Size Variants */}
                     <div className="admin-card">
                       <div className="admin-variant-header">
@@ -1840,7 +1753,6 @@ function Admin() {
                         ))}
                       </div>
                     </div>
-
                     <div className="admin-form-actions">
                       <button type="submit" className="admin-btn admin-btn-primary admin-btn-sm" disabled={isLoading}>
                         {isLoading ? <Loader size={14} className="admin-spinner" /> : <Plus size={14} />}
@@ -1849,7 +1761,6 @@ function Admin() {
                     </div>
                   </form>
                 </div>
-
                 {/* Tiles */}
                 <div className="admin-card">
                   <div className="admin-card-header">
@@ -1899,7 +1810,6 @@ function Admin() {
                     </button>
                   </form>
                 </div>
-
                 {/* Pens */}
                 <div className="admin-card">
                   <div className="admin-card-header">
@@ -1952,7 +1862,6 @@ function Admin() {
               </div>
             </div>
           )}
-
           {/* Printing Section */}
           {activeSection === 'printing' && (
             <div className="admin-section">
@@ -1960,7 +1869,6 @@ function Admin() {
                 <Printer size={24} />
                 <h2>Printing Options Management</h2>
               </div>
-
               <div className="admin-printing-grid">
                 {/* Print Types */}
                 <div className="admin-card">
@@ -1998,7 +1906,6 @@ function Admin() {
                     </button>
                   </form>
                 </div>
-
                 {/* Print Sizes */}
                 <div className="admin-card">
                   <div className="admin-card-header">
@@ -2035,7 +1942,6 @@ function Admin() {
                     </button>
                   </form>
                 </div>
-
                 {/* Paper Types */}
                 <div className="admin-card">
                   <div className="admin-card-header">
@@ -2072,7 +1978,6 @@ function Admin() {
                     </button>
                   </form>
                 </div>
-
                 {/* Lamination Types */}
                 <div className="admin-card">
                   <div className="admin-card-header">
@@ -2117,5 +2022,4 @@ function Admin() {
     </div>
   );
 }
-
 export default Admin;

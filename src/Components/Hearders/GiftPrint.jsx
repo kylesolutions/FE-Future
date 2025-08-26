@@ -1,1183 +1,1225 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import axios from 'axios';
 import { Stage, Layer, Image as KonvaImage, Rect, Transformer, Group, Circle } from 'react-konva';
-import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Decal, useTexture, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import useImage from 'use-image';
-import { Upload, Crop, Check, X, Menu, Package, Coffee, Crown, Grid, Pen, Save, Eye } from 'lucide-react';
+import { Upload, Crop, Check, X, Menu, Package, Coffee, Crown, Grid, Pen, Save, Eye, Loader } from 'lucide-react';
 import './GiftPrint.css';
 
 const BASE_URL = 'http://82.180.146.4:8001';
 
+// Custom hook to replace the 'use-image' library
+const useImageLoader = (url, crossOrigin = 'anonymous') => {
+    const [image, setImage] = useState(null);
+
+    useEffect(() => {
+        if (!url) {
+            setImage(null);
+            return;
+        }
+
+        const img = new window.Image();
+        img.src = url;
+        img.crossOrigin = crossOrigin;
+
+        const handleLoad = () => {
+            setImage(img);
+        };
+
+        const handleError = (error) => {
+            console.error('Failed to load image:', url, error);
+            setImage(null);
+        };
+
+        img.addEventListener('load', handleLoad);
+        img.addEventListener('error', handleError);
+
+        return () => {
+            img.removeEventListener('load', handleLoad);
+            img.removeEventListener('error', handleError);
+        };
+    }, [url, crossOrigin]);
+
+    return image;
+};
+
+// Error Boundary to catch rendering errors
 class ErrorBoundary extends React.Component {
-  state = { hasError: false, error: null };
+    state = { hasError: false, error: null };
 
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="alert alert-danger m-3">
-          <h3>Something went wrong</h3>
-          <p>{this.state.error?.message || 'Unknown error occurred'}</p>
-          <button onClick={() => window.location.reload()} className="btn btn-primary">
-            Try Again
-          </button>
-        </div>
-      );
+    static getDerivedStateFromError(error) {
+        return { hasError: true, error };
     }
-    return this.props.children;
-  }
+
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="alert alert-danger m-3">
+                    <h3>Something went wrong</h3>
+                    <p>{this.state.error?.message || 'Unknown error occurred'}</p>
+                    <button onClick={() => window.location.reload()} className="btn btn-primary">
+                        Try Again
+                    </button>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
 }
 
 const categoryIcons = {
-  tshirts: Package,
-  mugs: Coffee,
-  caps: Crown,
-  tiles: Grid,
-  pens: Pen,
+    tshirts: Package,
+    mugs: Coffee,
+    caps: Crown,
+    tiles: Grid,
+    pens: Pen,
 };
 
-function Mug3D({ textureUrl, canvasSize }) {
-  const mugRef = useRef();
-  const handleRef = useRef();
-  const texture = useLoader(THREE.TextureLoader, textureUrl, (loader) => {
-    loader.crossOrigin = 'anonymous';
-  });
+// Updated Mug3D Component
+function Mug3D({ mugData, uploadedImage }) {
+    const groupRef = useRef();
 
-  useEffect(() => {
-    if (texture) {
-      console.log('Texture loaded successfully:', textureUrl);
-    } else {
-      console.error('Texture failed to load:', textureUrl);
-    }
-  }, [texture, textureUrl]);
+    // Load the mug's base texture
+    const mugTexture = useTexture(
+        mugData?.image ? (mugData.image.startsWith('http') ? mugData.image : `${BASE_URL}${mugData.image}`) : '',
+        (texture) => {
+            if (texture.image) {
+                const aspect = texture.image.width / texture.image.height;
+                texture.repeat.set(1 / aspect, 1);
+                texture.offset.set(0.5 - 1 / (2 * aspect), 0);
+                texture.wrapS = THREE.RepeatWrapping;
+                texture.wrapT = THREE.ClampToEdgeWrapping;
+                texture.needsUpdate = true;
+            }
+        }
+    );
 
-  useFrame(({ clock }) => {
-    if (mugRef.current && handleRef.current) {
-      mugRef.current.rotation.y = clock.getElapsedTime() * 0.3;
-      handleRef.current.rotation.y = clock.getElapsedTime() * 0.3;
-    }
-  });
+    // Load the uploaded image as a decal
+    const decalTexture = useTexture(uploadedImage || '', (texture) => {
+        if (texture.image) {
+            const aspect = texture.image.width / texture.image.height;
+            texture.repeat.set(1, 1 / aspect);
+            texture.needsUpdate = true;
+        }
+    });
 
-  const radius = 1;
-  const height = 2.5;
-  const radialSegments = 64;
+    useEffect(() => {
+        if (mugTexture) {
+            console.log('Mug texture loaded:', mugData.image, 'Dimensions:', mugTexture.image?.width, 'x', mugTexture.image?.height);
+        } else {
+            console.error('Failed to load mug texture:', mugData.image);
+        }
+        if (decalTexture && uploadedImage) {
+            console.log('Decal texture loaded:', uploadedImage, 'Dimensions:', decalTexture.image?.width, 'x', decalTexture.image?.height);
+        }
+    }, [mugTexture, decalTexture, mugData.image, uploadedImage]);
 
-  const mugGeometry = new THREE.CylinderGeometry(radius, radius, height, radialSegments, 1, false, 0, 2 * Math.PI);
+    // Auto-rotate the mug
+    useFrame((state, delta) => {
+        if (groupRef.current) {
+            groupRef.current.rotation.y += delta * 0.3;
+        }
+    });
 
-  const uvAttribute = mugGeometry.attributes.uv;
-  const marginFraction = 0.02 / height;
-  for (let i = 0; i < uvAttribute.count; i++) {
-    const v = uvAttribute.getY(i);
-    uvAttribute.setY(i, marginFraction + (1 - 2 * marginFraction) * v);
-  }
-  uvAttribute.needsUpdate = true;
+    // Mug dimensions
+    const radius = mugData?.radius || 1;
+    const height = mugData?.height || 2.5;
+    const radialSegments = 64;
 
-  const handleTube = 0.1;
-  const handleRadius = 0.5;
+    // Adjust UV mapping for better texture alignment
+    const mugGeometry = useMemo(() => {
+        const geometry = new THREE.CylinderGeometry(radius, radius, height, radialSegments, 1, false, 0, 2 * Math.PI);
+        const uvAttribute = geometry.attributes.uv;
+        for (let i = 0; i < uvAttribute.count; i++) {
+            const u = uvAttribute.getX(i);
+            const v = uvAttribute.getY(i);
+            uvAttribute.setXY(i, u * 0.95, v * 0.95);
+        }
+        uvAttribute.needsUpdate = true;
+        return geometry;
+    }, [radius, height]);
 
-  const angle0 = 0;
-  const topAttach = new THREE.Vector3(
-    radius * Math.cos(angle0),
-    height * 0.3,
-    radius * Math.sin(angle0)
-  );
-  const bottomAttach = new THREE.Vector3(
-    radius * Math.cos(angle0),
-    -height * 0.3,
-    radius * Math.sin(angle0)
-  );
-  const handleMidpoint = new THREE.Vector3(
-    radius + handleRadius,
-    0,
-    0
-  );
+    // Create the mug handle's shape
+    const handlePath = useMemo(() => {
+        const topAttach = new THREE.Vector3(radius, height * 0.35, 0);
+        const bottomAttach = new THREE.Vector3(radius, -height * 0.35, 0);
+        const handleMidpoint = new THREE.Vector3(radius + 0.5, 0, 0);
+        return new THREE.CatmullRomCurve3([topAttach, handleMidpoint, bottomAttach], false, 'catmullrom', 0.6);
+    }, [radius, height]);
 
-  console.log('Handle attachment points:', {
-    topAttach: { x: topAttach.x.toFixed(4), y: topAttach.y.toFixed(4), z: topAttach.z.toFixed(4) },
-    bottomAttach: { x: bottomAttach.x.toFixed(4), y: bottomAttach.y.toFixed(4), z: bottomAttach.z.toFixed(4) },
-    handleMidpoint: { x: handleMidpoint.x.toFixed(4), y: handleMidpoint.y.toFixed(4), z: handleMidpoint.z.toFixed(4) }
-  });
+    const mugColor = mugData?.color ? new THREE.Color(mugData.color) : '#ffffff';
 
-  const handlePath = new THREE.CatmullRomCurve3([
-    topAttach,
-    handleMidpoint,
-    bottomAttach
-  ], false, 'catmullrom', 0.5);
-
-  const handleGeometry = new THREE.TubeGeometry(handlePath, 32, handleTube, 16, false);
-
-  const mugMaterial = new THREE.MeshStandardMaterial({
-    map: texture,
-    color: 'white',
-    side: THREE.FrontSide,
-    metalness: 0.1,
-    roughness: 0.8,
-  });
-
-  const handleMaterial = new THREE.MeshStandardMaterial({
-    color: 'white',
-    side: THREE.FrontSide,
-    metalness: 0.1,
-    roughness: 0.8,
-  });
-
-  const debugMaterial = new THREE.MeshBasicMaterial({ color: 'red' });
-
-  return (
-    <group>
-      <mesh ref={mugRef} position={[0, 0, 0]}>
-        <primitive object={mugGeometry} attach="geometry" />
-        <primitive object={mugMaterial} attach="material" />
-      </mesh>
-      <mesh ref={handleRef} position={[0, 0, 0]} rotation={[0, 0, 0]}>
-        <primitive object={handleGeometry} attach="geometry" />
-        <primitive object={handleMaterial} attach="material" />
-      </mesh>
-      <mesh position={[0, 0, 0]} rotation={[0, 0, 0]}>
-        <cylinderGeometry args={[radius * 0.95, radius * 0.95, height * 0.95, radialSegments, 1, false]} />
-        <meshStandardMaterial color="white" side={THREE.BackSide} metalness={0.1} roughness={0.8} />
-      </mesh>
-      <mesh position={topAttach}>
-        <sphereGeometry args={[0.05, 16, 16]} />
-        <primitive object={debugMaterial} attach="material" />
-      </mesh>
-      <mesh position={bottomAttach}>
-        <sphereGeometry args={[0.05, 16, 16]} />
-        <primitive object={debugMaterial} attach="material" />
-      </mesh>
-    </group>
-  );
+    return (
+        <group ref={groupRef}>
+            <mesh castShadow receiveShadow>
+                <primitive object={mugGeometry} attach="geometry" />
+                <meshStandardMaterial
+                    map={mugTexture}
+                    color={mugColor}
+                    metalness={0.2}
+                    roughness={0.6}
+                />
+                {decalTexture && uploadedImage && (
+                    <Decal
+                        position={[0, 0, radius * 1.01]}
+                        rotation={[0, 0, 0]}
+                        scale={[radius * 0.6, height * 0.4, 1]}
+                        map={decalTexture}
+                        depthTest={true}
+                        depthWrite={false}
+                    />
+                )}
+            </mesh>
+            <mesh castShadow receiveShadow>
+                <tubeGeometry args={[handlePath, 32, 0.08, 16, false]} />
+                <meshStandardMaterial
+                    color={mugColor}
+                    metalness={0.2}
+                    roughness={0.6}
+                />
+            </mesh>
+            <mesh>
+                <cylinderGeometry args={[radius * 0.9, radius * 0.9, height, radialSegments]} />
+                <meshStandardMaterial
+                    color="#f0f0f0"
+                    side={THREE.BackSide}
+                    metalness={0.1}
+                    roughness={0.8}
+                />
+            </mesh>
+        </group>
+    );
 }
 
 function GiftPrint() {
-  const [giftItems, setGiftItems] = useState({
-    tshirts: [],
-    mugs: [],
-    caps: [],
-    tiles: [],
-    pens: [],
-  });
-  const [selectedCategory, setSelectedCategory] = useState('tshirts');
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [selectedColorVariant, setSelectedColorVariant] = useState(null);
-  const [selectedSizeVariant, setSelectedSizeVariant] = useState(null);
-  const [uploadedImage, setUploadedImage] = useState(null);
-  const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
-  const [imageScale, setImageScale] = useState({ x: 1, y: 1 });
-  const [imageRotation, setImageRotation] = useState(0);
-  const [isCropping, setIsCropping] = useState(false);
-  const [isImageSelected, setIsImageSelected] = useState(false);
-  const [cropRect, setCropRect] = useState({ x: 100, y: 100, width: 150, height: 150 });
-  const [canvasSize, setCanvasSize] = useState({ width: 500, height: 500 });
-  const [printableArea, setPrintableArea] = useState(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [orderFeedback, setOrderFeedback] = useState(null);
-  const [is3DView, setIs3DView] = useState(false);
-  const imageRef = useRef(null);
-  const transformerRef = useRef(null);
-  const containerRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const stageRef = useRef(null);
-
-  useEffect(() => {
-    if (selectedCategory !== 'tshirts' || !selectedItem) {
-      setSelectedColorVariant(null);
-      setSelectedSizeVariant(null);
-    }
-  }, [selectedCategory, selectedItem]);
-
-  useEffect(() => {
-    const updateCanvasSize = () => {
-      if (containerRef.current) {
-        const containerWidth = containerRef.current.offsetWidth;
-        const newSize = Math.min(containerWidth - 40, window.innerHeight * 0.6, 600);
-        setCanvasSize({ width: newSize, height: newSize });
-        if (selectedCategory === 'tshirts' && selectedItem) {
-          const areaWidth = newSize * 0.6;
-          const areaHeight = newSize * 0.6;
-          const areaX = (newSize - areaWidth) / 2;
-          const areaY = (newSize - areaHeight) / 2;
-          setPrintableArea({ x: areaX, y: areaY, width: areaWidth, height: areaHeight });
-        } else {
-          setPrintableArea(null);
-        }
-      }
-    };
-    updateCanvasSize();
-    window.addEventListener('resize', updateCanvasSize);
-    return () => window.removeEventListener('resize', updateCanvasSize);
-  }, [selectedCategory, selectedItem]);
-
-  useEffect(() => {
-    const fetchGiftItems = async () => {
-      setLoading(true);
-      try {
-        const token = localStorage.getItem('token');
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        const endpoints = {
-          tshirts: '/tshirts/',
-          mugs: '/mugs/',
-          caps: '/caps/',
-          tiles: '/tiles/',
-          pens: '/pens/',
-        };
-        const responses = await Promise.all(
-          Object.keys(endpoints).map((category) =>
-            axios.get(`${BASE_URL}${endpoints[category]}`, { headers })
-          )
-        );
-        const fetchedItems = {
-          tshirts: responses[0].data,
-          mugs: responses[1].data,
-          caps: responses[2].data,
-          tiles: responses[3].data,
-          pens: responses[4].data,
-        };
-        setGiftItems(fetchedItems);
-        setError(null);
-      } catch (error) {
-        console.error('Error fetching gift items:', error);
-        setError(`Failed to load gift items: ${error.response?.statusText || error.message}`);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchGiftItems();
-  }, []);
-
-  const [giftImage] = useImage(
-    selectedCategory === 'tshirts' && selectedColorVariant?.image
-      ? selectedColorVariant.image.startsWith('http')
-        ? selectedColorVariant.image
-        : `${BASE_URL}${selectedColorVariant.image}`
-      : selectedItem?.image
-      ? selectedItem.image.startsWith('http')
-        ? selectedItem.image
-        : `${BASE_URL}${selectedItem.image}`
-      : '',
-    'anonymous'
-  );
-  const [userImageImage] = useImage(uploadedImage || '', 'anonymous');
-
-  useEffect(() => {
-    if (imageRef.current && transformerRef.current && isImageSelected && !isCropping && uploadedImage && !is3DView) {
-      transformerRef.current.nodes([imageRef.current]);
-      transformerRef.current.getLayer()?.batchDraw();
-    } else if (transformerRef.current) {
-      transformerRef.current.nodes([]);
-      transformerRef.current.getLayer()?.batchDraw();
-    }
-  }, [uploadedImage, isCropping, isImageSelected, is3DView]);
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new window.Image();
-        img.src = reader.result;
-        img.crossOrigin = 'anonymous';
-        img.onload = () => {
-          const maxDimension = Math.min(canvasSize.width, canvasSize.height) * 0.5;
-          const scale = Math.min(maxDimension / img.width, maxDimension / img.height, 1);
-          let initialX, initialY;
-          if (selectedCategory === 'tshirts' && printableArea) {
-            const imgWidth = img.width * scale;
-            const imgHeight = img.height * scale;
-            initialX = printableArea.x + (printableArea.width - imgWidth) / 2;
-            initialY = printableArea.y + (printableArea.height - imgHeight) / 2;
-          } else {
-            initialX = canvasSize.width * 0.25;
-            initialY = canvasSize.height * 0.25;
-          }
-          setUploadedImage(reader.result);
-          setImagePosition({ x: initialX, y: initialY });
-          setImageScale({ x: scale, y: scale });
-          setImageRotation(0);
-          setCropRect({
-            x: initialX,
-            y: initialY,
-            width: maxDimension * 0.5,
-            height: maxDimension * 0.5,
-          });
-          setIsImageSelected(false);
-        };
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const applyCrop = () => {
-    if (!userImageImage || !uploadedImage) return;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = cropRect.width;
-    canvas.height = cropRect.height;
-    const ctx = canvas.getContext('2d');
-
-    const scaleX = userImageImage.width / (userImageImage.width * imageScale.x);
-    const scaleY = userImageImage.height / (userImageImage.height * imageScale.y);
-
-    ctx.translate(-cropRect.x + imagePosition.x, -cropRect.y + imagePosition.y);
-    ctx.rotate((imageRotation * Math.PI) / 180);
-    ctx.scale(imageScale.x, imageScale.y);
-
-    try {
-      ctx.drawImage(userImageImage, 0, 0);
-      const croppedImage = canvas.toDataURL('image/png');
-      setUploadedImage(croppedImage);
-      setImagePosition({ x: cropRect.x, y: cropRect.y });
-      setImageScale({ x: 1, y: 1 });
-      setImageRotation(0);
-      setIsCropping(false);
-      setIsImageSelected(true);
-    } catch (e) {
-      console.error('Error applying crop:', e);
-      setOrderFeedback({ type: 'error', message: 'Failed to crop image due to a security restriction.' });
-    }
-  };
-
-  const generatePreviewImage = async () => {
-    if (!stageRef.current || !giftImage || !userImageImage) {
-      console.error('Missing required elements for preview generation');
-      return null;
-    }
-
-    const stage = stageRef.current.getStage();
-    const canvas = document.createElement('canvas');
-    canvas.width = canvasSize.width;
-    canvas.height = canvasSize.height;
-    const ctx = canvas.getContext('2d');
-
-    const selectedImage = selectedCategory === 'tshirts' && selectedColorVariant?.image ? selectedColorVariant.image : selectedItem?.image;
-    const imgSrc = selectedImage
-      ? selectedImage.startsWith('http')
-        ? selectedImage
-        : `${BASE_URL}${selectedImage}`
-      : '';
-    const img = new window.Image();
-    img.crossOrigin = 'anonymous';
-    img.src = imgSrc;
-    await new Promise((resolve) => {
-      img.onload = resolve;
-      img.onerror = () => {
-        console.error('Error loading gift image:', imgSrc);
-        resolve();
-      };
+    const [giftItems, setGiftItems] = useState({
+        tshirts: [],
+        mugs: [],
+        caps: [],
+        tiles: [],
+        pens: [],
     });
+    const [selectedCategory, setSelectedCategory] = useState('tshirts');
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [selectedColorVariant, setSelectedColorVariant] = useState(null);
+    const [selectedSizeVariant, setSelectedSizeVariant] = useState(null);
+    const [uploadedImage, setUploadedImage] = useState(null);
+    const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+    const [imageScale, setImageScale] = useState({ x: 1, y: 1 });
+    const [imageRotation, setImageRotation] = useState(0);
+    const [isCropping, setIsCropping] = useState(false);
+    const [isImageSelected, setIsImageSelected] = useState(false);
+    const [cropRect, setCropRect] = useState({ x: 100, y: 100, width: 150, height: 150 });
+    const [canvasSize, setCanvasSize] = useState({ width: 500, height: 500 });
+    const [printableArea, setPrintableArea] = useState(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [error, setError] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [orderFeedback, setOrderFeedback] = useState(null);
+    const [is3DView, setIs3DView] = useState(false);
+    const imageRef = useRef(null);
+    const transformerRef = useRef(null);
+    const containerRef = useRef(null);
+    const fileInputRef = useRef(null);
+    const stageRef = useRef(null);
 
-    if (img.complete && img.naturalWidth !== 0) {
-      const giftWidth = img.width * Math.min(canvasSize.width / img.width, canvasSize.height / img.height, 1);
-      const giftHeight = img.height * Math.min(canvasSize.width / img.width, canvasSize.height / img.height, 1);
-      const giftX = (canvasSize.width - giftWidth) / 2;
-      const giftY = (canvasSize.height - giftHeight) / 2;
-      try {
-        ctx.drawImage(img, giftX, giftY, giftWidth, giftHeight);
-      } catch (e) {
-        console.error('Error drawing gift image:', e);
-        setOrderFeedback({ type: 'error', message: 'Failed to draw gift image due to a security restriction.' });
-        return null;
-      }
-    }
-
-    if (selectedCategory === 'tshirts' && printableArea) {
-      ctx.strokeStyle = '#0d6efd';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      ctx.strokeRect(printableArea.x, printableArea.y, printableArea.width, printableArea.height);
-      ctx.setLineDash([]);
-    }
-
-    ctx.save();
-    ctx.translate(imagePosition.x, imagePosition.y);
-    ctx.rotate((imageRotation * Math.PI) / 180);
-    ctx.scale(imageScale.x, imageScale.y);
-    try {
-      ctx.drawImage(userImageImage, 0, 0, userImageImage.width, userImageImage.height);
-    } catch (e) {
-      console.error('Error drawing user image:', e);
-      setOrderFeedback({ type: 'error', message: 'Failed to draw user image due to a security restriction.' });
-      return null;
-    }
-    ctx.restore();
-
-    try {
-      return canvas.toDataURL('image/png');
-    } catch (e) {
-      console.error('Error exporting canvas:', e);
-      setOrderFeedback({
-        type: 'error',
-        message: 'Failed to generate preview due to a security error. Ensure images are served with CORS.',
-      });
-      return null;
-    }
-  };
-
-  const handleSaveOrder = async () => {
-    if (!selectedItem || !uploadedImage) {
-      setOrderFeedback({ type: 'error', message: 'Please select an item and upload an image.' });
-      return;
-    }
-
-    if (selectedCategory === 'tshirts' && (!selectedColorVariant || !selectedSizeVariant)) {
-      setOrderFeedback({ type: 'error', message: 'Please select both a color and size variant for the T-shirt.' });
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setOrderFeedback({ type: 'error', message: 'You must be logged in to save an order.' });
-        return;
-      }
-
-      const uploadedResponse = await fetch(uploadedImage);
-      const uploadedBlob = await uploadedResponse.blob();
-      const uploadedFile = new File([uploadedBlob], 'custom_image.png', { type: 'image/png' });
-
-      let previewImage;
-      if (selectedCategory === 'mugs' && is3DView) {
-        previewImage = uploadedImage;
-      } else {
-        previewImage = await generatePreviewImage();
-        if (!previewImage) {
-          setOrderFeedback({ type: 'error', message: 'Failed to generate preview image.' });
-          return;
+    useEffect(() => {
+        if (selectedCategory !== 'tshirts' || !selectedItem) {
+            setSelectedColorVariant(null);
+            setSelectedSizeVariant(null);
         }
-      }
+    }, [selectedCategory, selectedItem]);
 
-      const previewResponse = await fetch(previewImage);
-      const previewBlob = await previewResponse.blob();
-      const previewFile = new File([previewBlob], 'preview_image.png', { type: 'image/png' });
+    useEffect(() => {
+        const updateCanvasSize = () => {
+            if (containerRef.current) {
+                const containerWidth = containerRef.current.offsetWidth;
+                const newSize = Math.min(containerWidth - 40, window.innerHeight * 0.6, 600);
+                setCanvasSize({ width: newSize, height: newSize });
+                if (selectedCategory === 'tshirts' && selectedItem) {
+                    const areaWidth = newSize * 0.6;
+                    const areaHeight = newSize * 0.6;
+                    const areaX = (newSize - areaWidth) / 2;
+                    const areaY = (newSize - areaHeight) / 2;
+                    setPrintableArea({ x: areaX, y: areaY, width: areaWidth, height: areaHeight });
+                } else {
+                    setPrintableArea(null);
+                }
+            }
+        };
+        updateCanvasSize();
+        window.addEventListener('resize', updateCanvasSize);
+        return () => window.removeEventListener('resize', updateCanvasSize);
+    }, [selectedCategory, selectedItem]);
 
-      const formData = new FormData();
-      formData.append(`${selectedCategory.slice(0, -1)}`, selectedItem.id);
-      if (selectedCategory === 'tshirts') {
-        formData.append('tshirt_color_variant', selectedColorVariant.id);
-        formData.append('tshirt_size_variant', selectedSizeVariant.id);
-        formData.append('total_price', (Number(selectedColorVariant.price) + Number(selectedSizeVariant.price)).toString());
-        formData.append('image_position_x', (imagePosition.x - (printableArea?.x || 0)).toString());
-        formData.append('image_position_y', (imagePosition.y - (printableArea?.y || 0)).toString());
-      } else {
-        formData.append('total_price', selectedItem.price.toString());
-        formData.append('image_position_x', imagePosition.x.toString());
-        formData.append('image_position_y', imagePosition.y.toString());
-      }
-      formData.append('image_scale_x', imageScale.x.toString());
-      formData.append('image_scale_y', imageScale.y.toString());
-      formData.append('image_rotation', imageRotation.toString());
-      formData.append('uploaded_image', uploadedFile);
-      formData.append('preview_image', previewFile);
-      formData.append('status', 'pending');
+    useEffect(() => {
+        const fetchGiftItems = async () => {
+            setLoading(true);
+            try {
+                const token = localStorage.getItem('token');
+                const headers = token ? { Authorization: `Bearer ${token}` } : {};
+                const endpoints = {
+                    tshirts: '/tshirts/',
+                    mugs: '/mugs/',
+                    caps: '/caps/',
+                    tiles: '/tiles/',
+                    pens: '/pens/',
+                };
+                const responses = await Promise.all(
+                    Object.keys(endpoints).map((category) =>
+                        axios.get(`${BASE_URL}${endpoints[category]}`, { headers })
+                    )
+                );
+                const fetchedItems = {
+                    tshirts: responses[0].data,
+                    mugs: responses[1].data,
+                    caps: responses[2].data,
+                    tiles: responses[3].data,
+                    pens: responses[4].data,
+                };
+                setGiftItems(fetchedItems);
+                setError(null);
+            } catch (error) {
+                console.error('Error fetching gift items:', error);
+                setError(`Failed to load gift items: ${error.response?.statusText || error.message}`);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchGiftItems();
+    }, []);
 
-      const result = await axios.post(`${BASE_URL}/gift-orders/`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      setOrderFeedback({ type: 'success', message: `Order saved successfully! ID: ${result.data.id}` });
-      setUploadedImage(null);
-      setSelectedItem(null);
-      setSelectedColorVariant(null);
-      setSelectedSizeVariant(null);
-      setImagePosition({ x: 0, y: 0 });
-      setImageScale({ x: 1, y: 1 });
-      setImageRotation(0);
-      setIsImageSelected(false);
-      setIsCropping(false);
-      setIs3DView(false);
-      setPrintableArea(null);
-    } catch (error) {
-      console.error('Error saving order:', error);
-      let errorMessage = 'Failed to save order. Please try again.';
-      if (error.response?.data) {
-        if (typeof error.response.data === 'object' && !Array.isArray(error.response.data)) {
-          errorMessage = Object.keys(error.response.data)
-            .map((key) => {
-              const value = error.response.data[key];
-              return Array.isArray(value) ? `${key}: ${value.join(', ')}` : `${key}: ${value}`;
-            })
-            .join(' ');
-        } else {
-          errorMessage = 'An unexpected server error occurred.';
+    const giftImageUrl = useMemo(() => {
+        if (selectedCategory === 'tshirts' && selectedColorVariant?.image) {
+            return selectedColorVariant.image.startsWith('http') ? selectedColorVariant.image : `${BASE_URL}${selectedColorVariant.image}`;
         }
-      }
-      setOrderFeedback({ type: 'error', message: errorMessage });
-    }
+        if (selectedItem?.image) {
+            return selectedItem.image.startsWith('http') ? selectedItem.image : `${BASE_URL}${selectedItem.image}`;
+        }
+        return '';
+    }, [selectedCategory, selectedItem, selectedColorVariant]);
 
-    setTimeout(() => setOrderFeedback(null), 5000);
-  };
+    const giftImage = useImageLoader(giftImageUrl);
+    const userImageImage = useImageLoader(uploadedImage);
 
-  const handleImageClick = () => {
-    if (!isCropping && uploadedImage && !is3DView) {
-      setIsImageSelected(true);
-    }
-  };
+    useEffect(() => {
+        if (imageRef.current && transformerRef.current && isImageSelected && !isCropping && uploadedImage && !is3DView) {
+            transformerRef.current.nodes([imageRef.current]);
+            transformerRef.current.getLayer()?.batchDraw();
+        } else if (transformerRef.current) {
+            transformerRef.current.nodes([]);
+            transformerRef.current.getLayer()?.batchDraw();
+        }
+    }, [uploadedImage, isCropping, isImageSelected, is3DView]);
 
-  const handleStageClick = (e) => {
-    if (e.target === stageRef.current?.getStage() && !isCropping && !is3DView) {
-      setIsImageSelected(false);
-    }
-  };
+    const handleImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const img = new window.Image();
+                img.src = reader.result;
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    const maxDimension = Math.min(canvasSize.width, canvasSize.height) * 0.5;
+                    const scale = Math.min(maxDimension / img.width, maxDimension / img.height, 1);
+                    let initialX, initialY;
+                    if (selectedCategory === 'tshirts' && printableArea) {
+                        const imgWidth = img.width * scale;
+                        const imgHeight = img.height * scale;
+                        initialX = printableArea.x + (printableArea.width - imgWidth) / 2;
+                        initialY = printableArea.y + (printableArea.height - imgHeight) / 2;
+                    } else {
+                        initialX = canvasSize.width * 0.25;
+                        initialY = canvasSize.height * 0.25;
+                    }
+                    setUploadedImage(reader.result);
+                    setImagePosition({ x: initialX, y: initialY });
+                    setImageScale({ x: scale, y: scale });
+                    setImageRotation(0);
+                    setCropRect({
+                        x: initialX,
+                        y: initialY,
+                        width: maxDimension * 0.5,
+                        height: maxDimension * 0.5,
+                    });
+                    setIsImageSelected(false);
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+    };
 
-  const handleSave = () => {
-    setIsImageSelected(false);
-  };
+    const applyCrop = () => {
+        if (!userImageImage || !uploadedImage) return;
 
-  const handleDragEnd = (e) => {
-    let newX = e.target.x();
-    let newY = e.target.y();
-    if (selectedCategory === 'tshirts' && printableArea && userImageImage) {
-      const imgWidth = (userImageImage.width || 100) * imageScale.x;
-      const imgHeight = (userImageImage.height || 100) * imageScale.y;
-      newX = Math.max(printableArea.x, Math.min(newX, printableArea.x + printableArea.width - imgWidth));
-      newY = Math.max(printableArea.y, Math.min(newY, printableArea.y + printableArea.height - imgHeight));
-      e.target.x(newX);
-      e.target.y(newY);
-    }
-    setImagePosition({ x: newX, y: newY });
-  };
+        const canvas = document.createElement('canvas');
+        canvas.width = cropRect.width;
+        canvas.height = cropRect.height;
+        const ctx = canvas.getContext('2d');
 
-  const handleTransformEnd = (e) => {
-    const node = imageRef.current;
-    if (node && userImageImage) {
-      let newScaleX = node.scaleX();
-      let newScaleY = node.scaleY();
-      let newX = node.x();
-      let newY = node.y();
-      if (selectedCategory === 'tshirts' && printableArea) {
-        const imgWidth = (userImageImage.width || 100) * newScaleX;
-        const imgHeight = (userImageImage.height || 100) * newScaleY;
-        newScaleX = Math.min(newScaleX, printableArea.width / (userImageImage.width || 100));
-        newScaleY = Math.min(newScaleY, printableArea.height / (userImageImage.height || 100));
-        newX = Math.max(printableArea.x, Math.min(newX, printableArea.x + printableArea.width - imgWidth));
-        newY = Math.max(printableArea.y, Math.min(newY, printableArea.y + printableArea.height - imgHeight));
-        node.scaleX(newScaleX);
-        node.scaleY(newScaleY);
-        node.x(newX);
-        node.y(newY);
-      }
-      setImageScale({ x: newScaleX, y: newScaleY });
-      setImagePosition({ x: newX, y: newY });
-      setImageRotation(node.rotation());
-    }
-  };
+        const scaleX = userImageImage.width / (userImageImage.width * imageScale.x);
+        const scaleY = userImageImage.height / (userImageImage.height * imageScale.y);
 
-  const handleCrop = () => {
-    if (isCropping) {
-      setIsCropping(false);
-      setCropRect({
-        x: printableArea ? printableArea.x + printableArea.width * 0.25 : canvasSize.width * 0.25,
-        y: printableArea ? printableArea.y + printableArea.height * 0.25 : canvasSize.height * 0.25,
-        width: canvasSize.width * 0.5,
-        height: canvasSize.width * 0.5,
-      });
-      setIsImageSelected(true);
-    } else {
-      setIsCropping(true);
-      setIsImageSelected(false);
-      if (userImageImage) {
-        const maxDimension = canvasSize.width * 0.5;
-        setCropRect({
-          x: imagePosition.x,
-          y: imagePosition.y,
-          width: (userImageImage.width || 100) * imageScale.x * 0.5,
-          height: (userImageImage.height || 100) * imageScale.y * 0.5,
+        ctx.translate(-cropRect.x + imagePosition.x, -cropRect.y + imagePosition.y);
+        ctx.rotate((imageRotation * Math.PI) / 180);
+        ctx.scale(imageScale.x, imageScale.y);
+
+        try {
+            ctx.drawImage(userImageImage, 0, 0);
+            const croppedImage = canvas.toDataURL('image/png');
+            setUploadedImage(croppedImage);
+            setImagePosition({ x: cropRect.x, y: cropRect.y });
+            setImageScale({ x: 1, y: 1 });
+            setImageRotation(0);
+            setIsCropping(false);
+            setIsImageSelected(true);
+        } catch (e) {
+            console.error('Error applying crop:', e);
+            setOrderFeedback({ type: 'error', message: 'Failed to crop image due to a security restriction.' });
+        }
+    };
+
+    const generatePreviewImage = async () => {
+        if (!stageRef.current || !giftImage || !userImageImage) {
+            console.error('Missing required elements for preview generation');
+            return null;
+        }
+
+        const stage = stageRef.current.getStage();
+        const canvas = document.createElement('canvas');
+        canvas.width = canvasSize.width;
+        canvas.height = canvasSize.height;
+        const ctx = canvas.getContext('2d');
+
+        const selectedImage = selectedCategory === 'tshirts' && selectedColorVariant?.image ? selectedColorVariant.image : selectedItem?.image;
+        const imgSrc = selectedImage
+            ? selectedImage.startsWith('http')
+                ? selectedImage
+                : `${BASE_URL}${selectedImage}`
+            : '';
+        const img = new window.Image();
+        img.crossOrigin = 'anonymous';
+        img.src = imgSrc;
+        await new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = () => {
+                console.error('Error loading gift image:', imgSrc);
+                resolve();
+            };
         });
-      }
-    }
-  };
 
-  const handleCropHandleDrag = (handle, e) => {
-    const newCropRect = { ...cropRect };
-    const { x, y } = e.target.position();
+        if (img.complete && img.naturalWidth !== 0) {
+            const giftWidth = img.width * Math.min(canvasSize.width / img.width, canvasSize.height / img.height, 1);
+            const giftHeight = img.height * Math.min(canvasSize.width / img.width, canvasSize.height / img.height, 1);
+            const giftX = (canvasSize.width - giftWidth) / 2;
+            const giftY = (canvasSize.height - giftHeight) / 2;
+            try {
+                ctx.drawImage(img, giftX, giftY, giftWidth, giftHeight);
+            } catch (e) {
+                console.error('Error drawing gift image:', e);
+                setOrderFeedback({ type: 'error', message: 'Failed to draw gift image due to a security restriction.' });
+                return null;
+            }
+        }
 
-    const minSize = 20;
-    let maxX = canvasSize.width - minSize;
-    let maxY = canvasSize.height - minSize;
-    let maxWidth = canvasSize.width;
+        if (selectedCategory === 'tshirts' && printableArea) {
+            ctx.strokeStyle = '#0d6efd';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(printableArea.x, printableArea.y, printableArea.width, printableArea.height);
+            ctx.setLineDash([]);
+        }
 
-    if (selectedCategory === 'tshirts' && printableArea) {
-      maxX = printableArea.x + printableArea.width - minSize;
-      maxY = printableArea.y + printableArea.height - minSize;
-      maxWidth = printableArea.width;
-    } else if (selectedCategory === 'mugs') {
-      maxWidth = canvasSize.width * 0.8;
-    }
+        ctx.save();
+        ctx.translate(imagePosition.x, imagePosition.y);
+        ctx.rotate((imageRotation * Math.PI) / 180);
+        ctx.scale(imageScale.x, imageScale.y);
+        try {
+            ctx.drawImage(userImageImage, 0, 0, userImageImage.width, userImageImage.height);
+        } catch (e) {
+            console.error('Error drawing user image:', e);
+            setOrderFeedback({ type: 'error', message: 'Failed to draw user image due to a security restriction.' });
+            return null;
+        }
+        ctx.restore();
 
-    switch (handle) {
-      case 'top-left':
-        newCropRect.x = Math.max(printableArea ? printableArea.x : 0, Math.min(x, newCropRect.x + newCropRect.width - minSize));
-        newCropRect.y = Math.max(printableArea ? printableArea.y : 0, Math.min(y, newCropRect.y + newCropRect.height - minSize));
-        newCropRect.width = Math.max(minSize, Math.min(newCropRect.width + (newCropRect.x - x), maxWidth));
-        newCropRect.height = Math.max(minSize, newCropRect.height + (newCropRect.y - y));
-        break;
-      case 'top-right':
-        newCropRect.y = Math.max(printableArea ? printableArea.y : 0, Math.min(y, newCropRect.y + newCropRect.height - minSize));
-        newCropRect.width = Math.max(minSize, Math.min(x - newCropRect.x, maxWidth));
-        newCropRect.height = Math.max(minSize, newCropRect.height + (newCropRect.y - y));
-        break;
-      case 'bottom-left':
-        newCropRect.x = Math.max(printableArea ? printableArea.x : 0, Math.min(x, newCropRect.x + newCropRect.width - minSize));
-        newCropRect.width = Math.max(minSize, Math.min(newCropRect.width + (newCropRect.x - x), maxWidth));
-        newCropRect.height = Math.max(minSize, y - newCropRect.y);
-        break;
-      case 'bottom-right':
-        newCropRect.width = Math.max(minSize, Math.min(x - newCropRect.x, maxWidth));
-        newCropRect.height = Math.max(minSize, y - newCropRect.y);
-        break;
-      case 'top':
-        newCropRect.y = Math.max(printableArea ? printableArea.y : 0, Math.min(y, newCropRect.y + newCropRect.height - minSize));
-        newCropRect.height = Math.max(minSize, newCropRect.height + (newCropRect.y - y));
-        break;
-      case 'bottom':
-        newCropRect.height = Math.max(minSize, y - newCropRect.y);
-        break;
-      case 'left':
-        newCropRect.x = Math.max(printableArea ? printableArea.x : 0, Math.min(x, newCropRect.x + newCropRect.width - minSize));
-        newCropRect.width = Math.max(minSize, Math.min(newCropRect.width + (newCropRect.x - x), maxWidth));
-        break;
-      case 'right':
-        newCropRect.width = Math.max(minSize, Math.min(x - newCropRect.x, maxWidth));
-        break;
-      default:
-        break;
-    }
+        try {
+            return canvas.toDataURL('image/png');
+        } catch (e) {
+            console.error('Error exporting canvas:', e);
+            setOrderFeedback({
+                type: 'error',
+                message: 'Failed to generate preview due to a security error. Ensure images are served with CORS.',
+            });
+            return null;
+        }
+    };
 
-    setCropRect(newCropRect);
-    e.target.position(getHandlePosition(handle, newCropRect));
-  };
+    const handleSaveOrder = async () => {
+        if (!selectedItem || !uploadedImage) {
+            setOrderFeedback({ type: 'error', message: 'Please select an item and upload an image.' });
+            return;
+        }
 
-  const getHandlePosition = (handle, rect) => {
-    switch (handle) {
-      case 'top-left':
-        return { x: rect.x, y: rect.y };
-      case 'top-right':
-        return { x: rect.x + rect.width, y: rect.y };
-      case 'bottom-left':
-        return { x: rect.x, y: rect.y + rect.height };
-      case 'bottom-right':
-        return { x: rect.x + rect.width, y: rect.y + rect.height };
-      case 'top':
-        return { x: rect.x + rect.width / 2, y: rect.y };
-      case 'bottom':
-        return { x: rect.x + rect.width / 2, y: rect.y + rect.height };
-      case 'left':
-        return { x: rect.x, y: rect.y + rect.height / 2 };
-      case 'right':
-        return { x: rect.x + rect.width, y: rect.y + rect.height / 2 };
-      default:
-        return { x: 0, y: 0 };
-    }
-  };
+        if (selectedCategory === 'tshirts' && (!selectedColorVariant || !selectedSizeVariant)) {
+            setOrderFeedback({ type: 'error', message: 'Please select both a color and size variant for the T-shirt.' });
+            return;
+        }
 
-  const handleSideDrag = (side, e) => {
-    const node = imageRef.current;
-    if (node && userImageImage) {
-      const newScale = { ...imageScale };
-      const newPosition = { ...imagePosition };
-      const { x, y } = e.target.position();
-      const minSize = 20;
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                setOrderFeedback({ type: 'error', message: 'You must be logged in to save an order.' });
+                return;
+            }
 
-      let maxWidth = canvasSize.width;
-      let minX = 0;
-      let minY = 0;
+            const uploadedResponse = await fetch(uploadedImage);
+            const uploadedBlob = await uploadedResponse.blob();
+            const uploadedFile = new File([uploadedBlob], 'custom_image.png', { type: 'image/png' });
 
-      if (selectedCategory === 'tshirts' && printableArea) {
-        maxWidth = printableArea.width;
-        minX = printableArea.x;
-        minY = printableArea.y;
-      } else if (selectedCategory === 'mugs') {
-        maxWidth = canvasSize.width * 0.8;
-      }
+            let previewImage;
+            if (selectedCategory === 'mugs' && is3DView) {
+                previewImage = uploadedImage;
+            } else {
+                previewImage = await generatePreviewImage();
+                if (!previewImage) {
+                    setOrderFeedback({ type: 'error', message: 'Failed to generate preview image.' });
+                    return;
+                }
+            }
 
-      switch (side) {
-        case 'left':
-          newScale.x = Math.max(
-            minSize / (userImageImage.width || 100),
-            (imagePosition.x + imageScale.x * (userImageImage.width || 100) - x) / (userImageImage.width || 100)
-          );
-          newPosition.x = x;
-          break;
-        case 'right':
-          newScale.x = Math.max(minSize / (userImageImage.width || 100), (x - imagePosition.x) / (userImageImage.width || 100));
-          break;
-        case 'top':
-          newScale.y = Math.max(
-            minSize / (userImageImage.height || 100),
-            (imagePosition.y + imageScale.y * (userImageImage.height || 100) - y) / (userImageImage.height || 100)
-          );
-          newPosition.y = y;
-          break;
-        case 'bottom':
-          newScale.y = Math.max(minSize / (userImageImage.height || 100), (y - imagePosition.y) / (userImageImage.height || 100));
-          break;
-        default:
-          break;
-      }
+            const previewResponse = await fetch(previewImage);
+            const previewBlob = await previewResponse.blob();
+            const previewFile = new File([previewBlob], 'preview_image.png', { type: 'image/png' });
 
-      if (selectedCategory === 'tshirts' && printableArea) {
-        newScale.x = Math.min(newScale.x, printableArea.width / (userImageImage.width || 100));
-        newScale.y = Math.min(newScale.y, printableArea.height / (userImageImage.height || 100));
-        newPosition.x = Math.max(minX, Math.min(newPosition.x, minX + printableArea.width - (userImageImage.width || 100) * newScale.x));
-        newPosition.y = Math.max(minY, Math.min(newPosition.y, minY + printableArea.height - (userImageImage.height || 100) * newScale.y));
-      } else if (selectedCategory === 'mugs') {
-        newScale.x = Math.min(newScale.x, maxWidth / (userImageImage.width || 100));
-      }
+            const formData = new FormData();
+            formData.append(`${selectedCategory.slice(0, -1)}`, selectedItem.id);
+            if (selectedCategory === 'tshirts') {
+                formData.append('tshirt_color_variant', selectedColorVariant.id);
+                formData.append('tshirt_size_variant', selectedSizeVariant.id);
+                formData.append('total_price', (Number(selectedColorVariant.price) + Number(selectedSizeVariant.price)).toString());
+                formData.append('image_position_x', (imagePosition.x - (printableArea?.x || 0)).toString());
+                formData.append('image_position_y', (imagePosition.y - (printableArea?.y || 0)).toString());
+            } else {
+                formData.append('total_price', selectedItem.price.toString());
+                formData.append('image_position_x', imagePosition.x.toString());
+                formData.append('image_position_y', imagePosition.y.toString());
+            }
+            formData.append('image_scale_x', imageScale.x.toString());
+            formData.append('image_scale_y', imageScale.y.toString());
+            formData.append('image_rotation', imageRotation.toString());
+            formData.append('uploaded_image', uploadedFile);
+            formData.append('preview_image', previewFile);
+            formData.append('status', 'pending');
 
-      setImageScale(newScale);
-      setImagePosition(newPosition);
-      e.target.position(getSideHandlePosition(side, newPosition, newScale, userImageImage));
-    }
-  };
+            const result = await axios.post(`${BASE_URL}/gift-orders/`, formData, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
 
-  const getSideHandlePosition = (side, position, scale, image) => {
-    const imgWidth = (image.width || 100) * scale.x;
-    const imgHeight = (image.height || 100) * scale.y;
-    switch (side) {
-      case 'left':
-        return { x: position.x, y: position.y + imgHeight / 2 };
-      case 'right':
-        return { x: position.x + imgWidth, y: position.y + imgHeight / 2 };
-      case 'top':
-        return { x: position.x + imgWidth / 2, y: position.y };
-      case 'bottom':
-        return { x: position.x + imgWidth / 2, y: position.y + imgHeight };
-      default:
-        return { x: 0, y: 0 };
-    }
-  };
+            setOrderFeedback({ type: 'success', message: `Order saved successfully! ID: ${result.data.id}` });
+            setUploadedImage(null);
+            setSelectedItem(null);
+            setSelectedColorVariant(null);
+            setSelectedSizeVariant(null);
+            setImagePosition({ x: 0, y: 0 });
+            setImageScale({ x: 1, y: 1 });
+            setImageRotation(0);
+            setIsImageSelected(false);
+            setIsCropping(false);
+            setIs3DView(false);
+            setPrintableArea(null);
+        } catch (error) {
+            console.error('Error saving order:', error);
+            let errorMessage = 'Failed to save order. Please try again.';
+            if (error.response?.data) {
+                if (typeof error.response.data === 'object' && !Array.isArray(error.response.data)) {
+                    errorMessage = Object.keys(error.response.data)
+                        .map((key) => {
+                            const value = error.response.data[key];
+                            return Array.isArray(value) ? `${key}: ${value.join(', ')}` : `${key}: ${value}`;
+                        })
+                        .join(' ');
+                } else {
+                    errorMessage = 'An unexpected server error occurred.';
+                }
+            }
+            setOrderFeedback({ type: 'error', message: errorMessage });
+        }
 
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
+        setTimeout(() => setOrderFeedback(null), 5000);
+    };
 
-  const toggleView = () => {
-    setIs3DView(!is3DView);
-    setIsImageSelected(false);
-    setIsCropping(false);
-  };
+    const handleImageClick = () => {
+        if (!isCropping && uploadedImage && !is3DView) {
+            setIsImageSelected(true);
+        }
+    };
 
-  const triggerFileUpload = () => {
-    fileInputRef.current?.click();
-  };
+    const handleStageClick = (e) => {
+        if (e.target === stageRef.current?.getStage() && !isCropping && !is3DView) {
+            setIsImageSelected(false);
+        }
+    };
 
-  return (
-    <ErrorBoundary>
-      <div className="container-fluid gift-print-workspace">
-        <div className="d-flex align-items-center justify-content-between p-3 bg-light border-bottom d-lg-none">
-          <button className="btn btn-outline-primary" onClick={toggleSidebar}>
-            <Menu size={24} />
-            <span className="ms-2">Categories</span>
-          </button>
-          <h1 className="h4 m-0">Gift Designer</h1>
-        </div>
+    const handleSave = () => {
+        setIsImageSelected(false);
+    };
 
-        <div className={`gift-sidebar ${isSidebarOpen ? 'open' : ''} col-lg-3 bg-white border-end p-3`}>
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <h2 className="h5">Gift Categories</h2>
-            <button className="btn btn-outline-secondary d-lg-none" onClick={() => setIsSidebarOpen(false)}>
-              <X size={20} />
-            </button>
-          </div>
+    const handleDragEnd = (e) => {
+        let newX = e.target.x();
+        let newY = e.target.y();
+        if (selectedCategory === 'tshirts' && printableArea && userImageImage) {
+            const imgWidth = (userImageImage.width || 100) * imageScale.x;
+            const imgHeight = (userImageImage.height || 100) * imageScale.y;
+            newX = Math.max(printableArea.x, Math.min(newX, printableArea.x + printableArea.width - imgWidth));
+            newY = Math.max(printableArea.y, Math.min(newY, printableArea.y + printableArea.height - imgHeight));
+            e.target.x(newX);
+            e.target.y(newY);
+        }
+        setImagePosition({ x: newX, y: newY });
+    };
 
-          {error && (
-            <div className="alert alert-danger">
-              <p>{error}</p>
-            </div>
-          )}
+    const handleTransformEnd = (e) => {
+        const node = imageRef.current;
+        if (node && userImageImage) {
+            let newScaleX = node.scaleX();
+            let newScaleY = node.scaleY();
+            let newX = node.x();
+            let newY = node.y();
+            if (selectedCategory === 'tshirts' && printableArea) {
+                const imgWidth = (userImageImage.width || 100) * newScaleX;
+                const imgHeight = (userImageImage.height || 100) * newScaleY;
+                newScaleX = Math.min(newScaleX, printableArea.width / (userImageImage.width || 100));
+                newScaleY = Math.min(newScaleY, printableArea.height / (userImageImage.height || 100));
+                newX = Math.max(printableArea.x, Math.min(newX, printableArea.x + printableArea.width - imgWidth));
+                newY = Math.max(printableArea.y, Math.min(newY, printableArea.y + printableArea.height - imgHeight));
+                node.scaleX(newScaleX);
+                node.scaleY(newScaleY);
+                node.x(newX);
+                node.y(newY);
+            }
+            setImageScale({ x: newScaleX, y: newScaleY });
+            setImagePosition({ x: newX, y: newY });
+            setImageRotation(node.rotation());
+        }
+    };
 
-          {loading && (
-            <div className="text-center">
-              <div className="spinner-border" role="status"></div>
-              <p>Loading gift items...</p>
-            </div>
-          )}
+    const handleCrop = () => {
+        if (isCropping) {
+            setIsCropping(false);
+            setCropRect({
+                x: printableArea ? printableArea.x + printableArea.width * 0.25 : canvasSize.width * 0.25,
+                y: printableArea ? printableArea.y + printableArea.height * 0.25 : canvasSize.height * 0.25,
+                width: canvasSize.width * 0.5,
+                height: canvasSize.width * 0.5,
+            });
+            setIsImageSelected(true);
+        } else {
+            setIsCropping(true);
+            setIsImageSelected(false);
+            if (userImageImage) {
+                const maxDimension = canvasSize.width * 0.5;
+                setCropRect({
+                    x: imagePosition.x,
+                    y: imagePosition.y,
+                    width: (userImageImage.width || 100) * imageScale.x * 0.5,
+                    height: (userImageImage.height || 100) * imageScale.y * 0.5,
+                });
+            }
+        }
+    };
 
-          <div className="categories-list">
-            {Object.keys(giftItems).map((category) => {
-              const Icon = categoryIcons[category];
-              return (
-                <div key={category} className="mb-3">
-                  <button
-                    className={`btn btn-outline w-100 text-start mb-2 ${selectedCategory === category ? 'active' : ''}`}
-                    onClick={() => {
-                      setSelectedCategory(category);
-                      setSelectedItem(null);
-                      setSelectedColorVariant(null);
-                      setSelectedSizeVariant(null);
-                      setIs3DView(category === 'mugs' ? is3DView : false);
-                      setPrintableArea(null);
-                    }}
-                  >
-                    <Icon size={20} className="me-2" />
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
-                  </button>
+    const handleCropHandleDrag = (handle, e) => {
+        const newCropRect = { ...cropRect };
+        const { x, y } = e.target.position();
 
-                  {selectedCategory === category && (
-                    <div className="row row-cols-1 g-2">
-                      {giftItems[category].map((item) => (
-                        <div
-                          key={item.id}
-                          className={`card ${selectedItem?.id === item.id ? 'border-primary' : ''}`}
-                          onClick={() => {
-                            setSelectedItem(item);
-                            setSelectedColorVariant(null);
-                            setSelectedSizeVariant(null);
-                            setIsSidebarOpen(false);
-                          }}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          {item.image && (
-                            <div className="card-img-top p-2">
-                              <img
-                                src={item.image.startsWith('http') ? item.image : `${BASE_URL}${item.image}`}
-                                alt={item[`${category.slice(0, -1)}_name`] || item.name || 'Item'}
-                                className="img-fluid"
-                                crossOrigin="anonymous"
-                                onError={(e) => {
-                                  e.target.src =
-                                    'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0zNSA2NUw1MCA0NUw2NSA2NUgzNVoiIGZpbGw9IiNEMUQ1REIiLz4KPGNpcmNsZSBjeD0iNDAiIGN5PSIzNSIgcj0iNSIgZmlsbD0iI0QxRDVEQiIvPgo8L3N2Zz4K';
-                                }}
-                                style={{ maxHeight: '100px', objectFit: 'contain' }}
-                              />
-                            </div>
-                          )}
-                          <div className="card-body">
-                            <h5 className="card-title">{item[`${category.slice(0, -1)}_name`] || item.name || 'Unnamed Item'}</h5>
-                            {item.price && <p className="card-text text-muted">${item.price}</p>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        const minSize = 20;
+        let maxX = canvasSize.width - minSize;
+        let maxY = canvasSize.height - minSize;
+        let maxWidth = canvasSize.width;
 
-        <div className="main-workspace col-lg-9 p-3" ref={containerRef}>
-          <div className="d-flex flex-wrap gap-2 mb-3">
-            <div>
-              <button className="btn btn-primary" onClick={triggerFileUpload}>
-                <Upload size={18} className="me-2" />
-                Upload Image
-              </button>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                ref={fileInputRef}
-                style={{ display: 'none' }}
-              />
-            </div>
+        if (selectedCategory === 'tshirts' && printableArea) {
+            maxX = printableArea.x + printableArea.width - minSize;
+            maxY = printableArea.y + printableArea.height - minSize;
+            maxWidth = printableArea.width;
+        } else if (selectedCategory === 'mugs') {
+            maxWidth = canvasSize.width * 0.8;
+        }
 
-            {selectedCategory === 'tshirts' && selectedItem && (
-              <div className="d-flex gap-2">
-                <select
-                  value={selectedColorVariant?.id || ''}
-                  onChange={(e) => {
-                    const variant = selectedItem.color_variants.find((v) => v.id === parseInt(e.target.value));
-                    setSelectedColorVariant(variant || null);
-                  }}
-                  className="form-select"
-                >
-                  <option value="">Select Color</option>
-                  {selectedItem.color_variants.map((variant) => (
-                    <option key={variant.id} value={variant.id}>
-                      {variant.color_name} (${variant.price})
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={selectedSizeVariant?.id || ''}
-                  onChange={(e) => {
-                    const variant = selectedItem.size_variants.find((v) => v.id === parseInt(e.target.value));
-                    setSelectedSizeVariant(variant || null);
-                  }}
-                  className="form-select"
-                >
-                  <option value="">Select Size</option>
-                  {selectedItem.size_variants.map((variant) => (
-                    <option key={variant.id} value={variant.id}>
-                      {variant.size_name} (${variant.price})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+        switch (handle) {
+            case 'top-left':
+                newCropRect.x = Math.max(printableArea ? printableArea.x : 0, Math.min(x, newCropRect.x + newCropRect.width - minSize));
+                newCropRect.y = Math.max(printableArea ? printableArea.y : 0, Math.min(y, newCropRect.y + newCropRect.height - minSize));
+                newCropRect.width = Math.max(minSize, Math.min(newCropRect.width + (newCropRect.x - x), maxWidth));
+                newCropRect.height = Math.max(minSize, newCropRect.height + (newCropRect.y - y));
+                break;
+            case 'top-right':
+                newCropRect.y = Math.max(printableArea ? printableArea.y : 0, Math.min(y, newCropRect.y + newCropRect.height - minSize));
+                newCropRect.width = Math.max(minSize, Math.min(x - newCropRect.x, maxWidth));
+                newCropRect.height = Math.max(minSize, newCropRect.height + (newCropRect.y - y));
+                break;
+            case 'bottom-left':
+                newCropRect.x = Math.max(printableArea ? printableArea.x : 0, Math.min(x, newCropRect.x + newCropRect.width - minSize));
+                newCropRect.width = Math.max(minSize, Math.min(newCropRect.width + (newCropRect.x - x), maxWidth));
+                newCropRect.height = Math.max(minSize, y - newCropRect.y);
+                break;
+            case 'bottom-right':
+                newCropRect.width = Math.max(minSize, Math.min(x - newCropRect.x, maxWidth));
+                newCropRect.height = Math.max(minSize, y - newCropRect.y);
+                break;
+            case 'top':
+                newCropRect.y = Math.max(printableArea ? printableArea.y : 0, Math.min(y, newCropRect.y + newCropRect.height - minSize));
+                newCropRect.height = Math.max(minSize, newCropRect.height + (newCropRect.y - y));
+                break;
+            case 'bottom':
+                newCropRect.height = Math.max(minSize, y - newCropRect.y);
+                break;
+            case 'left':
+                newCropRect.x = Math.max(printableArea ? printableArea.x : 0, Math.min(x, newCropRect.x + newCropRect.width - minSize));
+                newCropRect.width = Math.max(minSize, Math.min(newCropRect.width + (newCropRect.x - x), maxWidth));
+                break;
+            case 'right':
+                newCropRect.width = Math.max(minSize, Math.min(x - newCropRect.x, maxWidth));
+                break;
+            default:
+                break;
+        }
 
-            {selectedCategory === 'tshirts' && selectedItem && selectedItem.color_variants.length === 0 && (
-              <div>
-                <p className="text-danger">No color variants available for this T-shirt.</p>
-              </div>
-            )}
+        setCropRect(newCropRect);
+        e.target.position(getHandlePosition(handle, newCropRect));
+    };
 
-            {selectedCategory === 'tshirts' && selectedItem && selectedItem.size_variants.length === 0 && (
-              <div>
-                <p className="text-danger">No size variants available for this T-shirt.</p>
-              </div>
-            )}
+    const getHandlePosition = (handle, rect) => {
+        switch (handle) {
+            case 'top-left':
+                return { x: rect.x, y: rect.y };
+            case 'top-right':
+                return { x: rect.x + rect.width, y: rect.y };
+            case 'bottom-left':
+                return { x: rect.x, y: rect.y + rect.height };
+            case 'bottom-right':
+                return { x: rect.x + rect.width, y: rect.y + rect.height };
+            case 'top':
+                return { x: rect.x + rect.width / 2, y: rect.y };
+            case 'bottom':
+                return { x: rect.x + rect.width / 2, y: rect.y + rect.height };
+            case 'left':
+                return { x: rect.x, y: rect.y + rect.height / 2 };
+            case 'right':
+                return { x: rect.x + rect.width, y: rect.y + rect.height / 2 };
+            default:
+                return { x: 0, y: 0 };
+        }
+    };
 
-            {uploadedImage && (
-              <div className="d-flex gap-2">
-                {selectedCategory === 'mugs' && (
-                  <button className="btn btn-outline-secondary" onClick={toggleView}>
-                    <Eye size={18} className="me-2" />
-                    {is3DView ? 'Switch to 2D View' : 'Switch to 3D View'}
-                  </button>
-                )}
-                {!is3DView && (
-                  <>
-                    <button
-                      className={`btn ${isCropping ? 'btn-danger' : 'btn-outline-secondary'}`}
-                      onClick={handleCrop}
-                    >
-                      {isCropping ? <X size={18} className="me-2" /> : <Crop size={18} className="me-2" />}
-                      {isCropping ? 'Cancel Crop' : 'Crop Image'}
+    const handleSideDrag = (side, e) => {
+        const node = imageRef.current;
+        if (node && userImageImage) {
+            const newScale = { ...imageScale };
+            const newPosition = { ...imagePosition };
+            const { x, y } = e.target.position();
+            const minSize = 20;
+
+            let maxWidth = canvasSize.width;
+            let minX = 0;
+            let minY = 0;
+
+            if (selectedCategory === 'tshirts' && printableArea) {
+                maxWidth = printableArea.width;
+                minX = printableArea.x;
+                minY = printableArea.y;
+            } else if (selectedCategory === 'mugs') {
+                maxWidth = canvasSize.width * 0.8;
+            }
+
+            switch (side) {
+                case 'left':
+                    newScale.x = Math.max(
+                        minSize / (userImageImage.width || 100),
+                        (imagePosition.x + imageScale.x * (userImageImage.width || 100) - x) / (userImageImage.width || 100)
+                    );
+                    newPosition.x = x;
+                    break;
+                case 'right':
+                    newScale.x = Math.max(minSize / (userImageImage.width || 100), (x - imagePosition.x) / (userImageImage.width || 100));
+                    break;
+                case 'top':
+                    newScale.y = Math.max(
+                        minSize / (userImageImage.height || 100),
+                        (imagePosition.y + imageScale.y * (userImageImage.height || 100) - y) / (userImageImage.height || 100)
+                    );
+                    newPosition.y = y;
+                    break;
+                case 'bottom':
+                    newScale.y = Math.max(minSize / (userImageImage.height || 100), (y - imagePosition.y) / (userImageImage.height || 100));
+                    break;
+                default:
+                    break;
+            }
+
+            if (selectedCategory === 'tshirts' && printableArea) {
+                newScale.x = Math.min(newScale.x, printableArea.width / (userImageImage.width || 100));
+                newScale.y = Math.min(newScale.y, printableArea.height / (userImageImage.height || 100));
+                newPosition.x = Math.max(minX, Math.min(newPosition.x, minX + printableArea.width - (userImageImage.width || 100) * newScale.x));
+                newPosition.y = Math.max(minY, Math.min(newPosition.y, minY + printableArea.height - (userImageImage.height || 100) * newScale.y));
+            } else if (selectedCategory === 'mugs') {
+                newScale.x = Math.min(newScale.x, maxWidth / (userImageImage.width || 100));
+            }
+
+            setImageScale(newScale);
+            setImagePosition(newPosition);
+            e.target.position(getSideHandlePosition(side, newPosition, newScale, userImageImage));
+        }
+    };
+
+    const getSideHandlePosition = (side, position, scale, image) => {
+        const imgWidth = (image.width || 100) * scale.x;
+        const imgHeight = (image.height || 100) * scale.y;
+        switch (side) {
+            case 'left':
+                return { x: position.x, y: position.y + imgHeight / 2 };
+            case 'right':
+                return { x: position.x + imgWidth, y: position.y + imgHeight / 2 };
+            case 'top':
+                return { x: position.x + imgWidth / 2, y: position.y };
+            case 'bottom':
+                return { x: position.x + imgWidth / 2, y: position.y + imgHeight };
+            default:
+                return { x: 0, y: 0 };
+        }
+    };
+
+    const toggleSidebar = () => {
+        setIsSidebarOpen(!isSidebarOpen);
+    };
+
+    const toggleView = () => {
+        setIs3DView(!is3DView);
+        setIsImageSelected(false);
+        setIsCropping(false);
+    };
+
+    const triggerFileUpload = () => {
+        fileInputRef.current?.click();
+    };
+
+    return (
+        <ErrorBoundary>
+            <div className="container-fluid gift-print-workspace">
+                <div className="d-flex align-items-center justify-content-between p-3 bg-light border-bottom d-lg-none">
+                    <button className="btn btn-outline-primary" onClick={toggleSidebar}>
+                        <Menu size={24} />
+                        <span className="ms-2">Categories</span>
                     </button>
-                    {isCropping && (
-                      <button className="btn btn-success" onClick={applyCrop}>
-                        <Check size={18} className="me-2" />
-                        Apply Crop
-                      </button>
+                    <h1 className="h4 m-0">Gift Designer</h1>
+                </div>
+
+                <div className={`gift-sidebar ${isSidebarOpen ? 'open' : ''} col-lg-3 bg-white border-end p-3`}>
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                        <h2 className="h5">Gift Categories</h2>
+                        <button className="btn btn-outline-secondary d-lg-none" onClick={() => setIsSidebarOpen(false)}>
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    {error && (
+                        <div className="alert alert-danger">
+                            <p>{error}</p>
+                        </div>
                     )}
-                    {!isCropping && (
-                      <button className="btn btn-success" onClick={handleSave}>
-                        <Save size={18} className="me-2" />
-                        Save
-                      </button>
+
+                    {loading && (
+                        <div className="text-center">
+                            <div className="spinner-border" role="status"></div>
+                            <p>Loading gift items...</p>
+                        </div>
                     )}
-                  </>
-                )}
-                {selectedItem && uploadedImage && (selectedCategory !== 'tshirts' || (selectedColorVariant && selectedSizeVariant)) && (
-                  <button className="btn btn-primary" onClick={handleSaveOrder}>
-                    <Save size={18} className="me-2" />
-                    Save Order
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
 
-          {orderFeedback && (
-            <div className={`alert alert-${orderFeedback.type === 'success' ? 'success' : 'danger'} mb-3`}>
-              <p>{orderFeedback.message}</p>
-            </div>
-          )}
+                    <div className="categories-list">
+                        {Object.keys(giftItems).map((category) => {
+                            const Icon = categoryIcons[category];
+                            return (
+                                <div key={category} className="mb-3">
+                                    <button
+                                        className={`btn btn-outline w-100 text-start mb-2 ${selectedCategory === category ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setSelectedCategory(category);
+                                            setSelectedItem(null);
+                                            setSelectedColorVariant(null);
+                                            setSelectedSizeVariant(null);
+                                            setIs3DView(category === 'mugs' ? is3DView : false);
+                                            setPrintableArea(null);
+                                        }}
+                                    >
+                                        <Icon size={20} className="me-2" />
+                                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                                    </button>
 
-          <div className="canvas-workspace card p-3">
-            <div className="gift-canvas-container">
-              {selectedCategory === 'mugs' && is3DView && uploadedImage ? (
-                <Canvas
-                  style={{ width: canvasSize.width, height: canvasSize.height }}
-                  camera={{ position: [0, 0, 4], fov: 50 }}
-                >
-                  <ambientLight intensity={0.6} />
-                  <pointLight position={[10, 10, 10]} intensity={1.2} />
-                  <pointLight position={[-10, -10, -10]} intensity={0.8} />
-                  <Mug3D textureUrl={uploadedImage} canvasSize={canvasSize} />
-                </Canvas>
-              ) : (
-                <Stage
-                  width={canvasSize.width}
-                  height={canvasSize.height}
-                  className="gift-design-canvas"
-                  ref={stageRef}
-                  onClick={handleStageClick}
-                >
-                  <Layer>
-                    {giftImage && (() => {
-                      const maxDimension = Math.min(canvasSize.width, canvasSize.height);
-                      const aspectRatio = giftImage.width / giftImage.height;
-                      let width, height;
+                                    {selectedCategory === category && (
+                                        <div className="row row-cols-2 g-3"> {/* Increased gap to g-3 for visibility */}
+                                            {giftItems[category].map((item) => (
+                                                <div key={item.id} className="col"> {/* Ensure each card is in a 'col' */}
+                                                    <div
+                                                        className={`card h-100 ${selectedItem?.id === item.id ? 'border-primary' : ''}`}
+                                                        onClick={() => {
+                                                            setSelectedItem(item);
+                                                            setSelectedColorVariant(null);
+                                                            setSelectedSizeVariant(null);
+                                                            setIsSidebarOpen(false);
+                                                        }}
+                                                        style={{ cursor: 'pointer' }}
+                                                    >
+                                                        {item.image && (
+                                                            <div className="card-img-top p-2">
+                                                                <img
+                                                                    src={item.image.startsWith('http') ? item.image : `${BASE_URL}${item.image}`}
+                                                                    alt={item[`${category.slice(0, -1)}_name`] || item.name || 'Item'}
+                                                                    className="img-fluid"
+                                                                    crossOrigin="anonymous"
+                                                                    onError={(e) => {
+                                                                        e.target.src =
+                                                                            'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0zNSA2NUw1MCA0NUw2NSA2NUgzNVoiIGZpbGw9IiNEMUQ1REIiLz4KPGNpcmNsZSBjeD0iNDAiIGN5PSIzNSIgcj0iNSIgZmlsbD0iI0QxRDVEQiIvPgo8L3N2Zz4K';
+                                                                    }}
+                                                                    style={{ maxHeight: '100px', objectFit: 'contain' }}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        <div className="card-body">
+                                                            <h5 className="card-title">{item[`${category.slice(0, -1)}_name`] || item.name || 'Unnamed Item'}</h5>
+                                                            {item.price && <p className="card-text text-muted">${item.price}</p>}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
 
-                      if (selectedCategory === 'mugs') {
-                        width = canvasSize.width * 0.9;
-                        height = width / aspectRatio;
-                        if (height > canvasSize.height * 0.9) {
-                          height = canvasSize.height * 0.9;
-                          width = height * aspectRatio;
-                        }
-                      } else {
-                        width = giftImage.width;
-                        height = giftImage.height;
-                        const scale = Math.min(maxDimension / giftImage.width, maxDimension / giftImage.height, 1);
-                        width *= scale;
-                        height *= scale;
-                      }
-
-                      const x = (canvasSize.width - width) / 2;
-                      const y = (canvasSize.height - height) / 2;
-
-                      return (
-                        <KonvaImage
-                          image={giftImage}
-                          width={width}
-                          height={height}
-                          x={x}
-                          y={y}
-                        />
-                      );
-                    })()}
-                    {selectedCategory === 'tshirts' && printableArea && (
-                      <Rect
-                        x={printableArea.x}
-                        y={printableArea.y}
-                        width={printableArea.width}
-                        height={printableArea.height}
-                        stroke="#0d6efd"
-                        strokeWidth={2}
-                        dash={[5, 5]}
-                        draggable={false}
-                      />
-                    )}
-                    {userImageImage && (
-                      <Group
-                        clipX={isCropping && selectedCategory === 'tshirts' ? printableArea?.x : isCropping ? cropRect.x : undefined}
-                        clipY={isCropping && selectedCategory === 'tshirts' ? printableArea?.y : isCropping ? cropRect.y : undefined}
-                        clipWidth={isCropping && selectedCategory === 'tshirts' ? printableArea?.width : isCropping ? cropRect.width : undefined}
-                        clipHeight={isCropping && selectedCategory === 'tshirts' ? printableArea?.height : isCropping ? cropRect.height : undefined}
-                      >
-                        <KonvaImage
-                          image={userImageImage}
-                          x={imagePosition.x}
-                          y={imagePosition.y}
-                          scaleX={imageScale.x}
-                          scaleY={imageScale.y}
-                          rotation={imageRotation}
-                          draggable={!isCropping}
-                          ref={imageRef}
-                          onClick={handleImageClick}
-                          onTap={handleImageClick}
-                          onDragEnd={handleDragEnd}
-                          onTransformEnd={handleTransformEnd}
-                        />
-                      </Group>
-                    )}
-                    {isCropping && (
-                      <>
-                        <Rect
-                          x={cropRect.x}
-                          y={cropRect.y}
-                          width={cropRect.width}
-                          height={cropRect.height}
-                          stroke="#0d6efd"
-                          strokeWidth={2}
-                          draggable={false}
-                        />
-                        {['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top', 'bottom', 'left', 'right'].map(
-                          (handle) => (
-                            <Circle
-                              key={handle}
-                              x={getHandlePosition(handle, cropRect).x}
-                              y={getHandlePosition(handle, cropRect).y}
-                              radius={8}
-                              fill="white"
-                              stroke="#0d6efd"
-                              strokeWidth={2}
-                              draggable
-                              onDragMove={(e) => handleCropHandleDrag(handle, e)}
-                              onDragEnd={(e) => handleCropHandleDrag(handle, e)}
+                <div className="main-workspace col-lg-9 p-3" ref={containerRef}>
+                    <div className="d-flex flex-wrap gap-2 mb-3">
+                        <div>
+                            <button className="btn btn-primary" onClick={triggerFileUpload}>
+                                <Upload size={18} className="me-2" />
+                                Upload Image
+                            </button>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleImageUpload}
+                                ref={fileInputRef}
+                                style={{ display: 'none' }}
                             />
-                          )
+                        </div>
+
+                        {selectedCategory === 'tshirts' && selectedItem && (
+                            <div className="d-flex gap-2">
+                                <select
+                                    value={selectedColorVariant?.id || ''}
+                                    onChange={(e) => {
+                                        const variant = selectedItem.color_variants.find((v) => v.id === parseInt(e.target.value));
+                                        setSelectedColorVariant(variant || null);
+                                    }}
+                                    className="form-select"
+                                >
+                                    <option value="">Select Color</option>
+                                    {selectedItem.color_variants.map((variant) => (
+                                        <option key={variant.id} value={variant.id}>
+                                            {variant.color_name} (${variant.price})
+                                        </option>
+                                    ))}
+                                </select>
+                                <select
+                                    value={selectedSizeVariant?.id || ''}
+                                    onChange={(e) => {
+                                        const variant = selectedItem.size_variants.find((v) => v.id === parseInt(e.target.value));
+                                        setSelectedSizeVariant(variant || null);
+                                    }}
+                                    className="form-select"
+                                >
+                                    <option value="">Select Size</option>
+                                    {selectedItem.size_variants.map((variant) => (
+                                        <option key={variant.id} value={variant.id}>
+                                            {variant.size_name} (${variant.price})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         )}
-                      </>
-                    )}
-                    {!isCropping && userImageImage && isImageSelected && (
-                      <>
-                        {['left', 'right', 'top', 'bottom'].map((side) => (
-                          <Circle
-                            key={side}
-                            x={getSideHandlePosition(side, imagePosition, imageScale, userImageImage).x}
-                            y={getSideHandlePosition(side, imagePosition, imageScale, userImageImage).y}
-                            radius={8}
-                            fill="white"
-                            stroke="#0d6efd"
-                            strokeWidth={2}
-                            draggable
-                            onDragMove={(e) => handleSideDrag(side, e)}
-                            onDragEnd={(e) => handleSideDrag(side, e)}
-                          />
-                        ))}
-                      </>
-                    )}
-                    {userImageImage && !isCropping && isImageSelected && (
-                      <Transformer
-                        ref={transformerRef}
-                        boundBoxFunc={(oldBox, newBox) => {
-                          if (newBox.width < 20 || newBox.height < 20) {
-                            return oldBox;
-                          }
-                          if (selectedCategory === 'tshirts' && printableArea && userImageImage) {
-                            const scaleX = newBox.width / (userImageImage.width || 100);
-                            const scaleY = newBox.height / (userImageImage.height || 100);
-                            const imgWidth = (userImageImage.width || 100) * scaleX;
-                            const imgHeight = (userImageImage.height || 100) * scaleY;
-                            const newX = Math.max(printableArea.x, Math.min(newBox.x, printableArea.x + printableArea.width - imgWidth));
-                            const newY = Math.max(printableArea.y, Math.min(newBox.y, printableArea.y + printableArea.height - imgHeight));
-                            return {
-                              ...newBox,
-                              x: newX,
-                              y: newY,
-                              width: Math.min(newBox.width, printableArea.width),
-                              height: Math.min(newBox.height, printableArea.height),
-                            };
-                          }
-                          return newBox;
-                        }}
-                      />
-                    )}
-                  </Layer>
-                </Stage>
-              )}
-            </div>
-          </div>
 
-          {selectedItem && (
-            <div className="card-footer bg-light mt-3">
-              <div className="d-flex flex-wrap gap-2">
-                <span>
-                  <strong>Selected:</strong>{' '}
-                  {selectedItem[`${selectedCategory.slice(0, -1)}_name`] || selectedItem.name || 'Unnamed Item'}
-                </span>
-                {selectedCategory === 'tshirts' && selectedColorVariant && selectedSizeVariant && (
-                  <span>
-                    <strong>Variant:</strong> {selectedColorVariant.color_name} - {selectedSizeVariant.size_name}
-                  </span>
-                )}
-                {(selectedCategory === 'tshirts'
-                  ? selectedColorVariant && selectedSizeVariant
-                    ? Number(selectedColorVariant.price) + Number(selectedSizeVariant.price)
-                    : 0
-                  : selectedItem?.price) && (
-                  <span>
-                    <strong>Price:</strong> $
-                    {selectedCategory === 'tshirts'
-                      ? selectedColorVariant && selectedSizeVariant
-                        ? (Number(selectedColorVariant.price) + Number(selectedSizeVariant.price)).toFixed(2)
-                        : '0.00'
-                      : selectedItem.price}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+                        {selectedCategory === 'tshirts' && selectedItem && selectedItem.color_variants.length === 0 && (
+                            <div>
+                                <p className="text-danger">No color variants available for this T-shirt.</p>
+                            </div>
+                        )}
 
-        {isSidebarOpen && <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>}
-      </div>
-    </ErrorBoundary>
-  );
+                        {selectedCategory === 'tshirts' && selectedItem && selectedItem.size_variants.length === 0 && (
+                            <div>
+                                <p className="text-danger">No size variants available for this T-shirt.</p>
+                            </div>
+                        )}
+
+                        {uploadedImage && (
+                            <div className="d-flex gap-2">
+                                {selectedCategory === 'mugs' && (
+                                    <button className="btn btn-outline-secondary" onClick={toggleView}>
+                                        <Eye size={18} className="me-2" />
+                                        {is3DView ? 'Switch to 2D View' : 'Switch to 3D View'}
+                                    </button>
+                                )}
+                                {!is3DView && (
+                                    <>
+                                        <button
+                                            className={`btn ${isCropping ? 'btn-danger' : 'btn-outline-secondary'}`}
+                                            onClick={handleCrop}
+                                        >
+                                            {isCropping ? <X size={18} className="me-2" /> : <Crop size={18} className="me-2" />}
+                                            {isCropping ? 'Cancel Crop' : 'Crop Image'}
+                                        </button>
+                                        {isCropping && (
+                                            <button className="btn btn-success" onClick={applyCrop}>
+                                                <Check size={18} className="me-2" />
+                                                Apply Crop
+                                            </button>
+                                        )}
+                                        {!isCropping && (
+                                            <button className="btn btn-success" onClick={handleSave}>
+                                                <Save size={18} className="me-2" />
+                                                Save
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+                                {selectedItem && uploadedImage && (selectedCategory !== 'tshirts' || (selectedColorVariant && selectedSizeVariant)) && (
+                                    <button className="btn btn-primary" onClick={handleSaveOrder}>
+                                        <Save size={18} className="me-2" />
+                                        Save Order
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {orderFeedback && (
+                        <div className={`alert alert-${orderFeedback.type === 'success' ? 'success' : 'danger'} mb-3`}>
+                            <p>{orderFeedback.message}</p>
+                        </div>
+                    )}
+
+                    <div className="canvas-workspace card p-3">
+                        <div className="gift-canvas-container">
+                            {selectedCategory === 'mugs' && is3DView && uploadedImage ? (
+                                <Suspense fallback={<div className="text-center"><Loader className="animate-spin" /> <p>Loading 3D Model...</p></div>}>
+                                    <Canvas
+                                        style={{ width: canvasSize.width, height: canvasSize.height }}
+                                        camera={{ position: [0, 0, 4], fov: 50 }}
+                                    >
+                                        <ambientLight intensity={0.8} />
+                                        <pointLight position={[10, 10, 10]} intensity={1} />
+                                        <pointLight position={[-10, -10, -10]} intensity={0.5} />
+                                        <Mug3D mugData={selectedItem} uploadedImage={uploadedImage} />
+                                        <OrbitControls enableZoom={false} />
+                                    </Canvas>
+                                </Suspense>
+                            ) : (
+                                <Stage
+                                    width={canvasSize.width}
+                                    height={canvasSize.height}
+                                    className="gift-design-canvas"
+                                    ref={stageRef}
+                                    onClick={handleStageClick}
+                                >
+                                    <Layer>
+                                        {giftImage && (() => {
+                                            const maxDimension = Math.min(canvasSize.width, canvasSize.height);
+                                            const aspectRatio = giftImage.width / giftImage.height;
+                                            let width, height;
+
+                                            if (selectedCategory === 'mugs') {
+                                                width = canvasSize.width * 0.9;
+                                                height = width / aspectRatio;
+                                                if (height > canvasSize.height * 0.9) {
+                                                    height = canvasSize.height * 0.9;
+                                                    width = height * aspectRatio;
+                                                }
+                                            } else {
+                                                width = giftImage.width;
+                                                height = giftImage.height;
+                                                const scale = Math.min(maxDimension / giftImage.width, maxDimension / giftImage.height, 1);
+                                                width *= scale;
+                                                height *= scale;
+                                            }
+
+                                            const x = (canvasSize.width - width) / 2;
+                                            const y = (canvasSize.height - height) / 2;
+
+                                            return (
+                                                <KonvaImage
+                                                    image={giftImage}
+                                                    width={width}
+                                                    height={height}
+                                                    x={x}
+                                                    y={y}
+                                                />
+                                            );
+                                        })()}
+                                        {selectedCategory === 'tshirts' && printableArea && (
+                                            <Rect
+                                                x={printableArea.x}
+                                                y={printableArea.y}
+                                                width={printableArea.width}
+                                                height={printableArea.height}
+                                                stroke="#0d6efd"
+                                                strokeWidth={2}
+                                                dash={[5, 5]}
+                                                draggable={false}
+                                            />
+                                        )}
+                                        {userImageImage && (
+                                            <Group
+                                                clipX={isCropping && selectedCategory === 'tshirts' ? printableArea?.x : isCropping ? cropRect.x : undefined}
+                                                clipY={isCropping && selectedCategory === 'tshirts' ? printableArea?.y : isCropping ? cropRect.y : undefined}
+                                                clipWidth={isCropping && selectedCategory === 'tshirts' ? printableArea?.width : isCropping ? cropRect.width : undefined}
+                                                clipHeight={isCropping && selectedCategory === 'tshirts' ? printableArea?.height : isCropping ? cropRect.height : undefined}
+                                            >
+                                                <KonvaImage
+                                                    image={userImageImage}
+                                                    x={imagePosition.x}
+                                                    y={imagePosition.y}
+                                                    scaleX={imageScale.x}
+                                                    scaleY={imageScale.y}
+                                                    rotation={imageRotation}
+                                                    draggable={!isCropping}
+                                                    ref={imageRef}
+                                                    onClick={handleImageClick}
+                                                    onTap={handleImageClick}
+                                                    onDragEnd={handleDragEnd}
+                                                    onTransformEnd={handleTransformEnd}
+                                                />
+                                            </Group>
+                                        )}
+                                        {isCropping && (
+                                            <>
+                                                <Rect
+                                                    x={cropRect.x}
+                                                    y={cropRect.y}
+                                                    width={cropRect.width}
+                                                    height={cropRect.height}
+                                                    stroke="#0d6efd"
+                                                    strokeWidth={2}
+                                                    draggable={false}
+                                                />
+                                                {['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top', 'bottom', 'left', 'right'].map(
+                                                    (handle) => (
+                                                        <Circle
+                                                            key={handle}
+                                                            x={getHandlePosition(handle, cropRect).x}
+                                                            y={getHandlePosition(handle, cropRect).y}
+                                                            radius={8}
+                                                            fill="white"
+                                                            stroke="#0d6efd"
+                                                            strokeWidth={2}
+                                                            draggable
+                                                            onDragMove={(e) => handleCropHandleDrag(handle, e)}
+                                                            onDragEnd={(e) => handleCropHandleDrag(handle, e)}
+                                                        />
+                                                    )
+                                                )}
+                                            </>
+                                        )}
+                                        {!isCropping && userImageImage && isImageSelected && (
+                                            <>
+                                                {['left', 'right', 'top', 'bottom'].map((side) => (
+                                                    <Circle
+                                                        key={side}
+                                                        x={getSideHandlePosition(side, imagePosition, imageScale, userImageImage).x}
+                                                        y={getSideHandlePosition(side, imagePosition, imageScale, userImageImage).y}
+                                                        radius={8}
+                                                        fill="white"
+                                                        stroke="#0d6efd"
+                                                        strokeWidth={2}
+                                                        draggable
+                                                        onDragMove={(e) => handleSideDrag(side, e)}
+                                                        onDragEnd={(e) => handleSideDrag(side, e)}
+                                                    />
+                                                ))}
+                                            </>
+                                        )}
+                                        {userImageImage && !isCropping && isImageSelected && (
+                                            <Transformer
+                                                ref={transformerRef}
+                                                boundBoxFunc={(oldBox, newBox) => {
+                                                    if (newBox.width < 20 || newBox.height < 20) {
+                                                        return oldBox;
+                                                    }
+                                                    if (selectedCategory === 'tshirts' && printableArea && userImageImage) {
+                                                        const scaleX = newBox.width / (userImageImage.width || 100);
+                                                        const scaleY = newBox.height / (userImageImage.height || 100);
+                                                        const imgWidth = (userImageImage.width || 100) * scaleX;
+                                                        const imgHeight = (userImageImage.height || 100) * scaleY;
+                                                        const newX = Math.max(printableArea.x, Math.min(newBox.x, printableArea.x + printableArea.width - imgWidth));
+                                                        const newY = Math.max(printableArea.y, Math.min(newBox.y, printableArea.y + printableArea.height - imgHeight));
+                                                        return {
+                                                            ...newBox,
+                                                            x: newX,
+                                                            y: newY,
+                                                            width: Math.min(newBox.width, printableArea.width),
+                                                            height: Math.min(newBox.height, printableArea.height),
+                                                        };
+                                                    }
+                                                    return newBox;
+                                                }}
+                                            />
+                                        )}
+                                    </Layer>
+                                </Stage>
+                            )}
+                        </div>
+                    </div>
+
+                    {selectedItem && (
+                        <div className="card-footer bg-light mt-3">
+                            <div className="d-flex flex-wrap gap-2">
+                                <span>
+                                    <strong>Selected:</strong>{' '}
+                                    {selectedItem[`${selectedCategory.slice(0, -1)}_name`] || selectedItem.name || 'Unnamed Item'}
+                                </span>
+                                {selectedCategory === 'tshirts' && selectedColorVariant && selectedSizeVariant && (
+                                    <span>
+                                        <strong>Variant:</strong> {selectedColorVariant.color_name} - {selectedSizeVariant.size_name}
+                                    </span>
+                                )}
+                                {(selectedCategory === 'tshirts'
+                                    ? selectedColorVariant && selectedSizeVariant
+                                        ? Number(selectedColorVariant.price) + Number(selectedSizeVariant.price)
+                                        : 0
+                                    : selectedItem?.price) && (
+                                        <span>
+                                            <strong>Price:</strong> $
+                                            {selectedCategory === 'tshirts'
+                                                ? selectedColorVariant && selectedSizeVariant
+                                                    ? (Number(selectedColorVariant.price) + Number(selectedSizeVariant.price)).toFixed(2)
+                                                    : '0.00'
+                                                : selectedItem.price}
+                                        </span>
+                                    )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {isSidebarOpen && <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>}
+            </div>
+        </ErrorBoundary>
+    );
 }
 
 export default GiftPrint;
