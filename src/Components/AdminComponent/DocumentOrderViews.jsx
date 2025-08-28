@@ -5,7 +5,21 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { Download, Trash2 } from 'lucide-react';
+import { 
+  Download, 
+  Trash2, 
+  Calendar, 
+  FileText, 
+  User, 
+  DollarSign,
+  Filter,
+  RefreshCw,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  ArrowRight
+} from 'lucide-react';
+import './DocumentOrderViews.css';
 
 const BASE_URL = 'http://82.180.146.4:8001';
 
@@ -13,13 +27,15 @@ function DocumentOrderViews() {
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState(null); // Track which order is being deleted
+  const [deleting, setDeleting] = useState(null);
+  const [downloading, setDownloading] = useState(null);
   const [error, setError] = useState(null);
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
   const navigate = useNavigate();
   const user = useSelector((state) => state.user);
-  const isAdmin = user.is_staff || user.is_superuser;
+  const isAdmin = user?.is_staff || user?.is_superuser;
 
   // Fetch document orders on component mount
   useEffect(() => {
@@ -38,13 +54,11 @@ function DocumentOrderViews() {
         });
 
         const processedOrders = response.data.map(item => ({ ...item, type: 'document' }));
-        console.log('Fetched document orders:', processedOrders);
         setOrders(processedOrders);
         setFilteredOrders(processedOrders);
         setError(null);
       } catch (error) {
         console.error('Error fetching document orders:', error);
-        console.error('Server response:', error.response?.data);
         setError(`Failed to load orders: ${error.response?.statusText || error.message}`);
         if (error.response?.status === 401) {
           localStorage.removeItem('token');
@@ -74,49 +88,61 @@ function DocumentOrderViews() {
 
   // Handle deleting an order
   const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+      return;
+    }
+
     setDeleting(orderId);
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Not authenticated');
+      
       await axios.delete(`${BASE_URL}/api/orders/${orderId}/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      
       setOrders((prevOrders) => prevOrders.filter((item) => item.id !== orderId));
       setFilteredOrders((prevFiltered) => prevFiltered.filter((item) => item.id !== orderId));
-      alert('Order deleted successfully.');
+      
+      // Success notification could be added here
     } catch (error) {
       console.error('Error deleting order:', error);
+      let errorMessage = 'Failed to delete order.';
+      
       if (error.response?.status === 401) {
         localStorage.removeItem('token');
         navigate('/');
-        alert('Session expired. Please log in again.');
+        errorMessage = 'Session expired. Please log in again.';
       } else if (error.response?.status === 403) {
-        alert('You do not have permission to delete this order.');
+        errorMessage = 'You do not have permission to delete this order.';
       } else if (error.response?.status === 404) {
-        alert('Order not found.');
-      } else {
-        alert('Failed to delete order: ' + (error.response?.data?.detail || error.message));
+        errorMessage = 'Order not found.';
       }
+      
+      alert(errorMessage);
     } finally {
       setDeleting(null);
     }
   };
 
   // Handle downloading a file
-  const handleDownloadFile = async (filePath) => {
+  const handleDownloadFile = async (filePath, orderId) => {
     if (!filePath) {
       alert('No file available for download.');
       return;
     }
+    
+    setDownloading(orderId);
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Not authenticated');
+      
       const fullUrl = getFileUrl(filePath);
-      console.log('Downloading file from:', fullUrl);
       const response = await axios.get(fullUrl, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob',
       });
+      
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -127,14 +153,16 @@ function DocumentOrderViews() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error downloading file:', error, 'filePath:', filePath);
+      console.error('Error downloading file:', error);
       alert('Failed to download file: ' + (error.response?.statusText || error.message));
+    } finally {
+      setDownloading(null);
     }
   };
 
-  // Handle submitting orders to payment (non-admins only)
+  // Handle submitting orders to payment
   const handleSubmitOrder = () => {
-    if (!isAdmin) {
+    if (!isAdmin && filteredOrders.length > 0) {
       navigate('/payment', { state: { selectedOrders: filteredOrders } });
     }
   };
@@ -152,12 +180,19 @@ function DocumentOrderViews() {
     0
   );
 
+  // Reset filters
+  const resetFilters = () => {
+    setStartDate(null);
+    setEndDate(null);
+  };
+
   if (loading) {
     return (
-      <div className="docprint-loading-container">
-        <div className="docprint-loading-content">
-          <div className="docprint-loading-spinner"></div>
-          <p>Loading document orders...</p>
+      <div className="doc-orders-loading">
+        <div className="doc-orders-loading-content">
+          <div className="doc-orders-spinner"></div>
+          <h3>Loading Orders</h3>
+          <p>Please wait while we fetch your document orders...</p>
         </div>
       </div>
     );
@@ -165,563 +200,320 @@ function DocumentOrderViews() {
 
   if (error) {
     return (
-      <div className="docprint-error-container">
-        <div className="docprint-error-content">
-          <h3>Error</h3>
+      <div className="doc-orders-error">
+        <div className="doc-orders-error-content">
+          <AlertTriangle className="doc-orders-error-icon" />
+          <h3>Something went wrong</h3>
           <p>{error}</p>
-          <button onClick={() => window.location.reload()} className="docprint-retry-btn">
-            Retry
+          <button 
+            onClick={() => window.location.reload()} 
+            className="doc-orders-retry-btn"
+          >
+            <RefreshCw size={18} />
+            Try Again
           </button>
         </div>
       </div>
     );
   }
 
-  if (filteredOrders.length === 0) {
-    return <div className="docprint-empty-state">No document orders found for the selected date range</div>;
-  }
-
   return (
-    <div className="docprint-orders-workspace">
-      <style>{`
-        /* Document Orders Workspace Styles */
-        .docprint-orders-workspace {
-          min-height: 100vh;
-          background: linear-gradient(135deg, #f1eedd 0%, #e7d98a 100%);
-          padding: 20px;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          display: flex;
-          flex-direction: column;
-        }
-
-        /* Loading States */
-        .docprint-loading-container {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 100vh;
-          background: linear-gradient(135deg, #f1eedd 0%, #e7d98a 100%);
-        }
-
-        .docprint-loading-content {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 20px;
-          padding: 40px;
-          background: rgba(255, 255, 255, 0.95);
-          border-radius: 20px;
-          backdrop-filter: blur(20px);
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-          color: #4a5568;
-        }
-
-        .docprint-loading-spinner {
-          width: 40px;
-          height: 40px;
-          border: 4px solid rgba(102, 126, 234, 0.2);
-          border-top: 4px solid #e7d98a;
-          border-radius: 50%;
-          animation: docprintSpin 1s linear infinite;
-        }
-
-        @keyframes docprintSpin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-
-        /* Error Boundary */
-        .docprint-error-container {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 100vh;
-          background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        }
-
-        .docprint-error-content {
-          text-align: center;
-          padding: 40px;
-          background: white;
-          border-radius: 20px;
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-          max-width: 400px;
-        }
-
-        .docprint-error-content h3 {
-          color: #e53e3e;
-          margin-bottom: 16px;
-          font-size: 24px;
-          font-weight: 600;
-        }
-
-        .docprint-error-content p {
-          color: #718096;
-          margin-bottom: 24px;
-          line-height: 1.6;
-        }
-
-        .docprint-retry-btn {
-          padding: 12px 24px;
-          background: linear-gradient(135deg, #FFD700 0%, #998304 100%);
-          color: white;
-          border: none;
-          border-radius: 12px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .docprint-retry-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
-        }
-
-        /* Main Content */
-        .docprint-main-content {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 40px;
-          background: rgba(255, 255, 255, 0.95);
-          border-radius: 20px;
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-          margin-bottom: 200px; /* Space for potential footer */
-        }
-
-        .docprint-orders-title {
-          color: #2d3748;
-          font-size: 28px;
-          font-weight: 600;
-          margin-bottom: 16px;
-          text-align: center;
-        }
-
-        .docprint-orders-subtitle {
-          color: #718096;
-          font-size: 16px;
-          margin-bottom: 32px;
-          text-align: center;
-        }
-
-        /* Date Filter */
-        .docprint-date-filter {
-          display: flex;
-          gap: 24px;
-          margin-bottom: 32px;
-          flex-wrap: wrap;
-        }
-
-        .docprint-date-group {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .docprint-date-label {
-          font-size: 14px;
-          font-weight: 600;
-          color: #4a5568;
-        }
-
-        .docprint-datepicker {
-          padding: 12px 16px;
-          border: 1px solid #e2e8f0;
-          border-radius: 12px;
-          font-size: 14px;
-          background: white;
-          transition: all 0.2s ease;
-          color: #2d3748;
-        }
-
-        .docprint-datepicker:focus {
-          outline: none;
-          border-color: #e7d98a;
-          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-          transform: translateY(-1px);
-        }
-
-        /* Table Styles */
-        .docprint-table {
-          width: 100%;
-          border-collapse: collapse;
-          background: white;
-          border-radius: 12px;
-          overflow: hidden;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        .docprint-table th,
-        .docprint-table td {
-          padding: 16px;
-          text-align: left;
-          border-bottom: 1px solid rgba(102, 126, 234, 0.1);
-        }
-
-        .docprint-table th {
-          background: #2d3748;
-          color: white;
-          font-weight: 600;
-          font-size: 14px;
-        }
-
-        .docprint-table td {
-          font-size: 14px;
-          color: #4a5568;
-        }
-
-        .docprint-table a {
-          color: #e7d98a;
-          text-decoration: none;
-        }
-
-        .docprint-table a:hover {
-          text-decoration: underline;
-        }
-
-        .docprint-table-actions {
-          display: flex;
-          gap: 12px;
-        }
-
-        .docprint-action-btn {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 8px 16px;
-          border: none;
-          border-radius: 8px;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .docprint-action-btn.download {
-          background: #48bb78;
-          color: white;
-        }
-
-        .docprint-action-btn.download:hover {
-          background: #38a169;
-          transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(72, 187, 120, 0.3);
-        }
-
-        .docprint-action-btn.delete {
-          background: #e53e3e;
-          color: white;
-        }
-
-        .docprint-action-btn.delete:hover {
-          background: #c53030;
-          transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(229, 62, 62, 0.3);
-        }
-
-        .docprint-action-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-          transform: none;
-        }
-
-        .docprint-btn-spinner {
-          width: 16px;
-          height: 16px;
-          border: 2px solid rgba(255, 255, 255, 0.3);
-          border-top: 2px solid white;
-          border-radius: 50%;
-          animation: docprintSpin 1s linear infinite;
-        }
-
-        /* Empty State */
-        .docprint-empty-state {
-          text-align: center;
-          padding: 40px;
-          background: rgba(255, 255, 255, 0.95);
-          border-radius: 20px;
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-          color: #4a5568;
-          font-size: 16px;
-          margin: 40px auto;
-          max-width: 500px;
-        }
-
-        /* Total Cost */
-        .docprint-total-cost {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 20px;
-          background: rgba(102, 126, 234, 0.05);
-          border: 1px solid rgba(102, 126, 234, 0.1);
-          border-radius: 12px;
-          margin-top: 24px;
-          font-size: 18px;
-          font-weight: 600;
-          color: #2d3748;
-        }
-
-        .docprint-total-cost span {
-          color: #e7d98a;
-        }
-
-        .docprint-submit-btn {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 12px 24px;
-          background: #48bb78;
-          color: white;
-          border: none;
-          border-radius: 12px;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          margin-top: 16px;
-        }
-
-        .docprint-submit-btn:hover {
-          background: #38a169;
-          transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(72, 187, 120, 0.3);
-        }
-
-        /* Responsive Design */
-        @media (max-width: 768px) {
-          .docprint-orders-workspace {
-            padding: 15px;
-          }
-
-          .docprint-main-content {
-            padding: 24px;
-            margin-bottom: 250px;
-          }
-
-          .docprint-orders-title {
-            font-size: 24px;
-          }
-
-          .docprint-orders-subtitle {
-            font-size: 14px;
-          }
-
-          .docprint-date-filter {
-            gap: 16px;
-            flex-direction: column;
-          }
-
-          .docprint-table th,
-          .docprint-table td {
-            padding: 12px;
-            font-size: 13px;
-          }
-
-          .docprint-action-btn {
-            padding: 6px 12px;
-            font-size: 12px;
-          }
-        }
-
-        @media (max-width: 480px) {
-          .docprint-orders-workspace {
-            padding: 10px;
-          }
-
-          .docprint-main-content {
-            padding: 16px;
-          }
-
-          .docprint-orders-title {
-            font-size: 20px;
-          }
-
-          .docprint-date-filter {
-            gap: 12px;
-          }
-
-          .docprint-datepicker {
-            font-size: 13px;
-          }
-
-          .docprint-table th,
-          .docprint-table td {
-            padding: 8px;
-            font-size: 12px;
-          }
-
-          .docprint-action-btn {
-            padding: 5px 10px;
-            font-size: 11px;
-          }
-
-          .docprint-total-cost {
-            font-size: 16px;
-          }
-
-          .docprint-submit-btn {
-            padding: 10px 20px;
-            font-size: 13px;
-          }
-        }
-
-        /* Smooth Animations */
-        * {
-          box-sizing: border-box;
-        }
-
-        .docprint-orders-workspace * {
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        /* Custom Scrollbar */
-        .docprint-main-content::-webkit-scrollbar {
-          width: 6px;
-        }
-
-        .docprint-main-content::-webkit-scrollbar-track {
-          background: rgba(255, 255, 255, 0.1);
-        }
-
-        .docprint-main-content::-webkit-scrollbar-thumb {
-          background: rgba(102, 126, 234, 0.3);
-          border-radius: 3px;
-        }
-
-        .docprint-main-content::-webkit-scrollbar-thumb:hover {
-          background: rgba(102, 126, 234, 0.5);
-        }
-      `}</style>
-      <div className="docprint-main-content">
-        <h2 className="docprint-orders-title">{isAdmin ? 'Document Orders Report' : 'Your Document Orders'}</h2>
-        <h4 className="docprint-orders-subtitle">{isAdmin ? 'All Users' : `Orders for ${user.username || 'You'}`}</h4>
-        <div className="docprint-date-filter">
-          <div className="docprint-date-group">
-            <label className="docprint-date-label">Start Date</label>
-            <DatePicker
-              selected={startDate}
-              onChange={(date) => setStartDate(date)}
-              selectsStart
-              startDate={startDate}
-              endDate={endDate}
-              dateFormat="MM/dd/yyyy"
-              className="docprint-datepicker"
-              placeholderText="Select start date"
-              isClearable
-            />
+    <div className="doc-orders-container">
+      <div className="doc-orders-header">
+        <div className="doc-orders-header-content">
+          <div className="doc-orders-title-section">
+            <FileText className="doc-orders-main-icon" />
+            <div>
+              <h1 className="doc-orders-title">
+                {isAdmin ? 'Document Orders Dashboard' : 'My Document Orders'}
+              </h1>
+              <p className="doc-orders-subtitle">
+                {isAdmin ? 'Manage all customer orders' : `Welcome back, ${user?.username || 'User'}`}
+              </p>
+            </div>
           </div>
-          <div className="docprint-date-group">
-            <label className="docprint-date-label">End Date</label>
-            <DatePicker
-              selected={endDate}
-              onChange={(date) => setEndDate(date)}
-              selectsEnd
-              startDate={startDate}
-              endDate={endDate}
-              minDate={startDate}
-              dateFormat="MM/dd/yyyy"
-              className="docprint-datepicker"
-              placeholderText="Select end date"
-              isClearable
-            />
+          
+          <div className="doc-orders-stats">
+            <div className="doc-orders-stat-card">
+              <FileText size={20} />
+              <div>
+                <span className="doc-orders-stat-number">{filteredOrders.length}</span>
+                <span className="doc-orders-stat-label">Orders</span>
+              </div>
+            </div>
+            <div className="doc-orders-stat-card">
+              <DollarSign size={20} />
+              <div>
+                <span className="doc-orders-stat-number">${totalCost.toFixed(2)}</span>
+                <span className="doc-orders-stat-label">Total</span>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="table-responsive">
-          <table className="docprint-table">
-            <thead>
-              <tr>
-                <th>File(s)</th>
-                <th>User</th>
-                <th>Print Type</th>
-                <th>Print Size</th>
-                <th>Paper Type</th>
-                <th>Quantity</th>
-                <th>Lamination</th>
-                <th>Lamination Type</th>
-                <th>Delivery Option</th>
-                <th>Address</th>
-                <th>Price</th>
-                <th>Created At</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.map((order) => (
-                <tr key={`document-${order.id}`}>
-                  <td>
-                    {order.files_data?.length > 0 ? (
-                      order.files_data.map((f, idx) => (
-                        <div key={idx}>
-                          <a
-                            href="#"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleDownloadFile(f.file);
-                            }}
-                          >
-                            {f.file.split('/').pop()}
-                          </a>
-                        </div>
-                      ))
-                    ) : (
-                      'No Files'
-                    )}
-                  </td>
-                  <td>{order.user || 'Unknown'}</td>
-                  <td>{order.print_type_name || 'N/A'}</td>
-                  <td>{order.print_size_name || 'N/A'}</td>
-                  <td>{order.paper_type_name || 'N/A'}</td>
-                  <td>{order.quantity || 'N/A'}</td>
-                  <td>{order.lamination ? 'Yes' : 'No'}</td>
-                  <td>{order.lamination_type_name || 'N/A'}</td>
-                  <td>{order.delivery_option || 'N/A'}</td>
-                  <td>
-                    {order.delivery_option === 'delivery'
-                      ? `${order.address_house_name || ''}, ${order.address_city || ''}, ${order.address_pin || ''}`
-                      : 'N/A'}
-                  </td>
-                  <td>${order.total_amount ? parseFloat(order.total_amount).toFixed(2) : '0.00'}</td>
-                  <td>{format(new Date(order.created_at), 'MM/dd/yyyy HH:mm:ss')}</td>
-                  <td className="docprint-table-actions">
-                    {(isAdmin || order.user === user.username) && order.files_data?.length > 0 && (
-                      <button
-                        className="docprint-action-btn download"
-                        onClick={() => handleDownloadFile(order.files_data[0].file)} // Download first file as example
-                      >
-                        <Download size={16} />
-                        Download
-                      </button>
-                    )}
-                    {(isAdmin || order.user === user.username) && (
-                      <button
-                        className="docprint-action-btn delete"
-                        onClick={() => handleDeleteOrder(order.id)}
-                        disabled={deleting === order.id}
-                      >
-                        {deleting === order.id ? (
-                          <div className="docprint-btn-spinner"></div>
+      </div>
+
+      <div className="doc-orders-content">
+        {/* Filters Section */}
+        <div className="doc-orders-filters-card">
+          <div className="doc-orders-filters-header">
+            <div className="doc-orders-filters-title">
+              <Filter size={18} />
+              <span>Filter Orders</span>
+            </div>
+            <button 
+              className="doc-orders-filters-toggle"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              {showFilters ? 'Hide Filters' : 'Show Filters'}
+            </button>
+          </div>
+          
+          {showFilters && (
+            <div className="doc-orders-filters-content">
+              <div className="doc-orders-date-filters">
+                <div className="doc-orders-date-group">
+                  <label className="doc-orders-date-label">
+                    <Calendar size={16} />
+                    Start Date
+                  </label>
+                  <DatePicker
+                    selected={startDate}
+                    onChange={(date) => setStartDate(date)}
+                    selectsStart
+                    startDate={startDate}
+                    endDate={endDate}
+                    dateFormat="MMM dd, yyyy"
+                    className="doc-orders-datepicker"
+                    placeholderText="Select start date"
+                    isClearable
+                  />
+                </div>
+                <div className="doc-orders-date-group">
+                  <label className="doc-orders-date-label">
+                    <Calendar size={16} />
+                    End Date
+                  </label>
+                  <DatePicker
+                    selected={endDate}
+                    onChange={(date) => setEndDate(date)}
+                    selectsEnd
+                    startDate={startDate}
+                    endDate={endDate}
+                    minDate={startDate}
+                    dateFormat="MMM dd, yyyy"
+                    className="doc-orders-datepicker"
+                    placeholderText="Select end date"
+                    isClearable
+                  />
+                </div>
+              </div>
+              
+              {(startDate || endDate) && (
+                <button 
+                  className="doc-orders-reset-btn"
+                  onClick={resetFilters}
+                >
+                  <RefreshCw size={16} />
+                  Reset Filters
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Orders Table */}
+        {filteredOrders.length === 0 ? (
+          <div className="doc-orders-empty">
+            <FileText className="doc-orders-empty-icon" />
+            <h3>No orders found</h3>
+            <p>
+              {startDate || endDate 
+                ? "No orders match your selected date range. Try adjusting the filters."
+                : "You haven't placed any document orders yet."
+              }
+            </p>
+            {(startDate || endDate) && (
+              <button className="doc-orders-reset-btn" onClick={resetFilters}>
+                <RefreshCw size={16} />
+                Clear Filters
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="doc-orders-table-card">
+            <div className="doc-orders-table-container">
+              <table className="doc-orders-table">
+                <thead>
+                  <tr>
+                    <th>Files</th>
+                    <th>User</th>
+                    <th>Print Details</th>
+                    <th>Quantity</th>
+                    <th>Delivery</th>
+                    <th>Amount</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredOrders.map((order) => (
+                    <tr key={order.id} className="doc-orders-table-row">
+                      <td className="doc-orders-files-cell">
+                        {order.files_data?.length > 0 ? (
+                          <div className="doc-orders-files-list">
+                            {order.files_data.map((f, idx) => (
+                              <button
+                                key={idx}
+                                className="doc-orders-file-link"
+                                onClick={() => handleDownloadFile(f.file, order.id)}
+                                disabled={downloading === order.id}
+                              >
+                                <FileText size={14} />
+                                <span>{f.file.split('/').pop()}</span>
+                              </button>
+                            ))}
+                          </div>
                         ) : (
-                          <>
-                            <Trash2 size={16} />
-                            Delete
-                          </>
+                          <span className="doc-orders-no-files">No files</span>
                         )}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="docprint-total-cost">
-          <span>Total Cost:</span>
-          <span>${totalCost.toFixed(2)}</span>
-        </div>
-        {!isAdmin && filteredOrders.length > 0 && (
-          <button className="docprint-submit-btn" onClick={handleSubmitOrder}>
-            Submit Order
-          </button>
+                      </td>
+                      
+                      <td className="doc-orders-user-cell">
+                        <div className="doc-orders-user-info">
+                          <User size={16} />
+                          <span>{order.user || 'Unknown'}</span>
+                        </div>
+                      </td>
+                      
+                      <td className="doc-orders-details-cell">
+                        <div className="doc-orders-print-details">
+                          <div className="doc-orders-detail-item">
+                            <strong>Type:</strong> {order.print_type_name || 'N/A'}
+                          </div>
+                          <div className="doc-orders-detail-item">
+                            <strong>Size:</strong> {order.print_size_name || 'N/A'}
+                          </div>
+                          <div className="doc-orders-detail-item">
+                            <strong>Paper:</strong> {order.paper_type_name || 'N/A'}
+                          </div>
+                          {order.lamination && (
+                            <div className="doc-orders-detail-item">
+                              <strong>Lamination:</strong> {order.lamination_type_name || 'Yes'}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      
+                      <td className="doc-orders-quantity-cell">
+                        <span className="doc-orders-quantity-badge">
+                          {order.quantity || 0}
+                        </span>
+                      </td>
+                      
+                      <td className="doc-orders-delivery-cell">
+                        <div className="doc-orders-delivery-info">
+                          <div className="doc-orders-delivery-method">
+                            {order.delivery_option || 'N/A'}
+                          </div>
+                          {order.delivery_option === 'delivery' && (
+                            <div className="doc-orders-address">
+                              {`${order.address_house_name || ''}, ${order.address_city || ''}, ${order.address_pin || ''}`}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      
+                      <td className="doc-orders-amount-cell">
+                        <span className="doc-orders-amount">
+                          ${order.total_amount ? parseFloat(order.total_amount).toFixed(2) : '0.00'}
+                        </span>
+                      </td>
+                      
+                      <td className="doc-orders-date-cell">
+                        <div className="doc-orders-date-info">
+                          <Clock size={14} />
+                          <span>{format(new Date(order.created_at), 'MMM dd, yyyy')}</span>
+                        </div>
+                      </td>
+                      
+                      <td className="doc-orders-actions-cell">
+                        <div className="doc-orders-actions">
+                          {(isAdmin || order.user === user?.username) && order.files_data?.length > 0 && (
+                            <button
+                              className="doc-orders-action-btn doc-orders-download-btn"
+                              onClick={() => handleDownloadFile(order.files_data[0].file, order.id)}
+                              disabled={downloading === order.id}
+                            >
+                              {downloading === order.id ? (
+                                <div className="doc-orders-btn-spinner"></div>
+                              ) : (
+                                <Download size={16} />
+                              )}
+                            </button>
+                          )}
+                          
+                          {(isAdmin || order.user === user?.username) && (
+                            <button
+                              className="doc-orders-action-btn doc-orders-delete-btn"
+                              onClick={() => handleDeleteOrder(order.id)}
+                              disabled={deleting === order.id}
+                            >
+                              {deleting === order.id ? (
+                                <div className="doc-orders-btn-spinner"></div>
+                              ) : (
+                                <Trash2 size={16} />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Summary and Actions */}
+        {filteredOrders.length > 0 && (
+          <div className="doc-orders-summary-card">
+            <div className="doc-orders-total-section">
+              <div className="doc-orders-total-info">
+                <DollarSign className="doc-orders-total-icon" />
+                <div>
+                  <span className="doc-orders-total-label">Total Amount</span>
+                  <span className="doc-orders-total-amount">${totalCost.toFixed(2)}</span>
+                </div>
+              </div>
+              
+              {!isAdmin && (
+                <button 
+                  className="doc-orders-submit-btn"
+                  onClick={handleSubmitOrder}
+                >
+                  <span>Submit Order</span>
+                  <ArrowRight size={18} />
+                </button>
+              )}
+            </div>
+            
+            <div className="doc-orders-summary-stats">
+              <div className="doc-orders-summary-stat">
+                <span className="doc-orders-summary-stat-label">Orders Selected</span>
+                <span className="doc-orders-summary-stat-value">{filteredOrders.length}</span>
+              </div>
+              
+              {startDate && endDate && (
+                <div className="doc-orders-summary-stat">
+                  <span className="doc-orders-summary-stat-label">Date Range</span>
+                  <span className="doc-orders-summary-stat-value">
+                    {format(startDate, 'MMM dd')} - {format(endDate, 'MMM dd')}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -729,4 +521,3 @@ function DocumentOrderViews() {
 }
 
 export default DocumentOrderViews;
-
