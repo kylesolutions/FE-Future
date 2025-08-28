@@ -17,7 +17,7 @@ function Navbar() {
         const token = localStorage.getItem('token');
         console.log('Token:', token); // Debug token
         if (token) {
-          const response = await axios.get('http://82.180.146.4:8001/user/', {
+          const response = await axios.get('http://localhost:8000/user/', {
             headers: { Authorization: `Bearer ${token}` },
           });
           console.log('User data:', response.data); // Debug response

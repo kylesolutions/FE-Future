@@ -45,7 +45,7 @@ function Signup() {
     }),
     onSubmit: async (values, { setStatus, setErrors }) => {
       try {
-        const response = await axios.post('http://82.180.146.4:8001/api/user_registration/', {
+        const response = await axios.post('http://localhost:8000/api/user_registration/', {
           username: values.username,
           password1: values.password1, // Send password1
           password2: values.password2, // Send password2
@@ -57,7 +57,7 @@ function Signup() {
         if (response.data.result && response.data.access) {
           localStorage.setItem('token', response.data.access); // Fixed typo
           localStorage.setItem('refresh_token', response.data.refresh);
-          const userResponse = await axios.get('http://82.180.146.4:8001/user/', {
+          const userResponse = await axios.get('http://localhost:8000/user/', {
             headers: { Authorization: `Bearer ${response.data.access}` },
           });
           console.log('User response:', userResponse.data);

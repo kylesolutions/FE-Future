@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Download, Trash2 } from 'lucide-react';
 
-const BASE_URL = 'http://82.180.146.4:8001';
+const BASE_URL = 'http://localhost:8000';
 
 function GiftOrdersView() {
   const [orders, setOrders] = useState([]);

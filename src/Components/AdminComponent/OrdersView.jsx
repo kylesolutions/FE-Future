@@ -7,7 +7,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { format } from 'date-fns';
 
 
-const BASE_URL = 'http://82.180.146.4:8001';
+const BASE_URL = 'http://localhost:8000';
 
 function OrdersView() {
   const [savedOrders, setSavedOrders] = useState([]);
