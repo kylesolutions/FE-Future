@@ -80,6 +80,7 @@ function Cart() {
   return (
     <div className="container mt-5">
       <h2>Your Cart</h2>
+      {/* <h2>Your Cart</h2> */}
       <div className="row">
         {cartItems.map((item) => (
           <div key={item.id} className="col-12 mb-3">
