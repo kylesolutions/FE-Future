@@ -480,7 +480,6 @@ function DocumentOrderViews() {
           <div className="doc-orders-summary-card">
             <div className="doc-orders-total-section">
               <div className="doc-orders-total-info">
-                <DollarSign className="doc-orders-total-icon" />
                 <div>
                   <span className="doc-orders-total-label">Total Amount</span>
                   <span className="doc-orders-total-amount">${totalCost.toFixed(2)}</span>

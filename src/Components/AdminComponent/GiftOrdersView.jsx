@@ -20,7 +20,8 @@ import {
   Eye,
   RotateCw,
   Move,
-  ZoomIn
+  ZoomIn,
+  X
 } from 'lucide-react';
 import './GiftOrdersView.css';
 
@@ -36,6 +37,7 @@ function GiftOrdersView() {
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
   const navigate = useNavigate();
   const user = useSelector((state) => state.user);
   const isAdmin = user?.is_staff || user?.is_superuser;
@@ -361,6 +363,7 @@ function GiftOrdersView() {
                               src={getImageUrl(order.uploaded_image)}
                               alt="Uploaded"
                               className="gift-orders-image"
+                              onClick={() => setSelectedImage(getImageUrl(order.uploaded_image))}
                               onError={(e) => {
                                 e.target.src = 'https://images.pexels.com/photos/3944091/pexels-photo-3944091.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&fit=crop';
                               }}
@@ -373,6 +376,7 @@ function GiftOrdersView() {
                               src={getImageUrl(order.preview_image)}
                               alt="Preview"
                               className="gift-orders-image"
+                              onClick={() => setSelectedImage(getImageUrl(order.preview_image))}
                               onError={(e) => {
                                 e.target.src = 'https://images.pexels.com/photos/3944091/pexels-photo-3944091.jpeg?auto=compress&cs=tinysrgb&w=50&h=50&fit=crop';
                               }}
@@ -476,7 +480,6 @@ function GiftOrdersView() {
           <div className="gift-orders-summary-card">
             <div className="gift-orders-total-section">
               <div className="gift-orders-total-info">
-                <DollarSign className="gift-orders-total-icon" />
                 <div>
                   <span className="gift-orders-total-label">Total Amount</span>
                   <span className="gift-orders-total-amount">${totalCost.toFixed(2)}</span>
@@ -498,6 +501,28 @@ function GiftOrdersView() {
                   </span>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Image Modal */}
+        {selectedImage && (
+          <div className="image-modal-overlay">
+            <div className="image-modal">
+              <button 
+                className="image-modal-close"
+                onClick={() => setSelectedImage(null)}
+              >
+                <X size={24} />
+              </button>
+              <img 
+                src={selectedImage} 
+                alt="Enlarged view" 
+                className="image-modal-content"
+                onError={(e) => {
+                  e.target.src = 'https://images.pexels.com/photos/3944091/pexels-photo-3944091.jpeg?auto=compress&cs=tinysrgb&w=600';
+                }}
+              />
             </div>
           </div>
         )}

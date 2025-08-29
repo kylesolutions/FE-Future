@@ -5,7 +5,21 @@ import { useSelector } from 'react-redux';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { format } from 'date-fns';
-
+import { 
+  ChevronDown, 
+  ChevronUp, 
+  Download, 
+  Trash2, 
+  Calendar,
+  User,
+  Package,
+  DollarSign,
+  Clock,
+  AlertCircle,
+  CheckCircle,
+  Loader2
+} from 'lucide-react';
+import './OrdersView.css';
 
 const BASE_URL = 'http://82.180.146.4:8001';
 
@@ -15,7 +29,8 @@ function OrdersView() {
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
-  const [expandedRows, setExpandedRows] = useState({}); // Track expanded rows
+  const [expandedRows, setExpandedRows] = useState({});
+  const [updatingStatus, setUpdatingStatus] = useState({});
   const navigate = useNavigate();
   const user = useSelector((state) => state.user);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -87,6 +102,7 @@ function OrdersView() {
 
   // Update order status
   const handleUpdateStatus = async (itemId, newStatus) => {
+    setUpdatingStatus(prev => ({ ...prev, [itemId]: true }));
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Not authenticated');
@@ -114,11 +130,17 @@ function OrdersView() {
       } else {
         alert('Failed to update order status.');
       }
+    } finally {
+      setUpdatingStatus(prev => ({ ...prev, [itemId]: false }));
     }
   };
 
   // Delete an order
   const handleDeleteOrder = async (itemId) => {
+    if (!window.confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+      return;
+    }
+    
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Not authenticated');
@@ -188,203 +210,447 @@ function OrdersView() {
     0
   );
 
-  if (loading || isLoading) return <div className="text-center mt-5">Loading...</div>;
-  if (filteredOrders.length === 0)
-    return <div className="text-center mt-5">No orders found for the selected date range</div>;
+  // Get status badge styling
+  const getStatusBadge = (status) => {
+    const baseClasses = "frameorder-status-badge";
+    switch (status?.toLowerCase()) {
+      case 'paid':
+        return `${baseClasses} frameorder-status-paid`;
+      case 'pending':
+        return `${baseClasses} frameorder-status-pending`;
+      default:
+        return `${baseClasses} frameorder-status-default`;
+    }
+  };
 
-  return (
-    <div className="container mt-5">
-      <h2>Orders Report</h2>
-      <div className="mb-4">
-        <div className="d-flex gap-3 flex-wrap">
-          <div>
-            <label className="form-label">Start Date</label>
-            <DatePicker
-              selected={startDate}
-              onChange={(date) => setStartDate(date)}
-              selectsStart
-              startDate={startDate}
-              endDate={endDate}
-              dateFormat="MM/dd/yyyy"
-              className="form-control"
-              placeholderText="Select start date"
-              isClearable
-            />
-          </div>
-          <div>
-            <label className="form-label">End Date</label>
-            <DatePicker
-              selected={endDate}
-              onChange={(date) => setEndDate(date)}
-              selectsEnd
-              startDate={startDate}
-              endDate={endDate}
-              minDate={startDate}
-              dateFormat="MM/dd/yyyy"
-              className="form-control"
-              placeholderText="Select end date"
-              isClearable
-            />
+  if (loading || isLoading) {
+    return (
+      <div className="frameorder-loading-container">
+        <div className="frameorder-loading-content">
+          <Loader2 className="frameorder-loading-spinner" />
+          <p className="frameorder-loading-text">Loading orders...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (filteredOrders.length === 0) {
+    return (
+      <div className="frameorder-empty-container">
+        <div className="frameorder-empty-wrapper">
+          <div className="frameorder-empty-card">
+            <Package className="frameorder-empty-icon" />
+            <h3 className="frameorder-empty-title">No Orders Found</h3>
+            <p className="frameorder-empty-description">
+              {startDate || endDate 
+                ? "No orders found for the selected date range" 
+                : "You don't have any orders yet"}
+            </p>
           </div>
         </div>
       </div>
-      <div className="table-responsive">
-        <table className="table table-striped table-bordered">
-          <thead className="table">
-            <tr>
-              <th></th> {/* For expand/collapse button */}
-              <th>Image</th>
-              <th>User</th>
-              <th>Frame</th>
-              <th>Mack Boards</th>
-              <th>Print Size</th>
-              <th>Media Type</th>
-              <th>Fit</th>
-              <th>Price</th>
-              <th>Status</th>
-              <th>Created At</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredOrders.map((item) => (
-              <React.Fragment key={item.id}>
+    );
+  }
+
+  return (
+    <div className="frameorder-container">
+      <div className="frameorder-wrapper">
+        {/* Header */}
+        <div className="frameorder-header">
+          <div className="frameorder-header-content">
+            <h1 className="frameorder-title">Orders Dashboard</h1>
+            <p className="frameorder-subtitle">Manage and track all orders in your system</p>
+          </div>
+          <div className="frameorder-stats">
+            <div className="frameorder-stat-card">
+              <div className="frameorder-stat-icon-wrapper">
+                <Package className="frameorder-stat-icon" />
+              </div>
+              <div className="frameorder-stat-content">
+                <div className="frameorder-stat-number">{filteredOrders.length}</div>
+                <div className="frameorder-stat-label">Total Orders</div>
+              </div>
+            </div>
+            <div className="frameorder-stat-card">
+              <div className="frameorder-stat-icon-wrapper frameorder-stat-icon-revenue">
+                <DollarSign className="frameorder-stat-icon" />
+              </div>
+              <div className="frameorder-stat-content">
+                <div className="frameorder-stat-number">${totalCost.toFixed(2)}</div>
+                <div className="frameorder-stat-label">Total Revenue</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="frameorder-filters-section">
+          <div className="frameorder-filters-header">
+            <Calendar className="frameorder-filters-icon" />
+            <h3 className="frameorder-filters-title">Filter by Date Range</h3>
+          </div>
+          <div className="frameorder-filters-grid">
+            <div className="frameorder-filter-group">
+              <label className="frameorder-filter-label">Start Date</label>
+              <DatePicker
+                selected={startDate}
+                onChange={(date) => setStartDate(date)}
+                selectsStart
+                startDate={startDate}
+                endDate={endDate}
+                dateFormat="MM/dd/yyyy"
+                className="frameorder-date-picker"
+                placeholderText="Select start date"
+                isClearable
+              />
+            </div>
+            <div className="frameorder-filter-group">
+              <label className="frameorder-filter-label">End Date</label>
+              <DatePicker
+                selected={endDate}
+                onChange={(date) => setEndDate(date)}
+                selectsEnd
+                startDate={startDate}
+                endDate={endDate}
+                minDate={startDate}
+                dateFormat="MM/dd/yyyy"
+                className="frameorder-date-picker"
+                placeholderText="Select end date"
+                isClearable
+              />
+            </div>
+            <div className="frameorder-total-cost-card">
+              <div className="frameorder-total-cost-header">
+                <DollarSign className="frameorder-total-cost-icon" />
+                <span className="frameorder-total-cost-label">Total Cost</span>
+              </div>
+              <p className="frameorder-total-cost-amount">${totalCost.toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Orders Table */}
+        <div className="frameorder-table-container">
+          <div className="frameorder-table-wrapper">
+            <table className="frameorder-table">
+              <thead className="frameorder-table-header">
                 <tr>
-                  <td>
-                    <button
-                      className="btn btn-link btn-sm"
-                      onClick={() => toggleRow(item.id)}
-                    >
-                      <i className={`bi ${expandedRows[item.id] ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
-                    </button>
-                  </td>
-                  <td>
-                    <img
-                      src={getImageUrl(item.adjusted_image || item.cropped_image || item.original_image)}
-                      alt="Item"
-                      style={{ height: '50px', width: '50px', objectFit: 'cover' }}
-                      onError={(e) => {
-                        e.target.src = 'https://via.placeholder.com/50x50?text=Image+Not+Found';
-                      }}
-                    />
-                  </td>
-                  <td>{item.user?.username || item.user || 'Unknown'}</td>
-                  <td>{item.frame?.name || 'None'}</td>
-                  <td>
-                    {item.mack_boards && item.mack_boards.length > 0
-                      ? item.mack_boards
-                          .map((mb) => `${mb.mack_board?.board_name || 'N/A'} (${mb.mack_board_color?.color_name || 'N/A'})`)
-                          .join(', ')
-                      : 'None'}
-                  </td>
-                  <td>
-                    {item.print_width || 'N/A'} x {item.print_height || 'N/A'} {item.print_unit}
-                  </td>
-                  <td>
-                    {item.media_type || 'None'}
-                    {item.media_type === 'Photopaper' && item.paper_type && ` (${item.paper_type})`}
-                  </td>
-                  <td>
-                    {item.fit || 'None'}
-                    {item.fit === 'bordered' && (
-                      <div>
-                        <small>
-                          Border: {item.border_depth || 0}px, {item.border_color || '#ffffff'}
-                        </small>
-                      </div>
-                    )}
-                  </td>
-                  <td>${item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00'}</td>
-                  <td>
-                    {isAdmin ? (
-                      <select
-                        value={item.status}
-                        onChange={(e) => handleUpdateStatus(item.id, e.target.value)}
-                        className="form-select form-select-sm"
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="paid">Paid</option>
-                      </select>
-                    ) : (
-                      item.status
-                    )}
-                  </td>
-                  <td>{format(new Date(item.created_at), 'MM/dd/yyyy HH:mm:ss')}</td>
-                  <td>
-                    <div className="d-flex gap-2">
-                      {(isAdmin || item.user?.id === user?.id) && item.original_image && (
-                        <button
-                          className="btn btn-primary btn-sm"
-                          onClick={() => handleDownloadImage(item.original_image)}
-                        >
-                          <i className="bi bi-download"></i> Download
-                        </button>
-                      )}
-                      {isAdmin && (
-                        <button
-                          className="btn btn-danger btn-sm"
-                          onClick={() => handleDeleteOrder(item.id)}
-                        >
-                          <i className="bi bi-trash"></i> Delete
-                        </button>
-                      )}
-                    </div>
-                  </td>
+                  <th className="frameorder-th frameorder-th-expand"></th>
+                  <th className="frameorder-th">Image</th>
+                  <th className="frameorder-th">User</th>
+                  <th className="frameorder-th">Frame</th>
+                  <th className="frameorder-th">Mack Boards</th>
+                  <th className="frameorder-th">Print Size</th>
+                  <th className="frameorder-th">Media Type</th>
+                  <th className="frameorder-th">Fit</th>
+                  <th className="frameorder-th">Price</th>
+                  <th className="frameorder-th">Status</th>
+                  <th className="frameorder-th">Created At</th>
+                  <th className="frameorder-th">Actions</th>
                 </tr>
-                {expandedRows[item.id] && (
-                  <tr>
-                    <td colSpan="12">
-                      <div className="p-3 bg-light">
-                        <h5>Order Details (ID: {item.id})</h5>
-                        <div className="row">
-                          <div className="col-md-6">
-                            <p><strong>Custom Size:</strong> {item.custom_width || 'N/A'} x {item.custom_height || 'N/A'}</p>
-                            <p><strong>Color Variant:</strong> {item.color_variant?.name || 'None'}</p>
-                            <p><strong>Size Variant:</strong> {item.size_variant?.name || 'None'}</p>
-                            <p><strong>Finish Variant:</strong> {item.finish_variant?.name || 'None'}</p>
-                            <p><strong>Hanging Variant:</strong> {item.hanging_variant?.name || 'None'}</p>
-                            <p><strong>Custom Frame Color:</strong> {item.custom_frame_color || 'None'}</p>
-                          </div>
-                          <div className="col-md-6">
-                            <p><strong>Transformations:</strong></p>
-                            <ul>
-                              <li>X: {item.transform_x || 0}</li>
-                              <li>Y: {item.transform_y || 0}</li>
-                              <li>Scale: {item.scale || 1}</li>
-                              <li>Rotation: {item.rotation || 0}°</li>
-                              <li>Frame Rotation: {item.frame_rotation || 0}°</li>
-                            </ul>
-                            <p><strong>Frame Depth:</strong> {item.frame_depth || 0}px</p>
-                            <p><strong>Border Unit:</strong> {item.border_unit || 'N/A'}</p>
-                            <p><strong>Updated At:</strong> {format(new Date(item.updated_at), 'MM/dd/yyyy HH:mm:ss')}</p>
-                          </div>
+              </thead>
+              <tbody className="frameorder-table-body">
+                {filteredOrders.map((item, index) => (
+                  <React.Fragment key={item.id}>
+                    <tr className={`frameorder-table-row ${expandedRows[item.id] ? 'frameorder-row-expanded' : ''}`}>
+                      <td className="frameorder-td">
+                        <button
+                          className="frameorder-expand-btn"
+                          onClick={() => toggleRow(item.id)}
+                        >
+                          {expandedRows[item.id] ? (
+                            <ChevronUp className="frameorder-expand-icon" />
+                          ) : (
+                            <ChevronDown className="frameorder-expand-icon" />
+                          )}
+                        </button>
+                      </td>
+                      <td className="frameorder-td">
+                        <div className="frameorder-image-container">
+                          <img
+                            src={getImageUrl(item.adjusted_image || item.cropped_image || item.original_image)}
+                            alt="Order Item"
+                            className="frameorder-order-image"
+                            onError={(e) => {
+                              e.target.src = 'https://via.placeholder.com/50x50?text=Image+Not+Found';
+                            }}
+                          />
                         </div>
-                        <p><strong>Mack Boards:</strong></p>
-                        {item.mack_boards && item.mack_boards.length > 0 ? (
-                          <ul>
-                            {item.mack_boards.map((mb) => (
-                              <li key={mb.id}>
-                                {mb.mack_board?.board_name || 'N/A'} ({mb.mack_board_color?.color_name || 'N/A'}) - 
-                                Width: {mb.width}px, Position: {mb.position}
-                              </li>
-                            ))}
-                          </ul>
+                      </td>
+                      <td className="frameorder-td">
+                        <div className="frameorder-user-info">
+                          <User className="frameorder-user-icon" />
+                          <span className="frameorder-user-name">
+                            {item.user?.username || item.user || 'Unknown'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="frameorder-td">
+                        <span className="frameorder-frame-name">
+                          {item.frame?.name || 'None'}
+                        </span>
+                      </td>
+                      <td className="frameorder-td">
+                        <div className="frameorder-mack-boards">
+                          {item.mack_boards && item.mack_boards.length > 0 ? (
+                            <div className="frameorder-mack-boards-list">
+                              {item.mack_boards.slice(0, 2).map((mb, idx) => (
+                                <div key={idx} className="frameorder-mack-board-tag">
+                                  {mb.mack_board?.board_name || 'N/A'} ({mb.mack_board_color?.color_name || 'N/A'})
+                                </div>
+                              ))}
+                              {item.mack_boards.length > 2 && (
+                                <div className="frameorder-mack-board-more">
+                                  +{item.mack_boards.length - 2} more
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="frameorder-no-data">None</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="frameorder-td">
+                        <span className="frameorder-print-size">
+                          {item.print_width || 'N/A'} x {item.print_height || 'N/A'} {item.print_unit}
+                        </span>
+                      </td>
+                      <td className="frameorder-td">
+                        <div className="frameorder-media-info">
+                          <span className="frameorder-media-type">
+                            {item.media_type || 'None'}
+                          </span>
+                          {item.media_type === 'Photopaper' && item.paper_type && (
+                            <div className="frameorder-paper-type">({item.paper_type})</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="frameorder-td">
+                        <div className="frameorder-fit-info">
+                          <span className="frameorder-fit-type">
+                            {item.fit || 'None'}
+                          </span>
+                          {item.fit === 'bordered' && (
+                            <div className="frameorder-border-info">
+                              Border: {item.border_depth || 0}px, {item.border_color || '#ffffff'}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="frameorder-td">
+                        <span className="frameorder-price">
+                          ${item.total_price ? parseFloat(item.total_price).toFixed(2) : '0.00'}
+                        </span>
+                      </td>
+                      <td className="frameorder-td">
+                        {isAdmin ? (
+                          <div className="frameorder-status-select-wrapper">
+                            <select
+                              value={item.status}
+                              onChange={(e) => handleUpdateStatus(item.id, e.target.value)}
+                              disabled={updatingStatus[item.id]}
+                              className="frameorder-status-select"
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="paid">Paid</option>
+                            </select>
+                            {updatingStatus[item.id] ? (
+                              <Loader2 className="frameorder-status-loading" />
+                            ) : (
+                              <ChevronDown className="frameorder-status-chevron" />
+                            )}
+                          </div>
                         ) : (
-                          <p>None</p>
+                          <span className={getStatusBadge(item.status)}>
+                            {item.status || 'Unknown'}
+                          </span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="mt-3">
-        <p>
-          <strong>Total Cost (Filtered Orders):</strong> ${totalCost.toFixed(2)}
-        </p>
+                      </td>
+                      <td className="frameorder-td">
+                        <div className="frameorder-date-info">
+                          <Clock className="frameorder-date-icon" />
+                          <span className="frameorder-date-text">
+                            {format(new Date(item.created_at), 'MM/dd/yyyy HH:mm:ss')}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="frameorder-td">
+                        <div className="frameorder-actions">
+                          {(isAdmin || item.user?.id === user?.id) && item.original_image && (
+                            <button
+                              className="frameorder-action-btn frameorder-download-btn"
+                              onClick={() => handleDownloadImage(item.original_image)}
+                            >
+                              <Download className="frameorder-action-icon" />
+                              Download
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <button
+                              className="frameorder-action-btn frameorder-delete-btn"
+                              onClick={() => handleDeleteOrder(item.id)}
+                            >
+                              <Trash2 className="frameorder-action-icon" />
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedRows[item.id] && (
+                      <tr className="frameorder-expanded-row">
+                        <td colSpan="12" className="frameorder-expanded-cell">
+                          <div className="frameorder-details-container">
+                            <div className="frameorder-details-header">
+                              <AlertCircle className="frameorder-details-icon" />
+                              <h4 className="frameorder-details-title">
+                                Order Details (ID: {item.id})
+                              </h4>
+                            </div>
+                            
+                            <div className="frameorder-details-grid">
+                              {/* Left Column */}
+                              <div className="frameorder-details-column">
+                                <div className="frameorder-detail-group">
+                                  <h5 className="frameorder-detail-group-title">Product Information</h5>
+                                  <div className="frameorder-detail-items">
+                                    <div className="frameorder-detail-item">
+                                      <span className="frameorder-detail-label">Custom Size:</span>
+                                      <span className="frameorder-detail-value">
+                                        {item.custom_width || 'N/A'} x {item.custom_height || 'N/A'}
+                                      </span>
+                                    </div>
+                                    <div className="frameorder-detail-item">
+                                      <span className="frameorder-detail-label">Color Variant:</span>
+                                      <span className="frameorder-detail-value">{item.color_variant?.name || 'None'}</span>
+                                    </div>
+                                    <div className="frameorder-detail-item">
+                                      <span className="frameorder-detail-label">Size Variant:</span>
+                                      <span className="frameorder-detail-value">{item.size_variant?.name || 'None'}</span>
+                                    </div>
+                                    <div className="frameorder-detail-item">
+                                      <span className="frameorder-detail-label">Finish Variant:</span>
+                                      <span className="frameorder-detail-value">{item.finish_variant?.name || 'None'}</span>
+                                    </div>
+                                    <div className="frameorder-detail-item">
+                                      <span className="frameorder-detail-label">Hanging Variant:</span>
+                                      <span className="frameorder-detail-value">{item.hanging_variant?.name || 'None'}</span>
+                                    </div>
+                                    <div className="frameorder-detail-item">
+                                      <span className="frameorder-detail-label">Custom Frame Color:</span>
+                                      <span className="frameorder-detail-value">{item.custom_frame_color || 'None'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Right Column */}
+                              <div className="frameorder-details-column">
+                                <div className="frameorder-detail-group">
+                                  <h5 className="frameorder-detail-group-title">Transformations</h5>
+                                  <div className="frameorder-detail-items">
+                                    <div className="frameorder-detail-item">
+                                      <span className="frameorder-detail-label">X Position:</span>
+                                      <span className="frameorder-detail-value">{item.transform_x || 0}</span>
+                                    </div>
+                                    <div className="frameorder-detail-item">
+                                      <span className="frameorder-detail-label">Y Position:</span>
+                                      <span className="frameorder-detail-value">{item.transform_y || 0}</span>
+                                    </div>
+                                    <div className="frameorder-detail-item">
+                                      <span className="frameorder-detail-label">Scale:</span>
+                                      <span className="frameorder-detail-value">{item.scale || 1}</span>
+                                    </div>
+                                    <div className="frameorder-detail-item">
+                                      <span className="frameorder-detail-label">Rotation:</span>
+                                      <span className="frameorder-detail-value">{item.rotation || 0}°</span>
+                                    </div>
+                                    <div className="frameorder-detail-item">
+                                      <span className="frameorder-detail-label">Frame Rotation:</span>
+                                      <span className="frameorder-detail-value">{item.frame_rotation || 0}°</span>
+                                    </div>
+                                    <div className="frameorder-detail-item">
+                                      <span className="frameorder-detail-label">Frame Depth:</span>
+                                      <span className="frameorder-detail-value">{item.frame_depth || 0}px</span>
+                                    </div>
+                                    <div className="frameorder-detail-item">
+                                      <span className="frameorder-detail-label">Border Unit:</span>
+                                      <span className="frameorder-detail-value">{item.border_unit || 'N/A'}</span>
+                                    </div>
+                                    <div className="frameorder-detail-item">
+                                      <span className="frameorder-detail-label">Updated At:</span>
+                                      <span className="frameorder-detail-value">
+                                        {format(new Date(item.updated_at), 'MM/dd/yyyy HH:mm:ss')}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Mack Boards Section */}
+                            <div className="frameorder-mack-boards-section">
+                              <h5 className="frameorder-detail-group-title">Mack Boards Configuration</h5>
+                              {item.mack_boards && item.mack_boards.length > 0 ? (
+                                <div className="frameorder-mack-boards-grid">
+                                  {item.mack_boards.map((mb) => (
+                                    <div key={mb.id} className="frameorder-mack-board-card">
+                                      <div className="frameorder-mack-board-header">
+                                        <span className="frameorder-mack-board-name">
+                                          {mb.mack_board?.board_name || 'N/A'}
+                                        </span>
+                                        <span className="frameorder-mack-board-color">
+                                          {mb.mack_board_color?.color_name || 'N/A'}
+                                        </span>
+                                      </div>
+                                      <div className="frameorder-mack-board-details">
+                                        <div className="frameorder-mack-board-detail">
+                                          Width: <span className="frameorder-mack-board-value">{mb.width}px</span>
+                                        </div>
+                                        <div className="frameorder-mack-board-detail">
+                                          Position: <span className="frameorder-mack-board-value">{mb.position}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="frameorder-no-mack-boards">No mack boards assigned to this order</p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Summary */}
+        <div className="frameorder-summary">
+          <div className="frameorder-summary-content">
+            <div className="frameorder-summary-left">
+              <div className="frameorder-summary-icon-wrapper">
+                <Package className="frameorder-summary-icon" />
+              </div>
+              <div className="frameorder-summary-info">
+                <p className="frameorder-summary-title">
+                  {filteredOrders.length} {filteredOrders.length === 1 ? 'Order' : 'Orders'}
+                </p>
+                <p className="frameorder-summary-subtitle">
+                  {startDate || endDate ? 'In selected date range' : 'Total orders'}
+                </p>
+              </div>
+            </div>
+            <div className="frameorder-summary-right">
+              <p className="frameorder-revenue-label">Total Revenue</p>
+              <p className="frameorder-revenue-amount">${totalCost.toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

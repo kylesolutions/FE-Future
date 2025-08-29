@@ -544,14 +544,6 @@ function GiftPrint() {
       }
     }
 
-    if (selectedCategory === 'tshirts' && printableArea) {
-      ctx.strokeStyle = '#6366f1';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      ctx.strokeRect(printableArea.x, printableArea.y, printableArea.width, printableArea.height);
-      ctx.setLineDash([]);
-    }
-
     ctx.save();
     ctx.translate(imagePosition.x, imagePosition.y);
     ctx.rotate((imageRotation * Math.PI) / 180);
@@ -743,7 +735,6 @@ function GiftPrint() {
       setIsCropping(true);
       setIsImageSelected(false);
       if (userImageImage) {
-        const maxDimension = Math.min(printableArea ? printableArea.width : canvasSize.width, printableArea ? printableArea.height : canvasSize.height) * 0.5;
         setCropRect({
           x: imagePosition.x,
           y: imagePosition.y,
@@ -877,8 +868,6 @@ function GiftPrint() {
           break;
         case 'bottom':
           newScale.y = Math.max(minSize / (userImageImage.height || 100), (y - imagePosition.y) / (userImageImage.height || 100));
-          break;
-        default:
           break;
       }
 
@@ -1217,18 +1206,6 @@ function GiftPrint() {
                             />
                           );
                         })()}
-                        {selectedCategory === 'tshirts' && printableArea && (
-                          <Rect
-                            x={printableArea.x}
-                            y={printableArea.y}
-                            width={printableArea.width}
-                            height={printableArea.height}
-                            stroke="#6366f1"
-                            strokeWidth={2}
-                            dash={[8, 4]}
-                            draggable={false}
-                          />
-                        )}
                         {userImageImage && (
                           <Group
                             clipX={isCropping && selectedCategory === 'tshirts' ? printableArea?.x : isCropping ? cropRect.x : undefined}
