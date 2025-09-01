@@ -4,10 +4,35 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './Details.css';
 import { logoutUser } from '../../Redux/slices/userSlice';
+import { 
+  Package, 
+  Users, 
+  Tag, 
+  Grid, 
+  Coffee, 
+  Crown, 
+  Shirt, 
+  Square, 
+  Pen, 
+  Printer, 
+  Ruler, 
+  FileText, 
+  Layers, 
+  ShoppingCart, 
+  Gift,
+  Edit,
+  Trash2,
+  X,
+  Loader2,
+  AlertCircle,
+  CheckCircle
+} from 'lucide-react';
+
 // Base URL for images
 const BASE_URL = 'http://82.180.146.4:8001';
 // Fallback image for broken or missing images
 const FALLBACK_IMAGE = 'https://via.placeholder.com/100x100?text=Image+Not+Found';
+
 function Details() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -34,6 +59,7 @@ function Details() {
   const [activeTab, setActiveTab] = useState('frames');
   const [selectedItem, setSelectedItem] = useState(null);
   const [modalType, setModalType] = useState(null);
+
   // Utility function to construct image URLs
   const getImageUrl = (path) => {
     if (!path) {
@@ -47,17 +73,20 @@ function Details() {
     console.log('Constructed image URL:', url);
     return url;
   };
+
   // Handle image load errors
   const handleImageError = (e) => {
     console.warn('Image failed to load:', e.target.src);
     e.target.src = FALLBACK_IMAGE;
   };
+
   // Redirect if not admin
   useEffect(() => {
     if (!user.username || user.type !== 'admin') {
       navigate('/login');
     }
   }, [user, navigate]);
+
   // Refresh token function
   const refreshToken = async () => {
     try {
@@ -75,6 +104,7 @@ function Details() {
       return null;
     }
   };
+
   // Fetch data
   useEffect(() => {
     const fetchData = async () => {
@@ -215,14 +245,17 @@ function Details() {
     };
     fetchData();
   }, [navigate, dispatch]);
+
   const handleSelectItem = (item, type) => {
     setSelectedItem(item);
     setModalType(type);
   };
+
   const handleCloseModal = () => {
     setSelectedItem(null);
     setModalType(null);
   };
+
   const handleUpdate = async (e, id, type, data) => {
     e.preventDefault();
     let url;
@@ -231,6 +264,7 @@ function Details() {
     };
     let payload;
     let isMultipart = false;
+
     switch (type) {
       case 'frame':
         isMultipart = true;
@@ -421,16 +455,20 @@ function Details() {
       default:
         return;
     }
+
     console.log('Data being sent:', payload);
     let token = localStorage.getItem('token');
+
     try {
       if (!token) {
         setError('Session expired. Please log in again.');
         navigate('/login');
         return;
       }
+
       headers['Content-Type'] = isMultipart ? 'multipart/form-data' : 'application/json';
       const response = await axios.put(url, payload, { headers });
+
       if (type === 'frame') {
         setFrames(frames.map((f) => (f.id === id ? response.data : f)));
       } else if (type === 'user') {
@@ -473,6 +511,7 @@ function Details() {
         });
         setFrames(framesResponse.data);
       }
+
       handleCloseModal();
       alert('Update successful');
     } catch (err) {
@@ -540,10 +579,13 @@ function Details() {
       }
     }
   };
+
   const handleDelete = async (id, type) => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
+
     let token = localStorage.getItem('token');
     let url;
+
     switch (type) {
       case 'frame':
         url = `http://82.180.146.4:8001/frames/${id}/`;
@@ -620,15 +662,18 @@ function Details() {
       default:
         return;
     }
+
     try {
       if (!token) {
         setError('Session expired. Please log in again.');
         navigate('/login');
         return;
       }
+
       await axios.delete(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       if (type === 'frame') {
         setFrames(frames.filter((f) => f.id !== id));
       } else if (type === 'user') {
@@ -679,6 +724,7 @@ function Details() {
         });
         setFrames(framesResponse.data);
       }
+
       handleCloseModal();
       alert('Delete successful');
     } catch (err) {
@@ -755,200 +801,222 @@ function Details() {
       }
     }
   };
-  if (loading)
+
+  const getTabIcon = (tabName) => {
+    switch (tabName) {
+      case 'frames': return <Package className="framedetails-tab-icon" />;
+      case 'users': return <Users className="framedetails-tab-icon" />;
+      case 'categories': return <Tag className="framedetails-tab-icon" />;
+      case 'mackboards': return <Grid className="framedetails-tab-icon" />;
+      case 'mugs': return <Coffee className="framedetails-tab-icon" />;
+      case 'caps': return <Crown className="framedetails-tab-icon" />;
+      case 'tshirts': return <Shirt className="framedetails-tab-icon" />;
+      case 'tiles': return <Square className="framedetails-tab-icon" />;
+      case 'pens': return <Pen className="framedetails-tab-icon" />;
+      case 'printtypes': return <Printer className="framedetails-tab-icon" />;
+      case 'printsizes': return <Ruler className="framedetails-tab-icon" />;
+      case 'papertypes': return <FileText className="framedetails-tab-icon" />;
+      case 'laminationtypes': return <Layers className="framedetails-tab-icon" />;
+      case 'frameOrders': return <ShoppingCart className="framedetails-tab-icon" />;
+      case 'giftOrders': return <Gift className="framedetails-tab-icon" />;
+      case 'simpleDocumentOrders': return <FileText className="framedetails-tab-icon" />;
+      default: return <Package className="framedetails-tab-icon" />;
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="d-flex justify-content-center align-items-center vh-100">
-        <div className="text-muted fs-4">Loading...</div>
-      </div>
-    );
-  if (error)
-    return (
-      <div className="d-flex justify-content-center align-items-center vh-100">
-        <div className="text-danger fs-4">Error: {error}</div>
-      </div>
-    );
-  return (
-    <div className="container-fluid py-4 details-container">
-      <div className="row g-4">
-        {/* Tabs Sidebar */}
-        <div className="col-lg-3 col-md-4">
-          <div className="card shadow-sm">
-            <div className="card-body">
-              <h2 className="card-title mb-4">Admin Dashboard</h2>
-              <ul className="nav nav-pills flex-column">
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'frames' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('frames')}
-                  >
-                    <i className="bi bi-card-image"></i> Frames
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'users' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('users')}
-                  >
-                    <i className="bi bi-people"></i> Users
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'categories' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('categories')}
-                  >
-                    <i className="bi bi-tags"></i> Categories
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'mackboards' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('mackboards')}
-                  >
-                    <i className="bi bi-fullscreen"></i> MatBoards
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'mugs' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('mugs')}
-                  >
-                    <i className="bi bi-cup"></i> Mugs
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'caps' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('caps')}
-                  >
-                    <i className="bi bi-hat"></i> Caps
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'tshirts' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('tshirts')}
-                  >
-                    <i className="bi bi-tshirt"></i> Tshirts
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'tiles' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('tiles')}
-                  >
-                    <i className="bi bi-grid"></i> Tiles
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'pens' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('pens')}
-                  >
-                    <i className="bi bi-pen"></i> Pens
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'printtypes' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('printtypes')}
-                  >
-                    <i className="bi bi-printer"></i> Print Types
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'printsizes' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('printsizes')}
-                  >
-                    <i className="bi bi-rulers"></i> Print Sizes
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'papertypes' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('papertypes')}
-                  >
-                    <i className="bi bi-file-earmark"></i> Paper Types
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'laminationtypes' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('laminationtypes')}
-                  >
-                    <i className="bi bi-layers"></i> Lamination Types
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'frameOrders' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('frameOrders')}
-                  >
-                    <i className="bi bi-box-seam"></i> Frame Orders
-                  </button>
-                </li>
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'giftOrders' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('giftOrders')}
-                  >
-                    <i className="bi bi-gift"></i> Gift Orders
-                  </button>
-                </li>
-                
-                <li className="nav-item">
-                  <button
-                    className={`nav-link ${activeTab === 'simpleDocumentOrders' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('simpleDocumentOrders')}
-                  >
-                    <i className="bi bi-file-earmark-text"></i> Simple Document Orders
-                  </button>
-                </li>
-              </ul>
-            </div>
-          </div>
+      <div className="framedetails-loading-container">
+        <div className="framedetails-loading-content">
+          <Loader2 className="framedetails-loading-spinner" />
+          <p className="framedetails-loading-text">Loading dashboard...</p>
         </div>
-        {/* Content Area */}
-        <div className="col-lg-9 col-md-8">
-          <div className="card shadow-sm">
-            <div className="card-body">
-              {activeTab === 'frames' && (
-                <div>
-                  <h2 className="card-title mb-4">Frame Details</h2>
-                  {frames.length === 0 ? (
-                    <p className="text-muted">No frames available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="framedetails-error-container">
+        <div className="framedetails-error-content">
+          <AlertCircle className="framedetails-error-icon" />
+          <h3 className="framedetails-error-title">Error</h3>
+          <p className="framedetails-error-message">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="framedetails-container">
+      <div className="framedetails-wrapper">
+        {/* Sidebar */}
+        <div className="framedetails-sidebar">
+          <div className="framedetails-sidebar-header">
+            <h2 className="framedetails-sidebar-title">Admin Dashboard</h2>
+            <p className="framedetails-sidebar-subtitle">Manage your store</p>
+          </div>
+          <nav className="framedetails-nav">
+            <button
+              className={`framedetails-nav-item ${activeTab === 'frames' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('frames')}
+            >
+              {getTabIcon('frames')}
+              <span>Frames</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'users' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('users')}
+            >
+              {getTabIcon('users')}
+              <span>Users</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'categories' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('categories')}
+            >
+              {getTabIcon('categories')}
+              <span>Categories</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'mackboards' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('mackboards')}
+            >
+              {getTabIcon('mackboards')}
+              <span>MatBoards</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'mugs' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('mugs')}
+            >
+              {getTabIcon('mugs')}
+              <span>Mugs</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'caps' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('caps')}
+            >
+              {getTabIcon('caps')}
+              <span>Caps</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'tshirts' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('tshirts')}
+            >
+              {getTabIcon('tshirts')}
+              <span>T-shirts</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'tiles' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('tiles')}
+            >
+              {getTabIcon('tiles')}
+              <span>Tiles</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'pens' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('pens')}
+            >
+              {getTabIcon('pens')}
+              <span>Pens</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'printtypes' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('printtypes')}
+            >
+              {getTabIcon('printtypes')}
+              <span>Print Types</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'printsizes' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('printsizes')}
+            >
+              {getTabIcon('printsizes')}
+              <span>Print Sizes</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'papertypes' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('papertypes')}
+            >
+              {getTabIcon('papertypes')}
+              <span>Paper Types</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'laminationtypes' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('laminationtypes')}
+            >
+              {getTabIcon('laminationtypes')}
+              <span>Lamination Types</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'frameOrders' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('frameOrders')}
+            >
+              {getTabIcon('frameOrders')}
+              <span>Frame Orders</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'giftOrders' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('giftOrders')}
+            >
+              {getTabIcon('giftOrders')}
+              <span>Gift Orders</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'simpleDocumentOrders' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('simpleDocumentOrders')}
+            >
+              {getTabIcon('simpleDocumentOrders')}
+              <span>Document Orders</span>
+            </button>
+          </nav>
+        </div>
+
+        {/* Main Content */}
+        <div className="framedetails-main">
+          <div className="framedetails-content-card">
+            {activeTab === 'frames' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <Package className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Frame Details</h2>
+                </div>
+                {frames.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <Package className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No frames available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">Name</th>
-                            <th scope="col">Price</th>
-                            <th scope="col">Image</th>
-                            <th scope="col">Corner Image</th>
-                            <th scope="col">Dimensions</th>
-                            <th scope="col">Category</th>
-                            <th scope="col">Created By</th>
-                            <th scope="col">Created At</th>
-                            <th scope="col">Color Variants</th>
-                            <th scope="col">Size Variants</th>
-                            <th scope="col">Finishing Variants</th>
-                            <th scope="col">Hanging Variants</th>
-                            <th scope="col">Actions</th>
+                            <th>Name</th>
+                            <th>Price</th>
+                            <th>Image</th>
+                            <th>Corner Image</th>
+                            <th>Dimensions</th>
+                            <th>Category</th>
+                            <th>Created By</th>
+                            <th>Created At</th>
+                            <th>Color Variants</th>
+                            <th>Size Variants</th>
+                            <th>Finishing Variants</th>
+                            <th>Hanging Variants</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {frames.map((frame) => (
-                            <tr key={frame.id}>
-                              <td>{frame.name}</td>
-                              <td>${frame.price}</td>
+                            <tr key={frame.id} className="framedetails-table-row">
+                              <td className="framedetails-name-cell">{frame.name}</td>
+                              <td className="framedetails-price-cell">${frame.price}</td>
                               <td>
                                 <img
                                   src={getImageUrl(frame.image)}
                                   alt={frame.name}
-                                  className="img-thumbnail"
-                                  style={{ width: '80px', height: '80px', objectFit: 'cover' }}
+                                  className="framedetails-image"
                                   onError={handleImageError}
                                 />
                               </td>
@@ -957,15 +1025,14 @@ function Details() {
                                   <img
                                     src={getImageUrl(frame.corner_image)}
                                     alt={`${frame.name} corner`}
-                                    className="img-thumbnail"
-                                    style={{ width: '80px', height: '80px', objectFit: 'cover' }}
+                                    className="framedetails-image"
                                     onError={handleImageError}
                                   />
                                 ) : (
-                                  <span>No corner image</span>
+                                  <span className="framedetails-no-data">No corner image</span>
                                 )}
                               </td>
-                              <td>
+                              <td className="framedetails-dimensions">
                                 {frame.inner_width} x {frame.inner_height}
                               </td>
                               <td>{frame.category?.frameCategory || 'None'}</td>
@@ -976,47 +1043,44 @@ function Details() {
                               </td>
                               <td>{new Date(frame.created_at).toLocaleDateString()}</td>
                               <td>
-                                <ul className="list-unstyled">
+                                <div className="framedetails-variants-list">
                                   {frame.color_variants.map((variant) => (
-                                    <li key={variant.id} className="d-flex align-items-center mb-2">
-                                      <span className="me-2">{variant.color_name}</span>
+                                    <div key={variant.id} className="framedetails-variant-item">
+                                      <span className="framedetails-variant-name">{variant.color_name}</span>
                                       <img
                                         src={getImageUrl(variant.image)}
                                         alt={variant.color_name}
-                                        className="img-thumbnail"
-                                        style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                                        className="framedetails-variant-image"
                                         onError={handleImageError}
                                       />
                                       {variant.corner_image && (
                                         <img
                                           src={getImageUrl(variant.corner_image)}
                                           alt={`${variant.color_name} corner`}
-                                          className="img-thumbnail ms-2"
-                                          style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                                          className="framedetails-variant-image"
                                           onError={handleImageError}
                                         />
                                       )}
                                       <button
-                                        className="btn btn-sm btn-info ms-2"
+                                        className="framedetails-variant-edit-btn"
                                         onClick={() => handleSelectItem(variant, 'color')}
                                       >
-                                        Edit
+                                        <Edit className="framedetails-btn-icon" />
                                       </button>
-                                    </li>
+                                    </div>
                                   ))}
-                                </ul>
+                                </div>
                               </td>
                               <td>
-                                <ul className="list-unstyled">
+                                <div className="framedetails-variants-list">
                                   {frame.size_variants.map((variant) => (
-                                    <li key={variant.id} className="d-flex align-items-center mb-2">
-                                      <span className="me-2">{variant.size_name}</span>
+                                    <div key={variant.id} className="framedetails-variant-item">
+                                      <span className="framedetails-variant-name">{variant.size_name}</span>
                                       {variant.image && (
                                         <img
                                           src={getImageUrl(variant.image)}
                                           alt={variant.size_name}
-                                          className="img-thumbnail ms-2"
-                                          style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                                          className="framedetails-variant-image"
                                           onError={handleImageError}
                                         />
                                       )}
@@ -1024,79 +1088,76 @@ function Details() {
                                         <img
                                           src={getImageUrl(variant.corner_image)}
                                           alt={`${variant.size_name} corner`}
-                                          className="img-thumbnail ms-2"
-                                          style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                                          className="framedetails-variant-image"
                                           onError={handleImageError}
                                         />
                                       )}
                                       <button
-                                        className="btn btn-sm btn-info ms-2"
+                                        className="framedetails-variant-edit-btn"
                                         onClick={() => handleSelectItem(variant, 'size')}
                                       >
-                                        Edit
+                                        <Edit className="framedetails-btn-icon" />
                                       </button>
-                                    </li>
+                                    </div>
                                   ))}
-                                </ul>
+                                </div>
                               </td>
                               <td>
-                                <ul className="list-unstyled">
+                                <div className="framedetails-variants-list">
                                   {frame.finishing_variants.map((variant) => (
-                                    <li key={variant.id} className="d-flex align-items-center mb-2">
-                                      <span className="me-2">{variant.finish_name}</span>
+                                    <div key={variant.id} className="framedetails-variant-item">
+                                      <span className="framedetails-variant-name">{variant.finish_name}</span>
                                       <img
                                         src={getImageUrl(variant.image)}
                                         alt={variant.finish_name}
-                                        className="img-thumbnail"
-                                        style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                                        className="framedetails-variant-image"
                                         onError={handleImageError}
                                       />
                                       {variant.corner_image && (
                                         <img
                                           src={getImageUrl(variant.corner_image)}
                                           alt={`${variant.finish_name} corner`}
-                                          className="img-thumbnail ms-2"
-                                          style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                                          className="framedetails-variant-image"
                                           onError={handleImageError}
                                         />
                                       )}
                                       <button
-                                        className="btn btn-sm btn-info ms-2"
+                                        className="framedetails-variant-edit-btn"
                                         onClick={() => handleSelectItem(variant, 'finish')}
                                       >
-                                        Edit
+                                        <Edit className="framedetails-btn-icon" />
                                       </button>
-                                    </li>
+                                    </div>
                                   ))}
-                                </ul>
+                                </div>
                               </td>
                               <td>
-                                <ul className="list-unstyled">
+                                <div className="framedetails-variants-list">
                                   {frame.frameHanging_variant.map((variant) => (
-                                    <li key={variant.id} className="d-flex align-items-center mb-2">
-                                      <span className="me-2">{variant.hanging_name}</span>
+                                    <div key={variant.id} className="framedetails-variant-item">
+                                      <span className="framedetails-variant-name">{variant.hanging_name}</span>
                                       <img
                                         src={getImageUrl(variant.image)}
                                         alt={variant.hanging_name}
-                                        className="img-thumbnail"
-                                        style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                                        className="framedetails-variant-image"
                                         onError={handleImageError}
                                       />
                                       <button
-                                        className="btn btn-sm btn-info ms-2"
+                                        className="framedetails-variant-edit-btn"
                                         onClick={() => handleSelectItem(variant, 'hanging')}
                                       >
-                                        Edit
+                                        <Edit className="framedetails-btn-icon" />
                                       </button>
-                                    </li>
+                                    </div>
                                   ))}
-                                </ul>
+                                </div>
                               </td>
                               <td>
                                 <button
-                                  className="btn btn-sm btn-info me-2"
+                                  className="framedetails-action-btn framedetails-edit-btn"
                                   onClick={() => handleSelectItem(frame, 'frame')}
                                 >
+                                  <Edit className="framedetails-btn-icon" />
                                   Edit
                                 </button>
                               </td>
@@ -1105,42 +1166,60 @@ function Details() {
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'users' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <Users className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Registered Users</h2>
                 </div>
-              )}
-              {activeTab === 'users' && (
-                <div>
-                  <h2 className="card-title mb-4">Registered Users</h2>
-                  {users.length === 0 ? (
-                    <p className="text-muted">No users available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+                {users.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <Users className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No users available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">Username</th>
-                            <th scope="col">Email</th>
-                            <th scope="col">Name</th>
-                            <th scope="col">Phone</th>
-                            <th scope="col">Role</th>
-                            <th scope="col">Blocked</th>
-                            <th scope="col">Actions</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Role</th>
+                            <th>Blocked</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {users.map((user) => (
-                            <tr key={user.id}>
-                              <td>{user.username}</td>
+                            <tr key={user.id} className="framedetails-table-row">
+                              <td className="framedetails-name-cell">{user.username}</td>
                               <td>{user.email || 'N/A'}</td>
                               <td>{user.name || 'N/A'}</td>
                               <td>{user.phone || 'N/A'}</td>
-                              <td>{user.is_staff ? 'Admin' : user.is_user ? 'User' : 'Employee'}</td>
-                              <td>{user.is_blocked ? 'Yes' : 'No'}</td>
+                              <td>
+                                <span className={`framedetails-role-badge ${user.is_staff ? 'framedetails-role-admin' : user.is_user ? 'framedetails-role-user' : 'framedetails-role-employee'}`}>
+                                  {user.is_staff ? 'Admin' : user.is_user ? 'User' : 'Employee'}
+                                </span>
+                              </td>
+                              <td>
+                                <span className={`framedetails-status-badge ${user.is_blocked ? 'framedetails-status-blocked' : 'framedetails-status-active'}`}>
+                                  {user.is_blocked ? 'Yes' : 'No'}
+                                </span>
+                              </td>
                               <td>
                                 <button
-                                  className="btn btn-sm btn-info me-2"
+                                  className="framedetails-action-btn framedetails-edit-btn"
                                   onClick={() => handleSelectItem(user, 'user')}
                                 >
+                                  <Edit className="framedetails-btn-icon" />
                                   Edit
                                 </button>
                               </td>
@@ -1149,32 +1228,42 @@ function Details() {
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'categories' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <Tag className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Frame Categories</h2>
                 </div>
-              )}
-              {activeTab === 'categories' && (
-                <div>
-                  <h2 className="card-title mb-4">Frame Categories</h2>
-                  {categories.length === 0 ? (
-                    <p className="text-muted">No categories available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+                {categories.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <Tag className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No categories available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">Category Name</th>
-                            <th scope="col">Actions</th>
+                            <th>Category Name</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {categories.map((category) => (
-                            <tr key={category.id}>
-                              <td>{category.frameCategory}</td>
+                            <tr key={category.id} className="framedetails-table-row">
+                              <td className="framedetails-name-cell">{category.frameCategory}</td>
                               <td>
                                 <button
-                                  className="btn btn-sm btn-info me-2"
+                                  className="framedetails-action-btn framedetails-edit-btn"
                                   onClick={() => handleSelectItem(category, 'category')}
                                 >
+                                  <Edit className="framedetails-btn-icon" />
                                   Edit
                                 </button>
                               </td>
@@ -1183,73 +1272,81 @@ function Details() {
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'mackboards' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <Grid className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">MatBoards</h2>
                 </div>
-              )}
-              {activeTab === 'mackboards' && (
-                <div>
-                  <h2 className="card-title mb-4">MatBoards</h2>
-                  {mackBoards.length === 0 ? (
-                    <p className="text-muted">No MatBoards available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+                {mackBoards.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <Grid className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No MatBoards available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">Board Name</th>
-                            <th scope="col">Image</th>
-                            <th scope="col">Price</th>
-                            <th scope="col">Color Variants</th>
-                            <th scope="col">Actions</th>
+                            <th>Board Name</th>
+                            <th>Image</th>
+                            <th>Price</th>
+                            <th>Color Variants</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {mackBoards.map((mackBoard) => (
-                            <tr key={mackBoard.id}>
-                              <td>{mackBoard.board_name}</td>
+                            <tr key={mackBoard.id} className="framedetails-table-row">
+                              <td className="framedetails-name-cell">{mackBoard.board_name}</td>
                               <td>
                                 {mackBoard.image ? (
                                   <img
                                     src={getImageUrl(mackBoard.image)}
                                     alt={mackBoard.board_name}
-                                    className="img-thumbnail"
-                                    style={{ width: '80px', height: '80px', objectFit: 'cover' }}
+                                    className="framedetails-image"
                                     onError={handleImageError}
                                   />
                                 ) : (
-                                  <span>No image</span>
+                                  <span className="framedetails-no-data">No image</span>
                                 )}
                               </td>
-                              <td>${mackBoard.price || 'N/A'}</td>
+                              <td className="framedetails-price-cell">${mackBoard.price || 'N/A'}</td>
                               <td>
-                                <ul className="list-unstyled">
+                                <div className="framedetails-variants-list">
                                   {mackBoard.color_variants.map((variant) => (
-                                    <li key={variant.id} className="d-flex align-items-center mb-2">
-                                      <span className="me-2">{variant.color_name}</span>
+                                    <div key={variant.id} className="framedetails-variant-item">
+                                      <span className="framedetails-variant-name">{variant.color_name}</span>
                                       {variant.image && (
                                         <img
                                           src={getImageUrl(variant.image)}
                                           alt={variant.color_name}
-                                          className="img-thumbnail"
-                                          style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                                          className="framedetails-variant-image"
                                           onError={handleImageError}
                                         />
                                       )}
                                       <button
-                                        className="btn btn-sm btn-info ms-2"
+                                        className="framedetails-variant-edit-btn"
                                         onClick={() => handleSelectItem(variant, 'mackboard_color')}
                                       >
-                                        Edit
+                                        <Edit className="framedetails-btn-icon" />
                                       </button>
-                                    </li>
+                                    </div>
                                   ))}
-                                </ul>
+                                </div>
                               </td>
                               <td>
                                 <button
-                                  className="btn btn-sm btn-info me-2"
+                                  className="framedetails-action-btn framedetails-edit-btn"
                                   onClick={() => handleSelectItem(mackBoard, 'mackboard')}
                                 >
+                                  <Edit className="framedetails-btn-icon" />
                                   Edit
                                 </button>
                               </td>
@@ -1258,58 +1355,67 @@ function Details() {
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'mugs' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <Coffee className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Mugs</h2>
                 </div>
-              )}
-              {activeTab === 'mugs' && (
-                <div>
-                  <h2 className="card-title mb-4">Mugs</h2>
-                  {mugs.length === 0 ? (
-                    <p className="text-muted">No mugs available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+                {mugs.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <Coffee className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No mugs available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">Mug Name</th>
-                            <th scope="col">Image</th>
-                            <th scope="col">GLB File</th>
-                            <th scope="col">Price</th>
-                            <th scope="col">Actions</th>
+                            <th>Mug Name</th>
+                            <th>Image</th>
+                            <th>GLB File</th>
+                            <th>Price</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {mugs.map((mug) => (
-                            <tr key={mug.id}>
-                              <td>{mug.mug_name}</td>
+                            <tr key={mug.id} className="framedetails-table-row">
+                              <td className="framedetails-name-cell">{mug.mug_name}</td>
                               <td>
                                 {mug.image ? (
                                   <img
                                     src={getImageUrl(mug.image)}
                                     alt={mug.mug_name}
-                                    className="img-thumbnail"
-                                    style={{ width: '80px', height: '80px', objectFit: 'cover' }}
+                                    className="framedetails-image"
                                     onError={handleImageError}
                                   />
                                 ) : (
-                                  <span>No image</span>
+                                  <span className="framedetails-no-data">No image</span>
                                 )}
                               </td>
                               <td>
                                 {mug.glb_file ? (
-                                  <a href={getImageUrl(mug.glb_file)} target="_blank" rel="noopener noreferrer">
+                                  <a href={getImageUrl(mug.glb_file)} target="_blank" rel="noopener noreferrer" className="framedetails-file-link">
                                     View GLB
                                   </a>
                                 ) : (
-                                  <span>No GLB file</span>
+                                  <span className="framedetails-no-data">No GLB file</span>
                                 )}
                               </td>
-                              <td>${mug.price || 'N/A'}</td>
+                              <td className="framedetails-price-cell">${mug.price || 'N/A'}</td>
                               <td>
                                 <button
-                                  className="btn btn-sm btn-info me-2"
+                                  className="framedetails-action-btn framedetails-edit-btn"
                                   onClick={() => handleSelectItem(mug, 'mug')}
                                 >
+                                  <Edit className="framedetails-btn-icon" />
                                   Edit
                                 </button>
                               </td>
@@ -1318,48 +1424,57 @@ function Details() {
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'caps' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <Crown className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Caps</h2>
                 </div>
-              )}
-              {activeTab === 'caps' && (
-                <div>
-                  <h2 className="card-title mb-4">Caps</h2>
-                  {caps.length === 0 ? (
-                    <p className="text-muted">No caps available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+                {caps.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <Crown className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No caps available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">Cap Name</th>
-                            <th scope="col">Image</th>
-                            <th scope="col">Price</th>
-                            <th scope="col">Actions</th>
+                            <th>Cap Name</th>
+                            <th>Image</th>
+                            <th>Price</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {caps.map((cap) => (
-                            <tr key={cap.id}>
-                              <td>{cap.cap_name}</td>
+                            <tr key={cap.id} className="framedetails-table-row">
+                              <td className="framedetails-name-cell">{cap.cap_name}</td>
                               <td>
                                 {cap.image ? (
                                   <img
                                     src={getImageUrl(cap.image)}
                                     alt={cap.cap_name}
-                                    className="img-thumbnail"
-                                    style={{ width: '80px', height: '80px', objectFit: 'cover' }}
+                                    className="framedetails-image"
                                     onError={handleImageError}
                                   />
                                 ) : (
-                                  <span>No image</span>
+                                  <span className="framedetails-no-data">No image</span>
                                 )}
                               </td>
-                              <td>${cap.price || 'N/A'}</td>
+                              <td className="framedetails-price-cell">${cap.price || 'N/A'}</td>
                               <td>
                                 <button
-                                  className="btn btn-sm btn-info me-2"
+                                  className="framedetails-action-btn framedetails-edit-btn"
                                   onClick={() => handleSelectItem(cap, 'cap')}
                                 >
+                                  <Edit className="framedetails-btn-icon" />
                                   Edit
                                 </button>
                               </td>
@@ -1368,43 +1483,51 @@ function Details() {
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'tshirts' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <Shirt className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">T-shirt Details</h2>
                 </div>
-              )}
-              {activeTab === 'tshirts' && (
-                <div>
-                  <h2 className="card-title mb-4">Tshirt Details</h2>
-                  {tshirts.length === 0 ? (
-                    <p className="text-muted">No tshirts available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+                {tshirts.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <Shirt className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No t-shirts available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">Name</th>
-                            <th scope="col">Image</th>
-                            <th scope="col">Created By</th>
-                            <th scope="col">Created At</th>
-                            <th scope="col">Color Variants</th>
-                            <th scope="col">Size Variants</th>
-                            <th scope="col">Actions</th>
+                            <th>Name</th>
+                            <th>Image</th>
+                            <th>Created By</th>
+                            <th>Created At</th>
+                            <th>Color Variants</th>
+                            <th>Size Variants</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {tshirts.map((tshirt) => (
-                            <tr key={tshirt.id}>
-                              <td>{tshirt.tshirt_name}</td>
+                            <tr key={tshirt.id} className="framedetails-table-row">
+                              <td className="framedetails-name-cell">{tshirt.tshirt_name}</td>
                               <td>
                                 {tshirt.image ? (
                                   <img
                                     src={getImageUrl(tshirt.image)}
                                     alt={tshirt.tshirt_name}
-                                    className="img-thumbnail"
-                                    style={{ width: '80px', height: '80px', objectFit: 'cover' }}
+                                    className="framedetails-image"
                                     onError={handleImageError}
                                   />
                                 ) : (
-                                  <span>No image</span>
+                                  <span className="framedetails-no-data">No image</span>
                                 )}
                               </td>
                               <td>
@@ -1414,58 +1537,57 @@ function Details() {
                               </td>
                               <td>{new Date(tshirt.created_at).toLocaleDateString()}</td>
                               <td>
-                                <ul className="list-unstyled">
+                                <div className="framedetails-variants-list">
                                   {tshirt.color_variants.map((variant) => (
-                                    <li key={variant.id} className="d-flex align-items-center mb-2">
-                                      <span className="me-2">{variant.color_name}</span>
+                                    <div key={variant.id} className="framedetails-variant-item">
+                                      <span className="framedetails-variant-name">{variant.color_name}</span>
                                       {variant.image && (
                                         <img
                                           src={getImageUrl(variant.image)}
                                           alt={variant.color_name}
-                                          className="img-thumbnail"
-                                          style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                                          className="framedetails-variant-image"
                                           onError={handleImageError}
                                         />
                                       )}
                                       <button
-                                        className="btn btn-sm btn-info ms-2"
+                                        className="framedetails-variant-edit-btn"
                                         onClick={() => handleSelectItem(variant, 'tshirt_color')}
                                       >
-                                        Edit
+                                        <Edit className="framedetails-btn-icon" />
                                       </button>
-                                    </li>
+                                    </div>
                                   ))}
-                                </ul>
+                                </div>
                               </td>
                               <td>
-                                <ul className="list-unstyled">
+                                <div className="framedetails-variants-list">
                                   {tshirt.size_variants.map((variant) => (
-                                    <li key={variant.id} className="d-flex align-items-center mb-2">
-                                      <span className="me-2">{variant.size_name}</span>
+                                    <div key={variant.id} className="framedetails-variant-item">
+                                      <span className="framedetails-variant-name">{variant.size_name}</span>
                                       {variant.image && (
                                         <img
                                           src={getImageUrl(variant.image)}
                                           alt={variant.size_name}
-                                          className="img-thumbnail"
-                                          style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+                                          className="framedetails-variant-image"
                                           onError={handleImageError}
                                         />
                                       )}
                                       <button
-                                        className="btn btn-sm btn-info ms-2"
+                                        className="framedetails-variant-edit-btn"
                                         onClick={() => handleSelectItem(variant, 'tshirt_size')}
                                       >
-                                        Edit
+                                        <Edit className="framedetails-btn-icon" />
                                       </button>
-                                    </li>
+                                    </div>
                                   ))}
-                                </ul>
+                                </div>
                               </td>
                               <td>
                                 <button
-                                  className="btn btn-sm btn-info me-2"
+                                  className="framedetails-action-btn framedetails-edit-btn"
                                   onClick={() => handleSelectItem(tshirt, 'tshirt')}
                                 >
+                                  <Edit className="framedetails-btn-icon" />
                                   Edit
                                 </button>
                               </td>
@@ -1474,48 +1596,57 @@ function Details() {
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'tiles' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <Square className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Tiles</h2>
                 </div>
-              )}
-              {activeTab === 'tiles' && (
-                <div>
-                  <h2 className="card-title mb-4">Tiles</h2>
-                  {tiles.length === 0 ? (
-                    <p className="text-muted">No tiles available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+                {tiles.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <Square className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No tiles available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">Tile Name</th>
-                            <th scope="col">Image</th>
-                            <th scope="col">Price</th>
-                            <th scope="col">Actions</th>
+                            <th>Tile Name</th>
+                            <th>Image</th>
+                            <th>Price</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {tiles.map((tile) => (
-                            <tr key={tile.id}>
-                              <td>{tile.tile_name}</td>
+                            <tr key={tile.id} className="framedetails-table-row">
+                              <td className="framedetails-name-cell">{tile.tile_name}</td>
                               <td>
                                 {tile.image ? (
                                   <img
                                     src={getImageUrl(tile.image)}
                                     alt={tile.tile_name}
-                                    className="img-thumbnail"
-                                    style={{ width: '80px', height: '80px', objectFit: 'cover' }}
+                                    className="framedetails-image"
                                     onError={handleImageError}
                                   />
                                 ) : (
-                                  <span>No image</span>
+                                  <span className="framedetails-no-data">No image</span>
                                 )}
                               </td>
-                              <td>${tile.price || 'N/A'}</td>
+                              <td className="framedetails-price-cell">${tile.price || 'N/A'}</td>
                               <td>
                                 <button
-                                  className="btn btn-sm btn-info me-2"
+                                  className="framedetails-action-btn framedetails-edit-btn"
                                   onClick={() => handleSelectItem(tile, 'tile')}
                                 >
+                                  <Edit className="framedetails-btn-icon" />
                                   Edit
                                 </button>
                               </td>
@@ -1524,48 +1655,57 @@ function Details() {
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'pens' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <Pen className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Pens</h2>
                 </div>
-              )}
-              {activeTab === 'pens' && (
-                <div>
-                  <h2 className="card-title mb-4">Pens</h2>
-                  {pens.length === 0 ? (
-                    <p className="text-muted">No pens available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+                {pens.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <Pen className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No pens available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">Pen Name</th>
-                            <th scope="col">Image</th>
-                            <th scope="col">Price</th>
-                            <th scope="col">Actions</th>
+                            <th>Pen Name</th>
+                            <th>Image</th>
+                            <th>Price</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {pens.map((pen) => (
-                            <tr key={pen.id}>
-                              <td>{pen.pen_name}</td>
+                            <tr key={pen.id} className="framedetails-table-row">
+                              <td className="framedetails-name-cell">{pen.pen_name}</td>
                               <td>
                                 {pen.image ? (
                                   <img
                                     src={getImageUrl(pen.image)}
                                     alt={pen.pen_name}
-                                    className="img-thumbnail"
-                                    style={{ width: '80px', height: '80px', objectFit: 'cover' }}
+                                    className="framedetails-image"
                                     onError={handleImageError}
                                   />
                                 ) : (
-                                  <span>No image</span>
+                                  <span className="framedetails-no-data">No image</span>
                                 )}
                               </td>
-                              <td>${pen.price || 'N/A'}</td>
+                              <td className="framedetails-price-cell">${pen.price || 'N/A'}</td>
                               <td>
                                 <button
-                                  className="btn btn-sm btn-info me-2"
+                                  className="framedetails-action-btn framedetails-edit-btn"
                                   onClick={() => handleSelectItem(pen, 'pen')}
                                 >
+                                  <Edit className="framedetails-btn-icon" />
                                   Edit
                                 </button>
                               </td>
@@ -1574,34 +1714,44 @@ function Details() {
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'printtypes' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <Printer className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Print Types</h2>
                 </div>
-              )}
-              {activeTab === 'printtypes' && (
-                <div>
-                  <h2 className="card-title mb-4">Print Types</h2>
-                  {printTypes.length === 0 ? (
-                    <p className="text-muted">No print types available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+                {printTypes.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <Printer className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No print types available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">Name</th>
-                            <th scope="col">Price</th>
-                            <th scope="col">Actions</th>
+                            <th>Name</th>
+                            <th>Price</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {printTypes.map((printType) => (
-                            <tr key={printType.id}>
-                              <td>{printType.name}</td>
-                              <td>${printType.price}</td>
+                            <tr key={printType.id} className="framedetails-table-row">
+                              <td className="framedetails-name-cell">{printType.name}</td>
+                              <td className="framedetails-price-cell">${printType.price}</td>
                               <td>
                                 <button
-                                  className="btn btn-sm btn-info me-2"
+                                  className="framedetails-action-btn framedetails-edit-btn"
                                   onClick={() => handleSelectItem(printType, 'printtype')}
                                 >
+                                  <Edit className="framedetails-btn-icon" />
                                   Edit
                                 </button>
                               </td>
@@ -1610,34 +1760,44 @@ function Details() {
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'printsizes' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <Ruler className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Print Sizes</h2>
                 </div>
-              )}
-              {activeTab === 'printsizes' && (
-                <div>
-                  <h2 className="card-title mb-4">Print Sizes</h2>
-                  {printSizes.length === 0 ? (
-                    <p className="text-muted">No print sizes available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+                {printSizes.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <Ruler className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No print sizes available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">Name</th>
-                            <th scope="col">Price</th>
-                            <th scope="col">Actions</th>
+                            <th>Name</th>
+                            <th>Price</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {printSizes.map((printSize) => (
-                            <tr key={printSize.id}>
-                              <td>{printSize.name}</td>
-                              <td>${printSize.price}</td>
+                            <tr key={printSize.id} className="framedetails-table-row">
+                              <td className="framedetails-name-cell">{printSize.name}</td>
+                              <td className="framedetails-price-cell">${printSize.price}</td>
                               <td>
                                 <button
-                                  className="btn btn-sm btn-info me-2"
+                                  className="framedetails-action-btn framedetails-edit-btn"
                                   onClick={() => handleSelectItem(printSize, 'printsize')}
                                 >
+                                  <Edit className="framedetails-btn-icon" />
                                   Edit
                                 </button>
                               </td>
@@ -1646,34 +1806,44 @@ function Details() {
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'papertypes' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <FileText className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Paper Types</h2>
                 </div>
-              )}
-              {activeTab === 'papertypes' && (
-                <div>
-                  <h2 className="card-title mb-4">Paper Types</h2>
-                  {paperTypes.length === 0 ? (
-                    <p className="text-muted">No paper types available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+                {paperTypes.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <FileText className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No paper types available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">Name</th>
-                            <th scope="col">Price</th>
-                            <th scope="col">Actions</th>
+                            <th>Name</th>
+                            <th>Price</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {paperTypes.map((paperType) => (
-                            <tr key={paperType.id}>
-                              <td>{paperType.name}</td>
-                              <td>${paperType.price}</td>
+                            <tr key={paperType.id} className="framedetails-table-row">
+                              <td className="framedetails-name-cell">{paperType.name}</td>
+                              <td className="framedetails-price-cell">${paperType.price}</td>
                               <td>
                                 <button
-                                  className="btn btn-sm btn-info me-2"
+                                  className="framedetails-action-btn framedetails-edit-btn"
                                   onClick={() => handleSelectItem(paperType, 'papertype')}
                                 >
+                                  <Edit className="framedetails-btn-icon" />
                                   Edit
                                 </button>
                               </td>
@@ -1682,34 +1852,44 @@ function Details() {
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'laminationtypes' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <Layers className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Lamination Types</h2>
                 </div>
-              )}
-              {activeTab === 'laminationtypes' && (
-                <div>
-                  <h2 className="card-title mb-4">Lamination Types</h2>
-                  {laminationTypes.length === 0 ? (
-                    <p className="text-muted">No lamination types available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+                {laminationTypes.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <Layers className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No lamination types available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">Name</th>
-                            <th scope="col">Price</th>
-                            <th scope="col">Actions</th>
+                            <th>Name</th>
+                            <th>Price</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {laminationTypes.map((laminationType) => (
-                            <tr key={laminationType.id}>
-                              <td>{laminationType.name}</td>
-                              <td>${laminationType.price}</td>
+                            <tr key={laminationType.id} className="framedetails-table-row">
+                              <td className="framedetails-name-cell">{laminationType.name}</td>
+                              <td className="framedetails-price-cell">${laminationType.price}</td>
                               <td>
                                 <button
-                                  className="btn btn-sm btn-info me-2"
+                                  className="framedetails-action-btn framedetails-edit-btn"
                                   onClick={() => handleSelectItem(laminationType, 'laminationtype')}
                                 >
+                                  <Edit className="framedetails-btn-icon" />
                                   Edit
                                 </button>
                               </td>
@@ -1718,1476 +1898,1741 @@ function Details() {
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'frameOrders' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <ShoppingCart className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Frame Orders</h2>
                 </div>
-              )}
-              {activeTab === 'frameOrders' && (
-                <div>
-                  <h2 className="card-title mb-4">Frame Orders</h2>
-                  {frameOrders.length === 0 ? (
-                    <p className="text-muted">No frame orders available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+                {frameOrders.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <ShoppingCart className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No frame orders available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">ID</th>
-                            <th scope="col">User</th>
-                            <th scope="col">Total Price</th>
-                            <th scope="col">Status</th>
-                            <th scope="col">Created At</th>
-                            <th scope="col">Actions</th>
+                            <th>ID</th>
+                            <th>User</th>
+                            <th>Total Price</th>
+                            <th>Status</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {frameOrders.map((order) => (
-                            <tr key={order.id}>
-                              <td>{order.id}</td>
+                            <tr key={order.id} className="framedetails-table-row">
+                              <td className="framedetails-id-cell">{order.id}</td>
                               <td>{order.user.username}</td>
-                              <td>${order.total_price}</td>
-                              <td>{order.status}</td>
+                              <td className="framedetails-price-cell">${order.total_price}</td>
+                              <td>
+                                <span className={`framedetails-status-badge framedetails-status-${order.status.toLowerCase()}`}>
+                                  {order.status}
+                                </span>
+                              </td>
                               <td>{new Date(order.created_at).toLocaleString()}</td>
                               <td>
-                                <button
-                                  className="btn btn-sm btn-info me-2"
-                                  onClick={() => handleSelectItem(order, 'frameOrder')}
-                                >
-                                  View
-                                </button>
-                                <button
-                                  className="btn btn-sm btn-danger"
-                                  onClick={() => handleDelete(order.id, 'frameOrder')}
-                                >
-                                  Delete
-                                </button>
+                                <div className="framedetails-action-group">
+                                  <button
+                                    className="framedetails-action-btn framedetails-view-btn"
+                                    onClick={() => handleSelectItem(order, 'frameOrder')}
+                                  >
+                                    <Edit className="framedetails-btn-icon" />
+                                    View
+                                  </button>
+                                  <button
+                                    className="framedetails-action-btn framedetails-delete-btn"
+                                    onClick={() => handleDelete(order.id, 'frameOrder')}
+                                  >
+                                    <Trash2 className="framedetails-btn-icon" />
+                                    Delete
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'giftOrders' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <Gift className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Gift Orders</h2>
                 </div>
-              )}
-              {activeTab === 'giftOrders' && (
-                <div>
-                  <h2 className="card-title mb-4">Gift Orders</h2>
-                  {giftOrders.length === 0 ? (
-                    <p className="text-muted">No gift orders available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+                {giftOrders.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <Gift className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No gift orders available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">ID</th>
-                            <th scope="col">User</th>
-                            <th scope="col">Total Price</th>
-                            <th scope="col">Status</th>
-                            <th scope="col">Created At</th>
-                            <th scope="col">Actions</th>
+                            <th>ID</th>
+                            <th>User</th>
+                            <th>Total Price</th>
+                            <th>Status</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {giftOrders.map((order) => (
-                            <tr key={order.id}>
-                              <td>{order.id}</td>
+                            <tr key={order.id} className="framedetails-table-row">
+                              <td className="framedetails-id-cell">{order.id}</td>
                               <td>{order.user.username}</td>
-                              <td>${order.total_price}</td>
-                              <td>{order.status}</td>
+                              <td className="framedetails-price-cell">${order.total_price}</td>
+                              <td>
+                                <span className={`framedetails-status-badge framedetails-status-${order.status.toLowerCase()}`}>
+                                  {order.status}
+                                </span>
+                              </td>
                               <td>{new Date(order.created_at).toLocaleString()}</td>
                               <td>
-                                <button
-                                  className="btn btn-sm btn-info me-2"
-                                  onClick={() => handleSelectItem(order, 'giftOrder')}
-                                >
-                                  View
-                                </button>
-                                <button
-                                  className="btn btn-sm btn-danger"
-                                  onClick={() => handleDelete(order.id, 'giftOrder')}
-                                >
-                                  Delete
-                                </button>
+                                <div className="framedetails-action-group">
+                                  <button
+                                    className="framedetails-action-btn framedetails-view-btn"
+                                    onClick={() => handleSelectItem(order, 'giftOrder')}
+                                  >
+                                    <Edit className="framedetails-btn-icon" />
+                                    View
+                                  </button>
+                                  <button
+                                    className="framedetails-action-btn framedetails-delete-btn"
+                                    onClick={() => handleDelete(order.id, 'giftOrder')}
+                                  >
+                                    <Trash2 className="framedetails-btn-icon" />
+                                    Delete
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'simpleDocumentOrders' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <FileText className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Simple Document Orders</h2>
                 </div>
-              )}
-              
-              {activeTab === 'simpleDocumentOrders' && (
-                <div>
-                  <h2 className="card-title mb-4">Simple Document Orders</h2>
-                  {simpleDocumentOrders.length === 0 ? (
-                    <p className="text-muted">No simple document orders available</p>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead className="table-light">
+                {simpleDocumentOrders.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <FileText className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No simple document orders available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
                           <tr>
-                            <th scope="col">ID</th>
-                            <th scope="col">User</th>
-                            <th scope="col">Total Amount</th>
-                            <th scope="col">Status</th>
-                            <th scope="col">Created At</th>
-                            <th scope="col">Actions</th>
+                            <th>ID</th>
+                            <th>User</th>
+                            <th>Total Amount</th>
+                            <th>Status</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {simpleDocumentOrders.map((order) => (
-                            <tr key={order.id}>
-                              <td>{order.id}</td>
+                            <tr key={order.id} className="framedetails-table-row">
+                              <td className="framedetails-id-cell">{order.id}</td>
                               <td>{order.user.username}</td>
-                              <td>${order.total_amount}</td>
-                              <td>{order.status}</td>
+                              <td className="framedetails-price-cell">${order.total_amount}</td>
+                              <td>
+                                <span className={`framedetails-status-badge framedetails-status-${order.status.toLowerCase()}`}>
+                                  {order.status}
+                                </span>
+                              </td>
                               <td>{new Date(order.created_at).toLocaleString()}</td>
                               <td>
-                                <button
-                                  className="btn btn-sm btn-info me-2"
-                                  onClick={() => handleSelectItem(order, 'simpleDocumentOrder')}
-                                >
-                                  View
-                                </button>
-                                <button
-                                  className="btn btn-sm btn-danger"
-                                  onClick={() => handleDelete(order.id, 'simpleDocumentOrder')}
-                                >
-                                  Delete
-                                </button>
+                                <div className="framedetails-action-group">
+                                  <button
+                                    className="framedetails-action-btn framedetails-view-btn"
+                                    onClick={() => handleSelectItem(order, 'simpleDocumentOrder')}
+                                  >
+                                    <Edit className="framedetails-btn-icon" />
+                                    View
+                                  </button>
+                                  <button
+                                    className="framedetails-action-btn framedetails-delete-btn"
+                                    onClick={() => handleDelete(order.id, 'simpleDocumentOrder')}
+                                  >
+                                    <Trash2 className="framedetails-btn-icon" />
+                                    Delete
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
-      {/* Modal for Item Details */}
+
+      {/* Modal */}
       {selectedItem && (
-        <div className="modal fade show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-lg">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">
-                  {modalType === 'frame' && 'Frame Details'}
-                  {modalType === 'color' && 'Color Variant Details'}
-                  {modalType === 'size' && 'Size Variant Details'}
-                  {modalType === 'finish' && 'Finishing Variant Details'}
-                  {modalType === 'hanging' && 'Hanging Variant Details'}
-                  {modalType === 'user' && 'User Details'}
-                  {modalType === 'category' && 'Category Details'}
-                  {modalType === 'mackboard' && 'MackBoard Details'}
-                  {modalType === 'mackboard_color' && 'MackBoard Color Variant Details'}
-                  {modalType === 'mug' && 'Mug Details'}
-                  {modalType === 'cap' && 'Cap Details'}
-                  {modalType === 'tshirt' && 'Tshirt Details'}
-                  {modalType === 'tshirt_color' && 'Tshirt Color Variant Details'}
-                  {modalType === 'tshirt_size' && 'Tshirt Size Variant Details'}
-                  {modalType === 'tile' && 'Tile Details'}
-                  {modalType === 'pen' && 'Pen Details'}
-                  {modalType === 'printtype' && 'Print Type Details'}
-                  {modalType === 'printsize' && 'Print Size Details'}
-                  {modalType === 'papertype' && 'Paper Type Details'}
-                  {modalType === 'laminationtype' && 'Lamination Type Details'}
-                  {modalType === 'frameOrder' && 'Frame Order Details'}
-                  {modalType === 'giftOrder' && 'Gift Order Details'}
-                  
-                  {modalType === 'simpleDocumentOrder' && 'Simple Document Order Details'}
-                </h5>
-                <button type="button" className="btn-close" onClick={handleCloseModal}></button>
-              </div>
-              <div className="modal-body">
-                {modalType === 'frame' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'frame', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="name"
-                        defaultValue={selectedItem.name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Category</label>
-                      <select
-                        className="form-control"
-                        name="category_id"
-                        defaultValue={selectedItem.category?.id || ''}
-                      >
-                        <option value="">-- Select Category (Optional) --</option>
-                        {categories.map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {category.frameCategory}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Image</label>
-                      <input type="file" className="form-control" name="image" accept="image/*" />
-                      {selectedItem.image && (
-                        <img
-                          src={getImageUrl(selectedItem.image)}
-                          alt={selectedItem.name}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Corner Image</label>
-                      <input type="file" className="form-control" name="corner_image" accept="image/*" />
-                      {selectedItem.corner_image && (
-                        <img
-                          src={getImageUrl(selectedItem.corner_image)}
-                          alt={`${selectedItem.name} corner`}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Inner Width</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="inner_width"
-                        defaultValue={selectedItem.inner_width}
-                        step="0.1"
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Inner Height</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="inner_height"
-                        defaultValue={selectedItem.inner_height}
-                        step="0.1"
-                        required
-                      />
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'frame')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'color' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'color', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Color Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="color_name"
-                        defaultValue={selectedItem.color_name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Image</label>
-                      <input type="file" className="form-control" name="image" accept="image/*" />
-                      {selectedItem.image && (
-                        <img
-                          src={getImageUrl(selectedItem.image)}
-                          alt={selectedItem.color_name}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Corner Image</label>
-                      <input type="file" className="form-control" name="corner_image" accept="image/*" />
-                      {selectedItem.corner_image && (
-                        <img
-                          src={getImageUrl(selectedItem.corner_image)}
-                          alt={`${selectedItem.color_name} corner`}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'color')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'size' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'size', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Size Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="size_name"
-                        defaultValue={selectedItem.size_name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Inner Width</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="inner_width"
-                        defaultValue={selectedItem.inner_width}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Inner Height</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="inner_height"
-                        defaultValue={selectedItem.inner_height}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Image (Optional)</label>
-                      <input type="file" className="form-control" name="image" accept="image/*" />
-                      {selectedItem.image && (
-                        <img
-                          src={getImageUrl(selectedItem.image)}
-                          alt={selectedItem.size_name}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Corner Image (Optional)</label>
-                      <input type="file" className="form-control" name="corner_image" accept="image/*" />
-                      {selectedItem.corner_image && (
-                        <img
-                          src={getImageUrl(selectedItem.corner_image)}
-                          alt={`${selectedItem.size_name} corner`}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'size')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'finish' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'finish', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Finish Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="finish_name"
-                        defaultValue={selectedItem.finish_name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Image</label>
-                      <input type="file" className="form-control" name="image" accept="image/*" />
-                      {selectedItem.image && (
-                        <img
-                          src={getImageUrl(selectedItem.image)}
-                          alt={selectedItem.finish_name}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Corner Image</label>
-                      <input type="file" className="form-control" name="corner_image" accept="image/*" />
-                      {selectedItem.corner_image && (
-                        <img
-                          src={getImageUrl(selectedItem.corner_image)}
-                          alt={`${selectedItem.finish_name} corner`}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'finish')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'hanging' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'hanging', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Hanging Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="hanging_name"
-                        defaultValue={selectedItem.hanging_name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Image</label>
-                      <input type="file" className="form-control" name="image" accept="image/*" />
-                      {selectedItem.image && (
-                        <img
-                          src={getImageUrl(selectedItem.image)}
-                          alt={selectedItem.hanging_name}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'hanging')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'user' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'user', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Username</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="username"
-                        defaultValue={selectedItem.username}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Email</label>
-                      <input
-                        type="email"
-                        className="form-control"
-                        name="email"
-                        defaultValue={selectedItem.email}
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="name"
-                        defaultValue={selectedItem.name}
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Phone</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="phone"
-                        defaultValue={selectedItem.phone}
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Blocked</label>
-                      <select
-                        className="form-control"
-                        name="is_blocked"
-                        defaultValue={selectedItem.is_blocked ? 'true' : 'false'}
-                      >
-                        <option value="false">No</option>
-                        <option value="true">Yes</option>
-                      </select>
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'user')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'category' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'category', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Category Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="frameCategory"
-                        defaultValue={selectedItem.frameCategory}
-                        required
-                      />
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'category')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'mackboard' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'mackboard', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Board Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="board_name"
-                        defaultValue={selectedItem.board_name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Image (Optional)</label>
-                      <input type="file" className="form-control" name="image" accept="image/*" />
-                      {selectedItem.image && (
-                        <img
-                          src={getImageUrl(selectedItem.image)}
-                          alt={selectedItem.board_name}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'mackboard')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'mackboard_color' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'mackboard_color', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Color Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="color_name"
-                        defaultValue={selectedItem.color_name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Image (Optional)</label>
-                      <input type="file" className="form-control" name="image" accept="image/*" />
-                      {selectedItem.image && (
-                        <img
-                          src={getImageUrl(selectedItem.image)}
-                          alt={selectedItem.color_name}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'mackboard_color')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'mug' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'mug', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Mug Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="mug_name"
-                        defaultValue={selectedItem.mug_name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Image (Optional)</label>
-                      <input type="file" className="form-control" name="image" accept="image/*" />
-                      {selectedItem.image && (
-                        <img
-                          src={getImageUrl(selectedItem.image)}
-                          alt={selectedItem.mug_name}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">GLB File (Optional)</label>
-                      <input type="file" className="form-control" name="glb_file" />
-                      {selectedItem.glb_file && (
-                        <a href={getImageUrl(selectedItem.glb_file)} target="_blank" rel="noopener noreferrer">
-                          View Current GLB
-                        </a>
-                      )}
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'mug')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'cap' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'cap', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Cap Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="cap_name"
-                        defaultValue={selectedItem.cap_name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Image (Optional)</label>
-                      <input type="file" className="form-control" name="image" accept="image/*" />
-                      {selectedItem.image && (
-                        <img
-                          src={getImageUrl(selectedItem.image)}
-                          alt={selectedItem.cap_name}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'cap')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'tshirt' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'tshirt', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Tshirt Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="tshirt_name"
-                        defaultValue={selectedItem.tshirt_name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Image (Optional)</label>
-                      <input type="file" className="form-control" name="image" accept="image/*" />
-                      {selectedItem.image && (
-                        <img
-                          src={getImageUrl(selectedItem.image)}
-                          alt={selectedItem.tshirt_name}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'tshirt')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'tshirt_color' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'tshirt_color', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Color Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="color_name"
-                        defaultValue={selectedItem.color_name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Image (Optional)</label>
-                      <input type="file" className="form-control" name="image" accept="image/*" />
-                      {selectedItem.image && (
-                        <img
-                          src={getImageUrl(selectedItem.image)}
-                          alt={selectedItem.color_name}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'tshirt_color')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'tshirt_size' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'tshirt_size', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Size Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="size_name"
-                        defaultValue={selectedItem.size_name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Inner Width (Optional)</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="inner_width"
-                        defaultValue={selectedItem.inner_width}
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Inner Height (Optional)</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="inner_height"
-                        defaultValue={selectedItem.inner_height}
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Image (Optional)</label>
-                      <input type="file" className="form-control" name="image" accept="image/*" />
-                      {selectedItem.image && (
-                        <img
-                          src={getImageUrl(selectedItem.image)}
-                          alt={selectedItem.size_name}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'tshirt_size')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'tile' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'tile', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Tile Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="tile_name"
-                        defaultValue={selectedItem.tile_name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Image (Optional)</label>
-                      <input type="file" className="form-control" name="image" accept="image/*" />
-                      {selectedItem.image && (
-                        <img
-                          src={getImageUrl(selectedItem.image)}
-                          alt={selectedItem.tile_name}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'tile')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'pen' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'pen', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Pen Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="pen_name"
-                        defaultValue={selectedItem.pen_name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Image (Optional)</label>
-                      <input type="file" className="form-control" name="image" accept="image/*" />
-                      {selectedItem.image && (
-                        <img
-                          src={getImageUrl(selectedItem.image)}
-                          alt={selectedItem.pen_name}
-                          className="img-thumbnail mt-2"
-                          style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      )}
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'pen')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'printtype' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'printtype', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="name"
-                        defaultValue={selectedItem.name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'printtype')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'printsize' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'printsize', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="name"
-                        defaultValue={selectedItem.name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'printsize')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'papertype' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'papertype', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="name"
-                        defaultValue={selectedItem.name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'papertype')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'laminationtype' && (
-                  <form
-                    onSubmit={(e) => {
-                      const formData = new FormData(e.target);
-                      handleUpdate(e, selectedItem.id, 'laminationtype', formData);
-                    }}
-                  >
-                    <div className="mb-3">
-                      <label className="form-label">Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="name"
-                        defaultValue={selectedItem.name}
-                        required
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Price</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="price"
-                        defaultValue={selectedItem.price}
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                    <div className="modal-footer">
-                      <button type="submit" className="btn btn-primary">Update</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'laminationtype')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {modalType === 'frameOrder' && (
-                  <div>
-                    <p><strong>ID:</strong> {selectedItem.id}</p>
-                    <p><strong>User:</strong> {selectedItem.user.username}</p>
-                    <p><strong>Frame:</strong> {selectedItem.frame ? selectedItem.frame.name : 'Custom'}</p>
-                    <p><strong>Color Variant:</strong> {selectedItem.color_variant ? selectedItem.color_variant.color_name : 'N/A'}</p>
-                    <p><strong>Size Variant:</strong> {selectedItem.size_variant ? selectedItem.size_name : 'N/A'}</p>
-                    <p><strong>Finish Variant:</strong> {selectedItem.finish_variant ? selectedItem.finish_name : 'N/A'}</p>
-                    <p><strong>Hanging Variant:</strong> {selectedItem.hanging_variant ? selectedItem.hanging_name : 'N/A'}</p>
-                    <p><strong>Total Price:</strong> ${selectedItem.total_price}</p>
-                    <p><strong>Status:</strong> {selectedItem.status}</p>
-                    <p><strong>Created At:</strong> {new Date(selectedItem.created_at).toLocaleString()}</p>
-                    <p><strong>Print Unit:</strong> {selectedItem.print_unit}</p>
-                    <p><strong>Media Type:</strong> {selectedItem.media_type}</p>
-                    <p><strong>Paper Type:</strong> {selectedItem.paper_type}</p>
-                    <p><strong>Fit:</strong> {selectedItem.fit}</p>
-                    {selectedItem.adjusted_image && (
-                      <div>
-                        <label>Adjusted Image:</label>
-                        <img
-                          src={getImageUrl(selectedItem.adjusted_image)}
-                          alt="Adjusted Image"
-                          className="img-thumbnail"
-                          style={{ width: '200px', height: '200px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      </div>
-                    )}
-                    {/* Add more fields as needed */}
-                    <div className="modal-footer">
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'frameOrder')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
+        <div className="framedetails-modal-overlay">
+          <div className="framedetails-modal">
+            <div className="framedetails-modal-header">
+              <h3 className="framedetails-modal-title">
+                {modalType === 'frame' && 'Frame Details'}
+                {modalType === 'color' && 'Color Variant Details'}
+                {modalType === 'size' && 'Size Variant Details'}
+                {modalType === 'finish' && 'Finishing Variant Details'}
+                {modalType === 'hanging' && 'Hanging Variant Details'}
+                {modalType === 'user' && 'User Details'}
+                {modalType === 'category' && 'Category Details'}
+                {modalType === 'mackboard' && 'MackBoard Details'}
+                {modalType === 'mackboard_color' && 'MackBoard Color Variant Details'}
+                {modalType === 'mug' && 'Mug Details'}
+                {modalType === 'cap' && 'Cap Details'}
+                {modalType === 'tshirt' && 'Tshirt Details'}
+                {modalType === 'tshirt_color' && 'Tshirt Color Variant Details'}
+                {modalType === 'tshirt_size' && 'Tshirt Size Variant Details'}
+                {modalType === 'tile' && 'Tile Details'}
+                {modalType === 'pen' && 'Pen Details'}
+                {modalType === 'printtype' && 'Print Type Details'}
+                {modalType === 'printsize' && 'Print Size Details'}
+                {modalType === 'papertype' && 'Paper Type Details'}
+                {modalType === 'laminationtype' && 'Lamination Type Details'}
+                {modalType === 'frameOrder' && 'Frame Order Details'}
+                {modalType === 'giftOrder' && 'Gift Order Details'}
+                {modalType === 'simpleDocumentOrder' && 'Simple Document Order Details'}
+              </h3>
+              <button className="framedetails-modal-close" onClick={handleCloseModal}>
+                <X className="framedetails-close-icon" />
+              </button>
+            </div>
+            <div className="framedetails-modal-body">
+              {modalType === 'frame' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'frame', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="name"
+                      defaultValue={selectedItem.name}
+                      required
+                    />
                   </div>
-                )}
-                {modalType === 'giftOrder' && (
-                  <div>
-                    <p><strong>ID:</strong> {selectedItem.id}</p>
-                    <p><strong>User:</strong> {selectedItem.user.username}</p>
-                    <p><strong>Total Price:</strong> ${selectedItem.total_price}</p>
-                    <p><strong>Status:</strong> {selectedItem.status}</p>
-                    <p><strong>Created At:</strong> {new Date(selectedItem.created_at).toLocaleString()}</p>
-                    <p><strong>Gift Type:</strong> {selectedItem.tshirt ? 'Tshirt' : selectedItem.mug ? 'Mug' : selectedItem.cap ? 'Cap' : selectedItem.tile ? 'Tile' : selectedItem.pen ? 'Pen' : 'Unknown'}</p>
-                    {/* Add specific gift details */}
-                    {selectedItem.uploaded_image && (
-                      <div>
-                        <label>Uploaded Image:</label>
-                        <img
-                          src={getImageUrl(selectedItem.uploaded_image)}
-                          alt="Uploaded Image"
-                          className="img-thumbnail"
-                          style={{ width: '200px', height: '200px', objectFit: 'cover' }}
-                          onError={handleImageError}
-                        />
-                      </div>
-                    )}
-                    <div className="modal-footer">
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'giftOrder')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
-                    </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                      required
+                    />
                   </div>
-                )}
-                
-                {modalType === 'simpleDocumentOrder' && (
-                  <div>
-                    <p><strong>ID:</strong> {selectedItem.id}</p>
-                    <p><strong>User:</strong> {selectedItem.user.username}</p>
-                    <p><strong>Total Amount:</strong> ${selectedItem.total_amount}</p>
-                    <p><strong>Status:</strong> {selectedItem.status}</p>
-                    <p><strong>Created At:</strong> {new Date(selectedItem.created_at).toLocaleString()}</p>
-                    <p><strong>Print Type:</strong> {selectedItem.print_type ? selectedItem.print_type.name : 'N/A'}</p>
-                    <p><strong>Print Size:</strong> {selectedItem.print_size ? selectedItem.print_size.name : 'N/A'}</p>
-                    <p><strong>Paper Type:</strong> {selectedItem.paper_type ? selectedItem.paper_type.name : 'N/A'}</p>
-                    <p><strong>Lamination:</strong> {selectedItem.lamination ? 'Yes' : 'No'}</p>
-                    <p><strong>Lamination Type:</strong> {selectedItem.lamination_type ? selectedItem.lamination_type.name : 'N/A'}</p>
-                    <p><strong>Delivery Option:</strong> {selectedItem.delivery_option}</p>
-                    <p><strong>Quantity:</strong> {selectedItem.quantity}</p>
-                    <h6>Files:</h6>
-                    <ul>
-                      {selectedItem.files.map((file, index) => (
-                        <li key={index}>
-                          <p><strong>File:</strong> {file.file}</p>
-                        </li>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Category</label>
+                    <select
+                      className="framedetails-form-select"
+                      name="category_id"
+                      defaultValue={selectedItem.category?.id || ''}
+                    >
+                      <option value="">-- Select Category (Optional) --</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.frameCategory}
+                        </option>
                       ))}
-                    </ul>
-                    <div className="modal-footer">
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleDelete(selectedItem.id, 'simpleDocumentOrder')}
-                      >
-                        Delete
-                      </button>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
-                        Close
-                      </button>
+                    </select>
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Corner Image</label>
+                    <input type="file" className="framedetails-form-file" name="corner_image" accept="image/*" />
+                    {selectedItem.corner_image && (
+                      <img
+                        src={getImageUrl(selectedItem.corner_image)}
+                        alt={`${selectedItem.name} corner`}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-form-row">
+                    <div className="framedetails-form-group">
+                      <label className="framedetails-form-label">Inner Width</label>
+                      <input
+                        type="number"
+                        className="framedetails-form-input"
+                        name="inner_width"
+                        defaultValue={selectedItem.inner_width}
+                        step="0.1"
+                        required
+                      />
+                    </div>
+                    <div className="framedetails-form-group">
+                      <label className="framedetails-form-label">Inner Height</label>
+                      <input
+                        type="number"
+                        className="framedetails-form-input"
+                        name="inner_height"
+                        defaultValue={selectedItem.inner_height}
+                        step="0.1"
+                        required
+                      />
                     </div>
                   </div>
-                )}
-              </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'frame')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'color' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'color', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Color Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="color_name"
+                      defaultValue={selectedItem.color_name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.color_name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Corner Image</label>
+                    <input type="file" className="framedetails-form-file" name="corner_image" accept="image/*" />
+                    {selectedItem.corner_image && (
+                      <img
+                        src={getImageUrl(selectedItem.corner_image)}
+                        alt={`${selectedItem.color_name} corner`}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'color')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'size' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'size', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Size Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="size_name"
+                      defaultValue={selectedItem.size_name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-row">
+                    <div className="framedetails-form-group">
+                      <label className="framedetails-form-label">Inner Width</label>
+                      <input
+                        type="number"
+                        className="framedetails-form-input"
+                        name="inner_width"
+                        defaultValue={selectedItem.inner_width}
+                        required
+                      />
+                    </div>
+                    <div className="framedetails-form-group">
+                      <label className="framedetails-form-label">Inner Height</label>
+                      <input
+                        type="number"
+                        className="framedetails-form-input"
+                        name="inner_height"
+                        defaultValue={selectedItem.inner_height}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image (Optional)</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.size_name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Corner Image (Optional)</label>
+                    <input type="file" className="framedetails-form-file" name="corner_image" accept="image/*" />
+                    {selectedItem.corner_image && (
+                      <img
+                        src={getImageUrl(selectedItem.corner_image)}
+                        alt={`${selectedItem.size_name} corner`}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'size')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'finish' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'finish', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Finish Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="finish_name"
+                      defaultValue={selectedItem.finish_name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.finish_name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Corner Image</label>
+                    <input type="file" className="framedetails-form-file" name="corner_image" accept="image/*" />
+                    {selectedItem.corner_image && (
+                      <img
+                        src={getImageUrl(selectedItem.corner_image)}
+                        alt={`${selectedItem.finish_name} corner`}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'finish')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'hanging' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'hanging', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Hanging Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="hanging_name"
+                      defaultValue={selectedItem.hanging_name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.hanging_name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'hanging')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'user' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'user', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Username</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="username"
+                      defaultValue={selectedItem.username}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Email</label>
+                    <input
+                      type="email"
+                      className="framedetails-form-input"
+                      name="email"
+                      defaultValue={selectedItem.email}
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="name"
+                      defaultValue={selectedItem.name}
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Phone</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="phone"
+                      defaultValue={selectedItem.phone}
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Blocked</label>
+                    <select
+                      className="framedetails-form-select"
+                      name="is_blocked"
+                      defaultValue={selectedItem.is_blocked ? 'true' : 'false'}
+                    >
+                      <option value="false">No</option>
+                      <option value="true">Yes</option>
+                    </select>
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'user')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'category' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'category', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Category Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="frameCategory"
+                      defaultValue={selectedItem.frameCategory}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'category')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'mackboard' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'mackboard', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Board Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="board_name"
+                      defaultValue={selectedItem.board_name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image (Optional)</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.board_name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'mackboard')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'mackboard_color' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'mackboard_color', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Color Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="color_name"
+                      defaultValue={selectedItem.color_name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image (Optional)</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.color_name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'mackboard_color')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'mug' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'mug', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Mug Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="mug_name"
+                      defaultValue={selectedItem.mug_name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image (Optional)</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.mug_name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">GLB File (Optional)</label>
+                    <input type="file" className="framedetails-form-file" name="glb_file" />
+                    {selectedItem.glb_file && (
+                      <a href={getImageUrl(selectedItem.glb_file)} target="_blank" rel="noopener noreferrer" className="framedetails-file-link">
+                        View Current GLB
+                      </a>
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'mug')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'cap' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'cap', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Cap Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="cap_name"
+                      defaultValue={selectedItem.cap_name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image (Optional)</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.cap_name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'cap')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'tshirt' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'tshirt', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Tshirt Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="tshirt_name"
+                      defaultValue={selectedItem.tshirt_name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image (Optional)</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.tshirt_name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'tshirt')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'tshirt_color' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'tshirt_color', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Color Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="color_name"
+                      defaultValue={selectedItem.color_name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image (Optional)</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.color_name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'tshirt_color')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'tshirt_size' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'tshirt_size', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Size Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="size_name"
+                      defaultValue={selectedItem.size_name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-row">
+                    <div className="framedetails-form-group">
+                      <label className="framedetails-form-label">Inner Width (Optional)</label>
+                      <input
+                        type="number"
+                        className="framedetails-form-input"
+                        name="inner_width"
+                        defaultValue={selectedItem.inner_width}
+                      />
+                    </div>
+                    <div className="framedetails-form-group">
+                      <label className="framedetails-form-label">Inner Height (Optional)</label>
+                      <input
+                        type="number"
+                        className="framedetails-form-input"
+                        name="inner_height"
+                        defaultValue={selectedItem.inner_height}
+                      />
+                    </div>
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image (Optional)</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.size_name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'tshirt_size')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'tile' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'tile', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Tile Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="tile_name"
+                      defaultValue={selectedItem.tile_name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image (Optional)</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.tile_name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'tile')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'pen' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'pen', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Pen Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="pen_name"
+                      defaultValue={selectedItem.pen_name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image (Optional)</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.pen_name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'pen')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'printtype' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'printtype', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="name"
+                      defaultValue={selectedItem.name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'printtype')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'printsize' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'printsize', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="name"
+                      defaultValue={selectedItem.name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'printsize')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'papertype' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'papertype', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="name"
+                      defaultValue={selectedItem.name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'papertype')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'laminationtype' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'laminationtype', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="name"
+                      defaultValue={selectedItem.name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'laminationtype')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'frameOrder' && (
+                <div className="framedetails-order-details">
+                  <div className="framedetails-detail-grid">
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">ID:</span>
+                      <span className="framedetails-detail-value">{selectedItem.id}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">User:</span>
+                      <span className="framedetails-detail-value">{selectedItem.user.username}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Frame:</span>
+                      <span className="framedetails-detail-value">{selectedItem.frame ? selectedItem.frame.name : 'Custom'}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Color Variant:</span>
+                      <span className="framedetails-detail-value">{selectedItem.color_variant ? selectedItem.color_variant.color_name : 'N/A'}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Size Variant:</span>
+                      <span className="framedetails-detail-value">{selectedItem.size_variant ? selectedItem.size_name : 'N/A'}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Finish Variant:</span>
+                      <span className="framedetails-detail-value">{selectedItem.finish_variant ? selectedItem.finish_name : 'N/A'}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Hanging Variant:</span>
+                      <span className="framedetails-detail-value">{selectedItem.hanging_variant ? selectedItem.hanging_name : 'N/A'}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Total Price:</span>
+                      <span className="framedetails-detail-value framedetails-price-highlight">${selectedItem.total_price}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Status:</span>
+                      <span className={`framedetails-status-badge framedetails-status-${selectedItem.status.toLowerCase()}`}>{selectedItem.status}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Created At:</span>
+                      <span className="framedetails-detail-value">{new Date(selectedItem.created_at).toLocaleString()}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Print Unit:</span>
+                      <span className="framedetails-detail-value">{selectedItem.print_unit}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Media Type:</span>
+                      <span className="framedetails-detail-value">{selectedItem.media_type}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Paper Type:</span>
+                      <span className="framedetails-detail-value">{selectedItem.paper_type}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Fit:</span>
+                      <span className="framedetails-detail-value">{selectedItem.fit}</span>
+                    </div>
+                  </div>
+                  {selectedItem.adjusted_image && (
+                    <div className="framedetails-image-section">
+                      <label className="framedetails-detail-label">Adjusted Image:</label>
+                      <img
+                        src={getImageUrl(selectedItem.adjusted_image)}
+                        alt="Adjusted Image"
+                        className="framedetails-order-image"
+                        onError={handleImageError}
+                      />
+                    </div>
+                  )}
+                  <div className="framedetails-modal-footer">
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'frameOrder')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {modalType === 'giftOrder' && (
+                <div className="framedetails-order-details">
+                  <div className="framedetails-detail-grid">
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">ID:</span>
+                      <span className="framedetails-detail-value">{selectedItem.id}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">User:</span>
+                      <span className="framedetails-detail-value">{selectedItem.user.username}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Total Price:</span>
+                      <span className="framedetails-detail-value framedetails-price-highlight">${selectedItem.total_price}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Status:</span>
+                      <span className={`framedetails-status-badge framedetails-status-${selectedItem.status.toLowerCase()}`}>{selectedItem.status}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Created At:</span>
+                      <span className="framedetails-detail-value">{new Date(selectedItem.created_at).toLocaleString()}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Gift Type:</span>
+                      <span className="framedetails-detail-value">
+                        {selectedItem.tshirt ? 'Tshirt' : selectedItem.mug ? 'Mug' : selectedItem.cap ? 'Cap' : selectedItem.tile ? 'Tile' : selectedItem.pen ? 'Pen' : 'Unknown'}
+                      </span>
+                    </div>
+                  </div>
+                  {selectedItem.uploaded_image && (
+                    <div className="framedetails-image-section">
+                      <label className="framedetails-detail-label">Uploaded Image:</label>
+                      <img
+                        src={getImageUrl(selectedItem.uploaded_image)}
+                        alt="Uploaded Image"
+                        className="framedetails-order-image"
+                        onError={handleImageError}
+                      />
+                    </div>
+                  )}
+                  <div className="framedetails-modal-footer">
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'giftOrder')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {modalType === 'simpleDocumentOrder' && (
+                <div className="framedetails-order-details">
+                  <div className="framedetails-detail-grid">
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">ID:</span>
+                      <span className="framedetails-detail-value">{selectedItem.id}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">User:</span>
+                      <span className="framedetails-detail-value">{selectedItem.user.username}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Total Amount:</span>
+                      <span className="framedetails-detail-value framedetails-price-highlight">${selectedItem.total_amount}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Status:</span>
+                      <span className={`framedetails-status-badge framedetails-status-${selectedItem.status.toLowerCase()}`}>{selectedItem.status}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Created At:</span>
+                      <span className="framedetails-detail-value">{new Date(selectedItem.created_at).toLocaleString()}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Print Type:</span>
+                      <span className="framedetails-detail-value">{selectedItem.print_type ? selectedItem.print_type.name : 'N/A'}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Print Size:</span>
+                      <span className="framedetails-detail-value">{selectedItem.print_size ? selectedItem.print_size.name : 'N/A'}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Paper Type:</span>
+                      <span className="framedetails-detail-value">{selectedItem.paper_type ? selectedItem.paper_type.name : 'N/A'}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Lamination:</span>
+                      <span className="framedetails-detail-value">{selectedItem.lamination ? 'Yes' : 'No'}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Lamination Type:</span>
+                      <span className="framedetails-detail-value">{selectedItem.lamination_type ? selectedItem.lamination_type.name : 'N/A'}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Delivery Option:</span>
+                      <span className="framedetails-detail-value">{selectedItem.delivery_option}</span>
+                    </div>
+                    <div className="framedetails-detail-item">
+                      <span className="framedetails-detail-label">Quantity:</span>
+                      <span className="framedetails-detail-value">{selectedItem.quantity}</span>
+                    </div>
+                  </div>
+                  <div className="framedetails-files-section">
+                    <h6 className="framedetails-files-title">Files:</h6>
+                    <div className="framedetails-files-list">
+                      {selectedItem.files.map((file, index) => (
+                        <div key={index} className="framedetails-file-item">
+                          <FileText className="framedetails-file-icon" />
+                          <span className="framedetails-file-name">{file.file}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'simpleDocumentOrder')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -3195,4 +3640,5 @@ function Details() {
     </div>
   );
 }
+
 export default Details;
