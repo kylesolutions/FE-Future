@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@playcanvas/react": "^0.7.0",
     "@react-three/drei": "^10.7.3",
     "@react-three/fiber": "^9.3.0",
     "@reduxjs/toolkit": "^2.8.2",
@@ -18,6 +19,7 @@
     "formik": "^2.4.6",
     "konva": "^9.3.22",
     "lucide-react": "^0.525.0",
+    "playcanvas": "^2.8.2",
     "react": "^19.1.0",
     "react-datepicker": "^8.7.0",
     "react-dom": "^19.1.0",

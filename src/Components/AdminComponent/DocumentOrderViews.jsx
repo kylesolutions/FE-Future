@@ -485,16 +485,6 @@ function DocumentOrderViews() {
                   <span className="doc-orders-total-amount">${totalCost.toFixed(2)}</span>
                 </div>
               </div>
-              
-              {!isAdmin && (
-                <button 
-                  className="doc-orders-submit-btn"
-                  onClick={handleSubmitOrder}
-                >
-                  <span>Submit Order</span>
-                  <ArrowRight size={18} />
-                </button>
-              )}
             </div>
             
             <div className="doc-orders-summary-stats">
