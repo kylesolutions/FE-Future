@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, Frame, FileText, Gift } from 'lucide-react';
-import './FirstTab.css';
+import './firstTab.css';
 
 function FirstTab() {
   const navigate = useNavigate();
