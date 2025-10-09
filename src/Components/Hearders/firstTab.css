@@ -1,139 +1,276 @@
-
-/* Container styling */
-.main {
-  padding: 2rem;
+.first-tab-container {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  background-color: #f8f9fa;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8edf2 100%);
+  padding: 2rem;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* Back button styling */
-.back-button {
+.back-btn {
   position: absolute;
-  top: 1rem;
-  left: 1rem;
-  font-size: 2rem;
-  color: #007bff;
-  background: none;
+  top: 2rem;
+  left: 2rem;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: white;
   border: none;
   cursor: pointer;
-  transition: color 0.3s ease, transform 0.2s ease;
-  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1e293b;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  z-index: 10;
 }
 
-.back-button:hover {
-  color: #0056b3;
-  transform: scale(1.1);
-}
-
-.back-button:focus {
-  outline: 2px solid #007bff;
-  outline-offset: 2px;
-}
-
-/* Main button styling */
-.main-button {
-  width: 100%;
-  max-width: 220px;
-  padding: 1rem;
-  font-size: 1.1rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: #000000;
-  background-color:  #FFD700;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.main-button:hover {
-  background-color: #ffffff;
+.back-btn:hover {
+  background: #1e293b;
+  color: white;
+  transform: translateX(-4px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.main-button:active {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+.back-btn:active {
+  transform: translateX(-2px);
 }
 
-.main-button:focus {
-  outline: 2px solid #0056b3;
-  outline-offset: 2px;
+.content-wrapper {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-/* Heading and subheading */
-.display-5 {
-  font-size: 2.5rem;
-  color: #343a40;
+.header-section {
+  text-align: center;
+  margin-bottom: 4rem;
 }
 
-.text-muted {
-  font-size: 1rem;
-  color: #6c757d;
+.main-title {
+  font-size: 3rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 1rem 0;
+  letter-spacing: -0.02em;
 }
 
-/* Responsive adjustments */
-@media (max-width: 767px) {
-  .main {
+.main-subtitle {
+  font-size: 1.125rem;
+  color: #64748b;
+  margin: 0;
+  font-weight: 400;
+}
+
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.service-card {
+  background: white;
+  border: none;
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.service-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.service-card:hover::before {
+  opacity: 1;
+}
+
+.service-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+.service-card:active {
+  transform: translateY(-4px);
+}
+
+.icon-wrapper {
+  width: 80px;
+  height: 80px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: all 0.3s ease;
+}
+
+.service-card:hover .icon-wrapper {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.bg-gradient-from-blue-500 {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.bg-gradient-from-amber-500 {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.bg-gradient-from-emerald-500 {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.bg-gradient-from-rose-500 {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+}
+
+.service-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 768px) {
+  .first-tab-container {
     padding: 1.5rem;
   }
 
-  .main-button {
+  .back-btn {
+    top: 1.5rem;
+    left: 1.5rem;
+    width: 44px;
+    height: 44px;
+  }
+
+  .header-section {
+    margin-bottom: 3rem;
+  }
+
+  .main-title {
+    font-size: 2.25rem;
+  }
+
+  .main-subtitle {
     font-size: 1rem;
-    padding: 0.75rem;
-    max-width: 180px;
   }
 
-  .display-5 {
-    font-size: 2rem;
+  .services-grid {
+    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   }
 
-  .text-muted {
-    font-size: 0.9rem;
+  .service-card {
+    padding: 2rem 1.5rem;
+  }
+
+  .icon-wrapper {
+    width: 70px;
+    height: 70px;
   }
 }
 
-@media (max-width: 575px) {
-  .main {
+@media (max-width: 480px) {
+  .first-tab-container {
     padding: 1rem;
   }
 
-  .back-button {
-    font-size: 1.5rem;
-    top: 0.75rem;
-    left: 0.75rem;
+  .back-btn {
+    top: 1rem;
+    left: 1rem;
+    width: 40px;
+    height: 40px;
   }
 
-  .main-button {
-    max-width: 100%;
+  .back-btn svg {
+    width: 20px;
+    height: 20px;
   }
 
-  .display-5 {
-    font-size: 1.75rem;
+  .header-section {
+    margin-bottom: 2rem;
+  }
+
+  .main-title {
+    font-size: 1.875rem;
+  }
+
+  .main-subtitle {
+    font-size: 0.875rem;
+  }
+
+  .services-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .service-card {
+    padding: 1.75rem 1.25rem;
+  }
+
+  .icon-wrapper {
+    width: 64px;
+    height: 64px;
+  }
+
+  .icon-wrapper svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .service-title {
+    font-size: 1.125rem;
   }
 }
 
-/* Accessibility: High contrast for low vision */
-@media (prefers-contrast: high) {
-  .main-button {
-    background-color: #003087;
-    color: #fff;
-  }
-
-  .back-button {
-    color: #003087;
-  }
-}
-
-/* Reduced motion for users who prefer less animation */
 @media (prefers-reduced-motion: reduce) {
-  .main-button,
-  .back-button {
+  .back-btn,
+  .service-card,
+  .icon-wrapper {
     transition: none;
+  }
+
+  .service-card:hover {
+    transform: none;
+  }
+
+  .service-card:hover .icon-wrapper {
     transform: none;
   }
 }
 
+@media (prefers-contrast: high) {
+  .first-tab-container {
+    background: #ffffff;
+  }
+
+  .service-card {
+    border: 2px solid #1e293b;
+  }
+
+  .back-btn {
+    border: 2px solid #1e293b;
+  }
+}

@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import './SavedOrder.css';
 
-const BASE_URL = 'http://82.180.146.4:8001';
+const BASE_URL = 'http://localhost:8000';
 
 class ErrorBoundary extends React.Component {
   state = { hasError: false, error: null };
