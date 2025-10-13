@@ -20,7 +20,7 @@ import {
   Package
 } from 'lucide-react';
 
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = 'http://82.180.146.4:8001';
 
 function Payment() {
   const [savedOrders, setSavedOrders] = useState([]);

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Printer, Frame, FileText, Gift } from 'lucide-react';
+import { ArrowLeft, Printer, Frame, FileText, Gift, Book } from 'lucide-react';
 import './firstTab.css';
 
 function FirstTab() {
@@ -33,6 +33,12 @@ function FirstTab() {
       path: '/gifting',
       state: { isGiftPrinting: true },
       gradient: 'from-rose-500 to-rose-600'
+    },
+    {
+      title: 'Photo Book',
+      icon: Book,
+      path: '/photobook',
+      gradient: 'from-red-500 to-red-600'
     }
   ];
 

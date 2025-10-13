@@ -4,28 +4,29 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './Details.css';
 import { logoutUser } from '../../Redux/slices/userSlice';
-import { 
-  Package, 
-  Users, 
-  Tag, 
-  Grid, 
-  Coffee, 
-  Crown, 
-  Shirt, 
-  Square, 
-  Pen, 
-  Printer, 
-  Ruler, 
-  FileText, 
-  Layers, 
-  ShoppingCart, 
+import {
+  Package,
+  Users,
+  Tag,
+  Grid,
+  Coffee,
+  Crown,
+  Shirt,
+  Square,
+  Pen,
+  Printer,
+  Ruler,
+  FileText,
+  Layers,
+  ShoppingCart,
   Gift,
   Edit,
   Trash2,
   X,
   Loader2,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Palette
 } from 'lucide-react';
 
 // Base URL for images
@@ -59,6 +60,10 @@ function Details() {
   const [activeTab, setActiveTab] = useState('frames');
   const [selectedItem, setSelectedItem] = useState(null);
   const [modalType, setModalType] = useState(null);
+  const [themes, setThemes] = useState([]);
+  const [backgrounds, setBackgrounds] = useState([]);
+  const [stickers, setStickers] = useState([]);
+  const [photoBookPapers, setPhotoBookPapers] = useState([]);
 
   // Utility function to construct image URLs
   const getImageUrl = (path) => {
@@ -116,9 +121,9 @@ function Details() {
           return;
         }
         const [
-          framesResponse, 
-          usersResponse, 
-          categoriesResponse, 
+          framesResponse,
+          usersResponse,
+          categoriesResponse,
           mackBoardsResponse,
           mugsResponse,
           capsResponse,
@@ -132,7 +137,11 @@ function Details() {
           frameOrdersResponse,
           giftOrdersResponse,
           documentOrdersResponse,
-          simpleDocumentOrdersResponse
+          simpleDocumentOrdersResponse,
+          themesResponse,
+          backgroundsResponse,
+          stickersResponse,
+          photoBookPapersResponse
         ] = await Promise.all([
           axios.get('http://82.180.146.4:8001/frames/', { headers: { Authorization: `Bearer ${token}` } }),
           axios.get('http://82.180.146.4:8001/users/', { headers: { Authorization: `Bearer ${token}` } }),
@@ -151,6 +160,10 @@ function Details() {
           axios.get('http://82.180.146.4:8001/gift-orders/list/', { headers: { Authorization: `Bearer ${token}` } }),
           axios.get('http://82.180.146.4:8001/api/document-print-orders/', { headers: { Authorization: `Bearer ${token}` } }),
           axios.get('http://82.180.146.4:8001/api/orders/', { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get('http://82.180.146.4:8001/themes/', { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get('http://82.180.146.4:8001/backgrounds/', { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get('http://82.180.146.4:8001/stickers/', { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get('http://82.180.146.4:8001/photobook-papers/', { headers: { Authorization: `Bearer ${token}` } }),
         ]);
         setFrames(framesResponse.data);
         setUsers(usersResponse.data);
@@ -169,15 +182,19 @@ function Details() {
         setGiftOrders(giftOrdersResponse.data);
         setDocumentOrders(documentOrdersResponse.data);
         setSimpleDocumentOrders(simpleDocumentOrdersResponse.data);
+        setThemes(themesResponse.data);
+        setBackgrounds(backgroundsResponse.data);
+        setStickers(stickersResponse.data);
+        setPhotoBookPapers(photoBookPapersResponse.data);
       } catch (err) {
         if (err.response?.status === 401) {
           const newToken = await refreshToken();
           if (newToken) {
             try {
               const [
-                framesResponse, 
-                usersResponse, 
-                categoriesResponse, 
+                framesResponse,
+                usersResponse,
+                categoriesResponse,
                 mackBoardsResponse,
                 mugsResponse,
                 capsResponse,
@@ -191,7 +208,11 @@ function Details() {
                 frameOrdersResponse,
                 giftOrdersResponse,
                 documentOrdersResponse,
-                simpleDocumentOrdersResponse
+                simpleDocumentOrdersResponse,
+                themesResponse,
+                backgroundsResponse,
+                stickersResponse,
+                photoBookPapersResponse,
               ] = await Promise.all([
                 axios.get('http://82.180.146.4:8001/frames/', { headers: { Authorization: `Bearer ${newToken}` } }),
                 axios.get('http://82.180.146.4:8001/users/', { headers: { Authorization: `Bearer ${newToken}` } }),
@@ -210,6 +231,10 @@ function Details() {
                 axios.get('http://82.180.146.4:8001/gift-orders/list/', { headers: { Authorization: `Bearer ${newToken}` } }),
                 axios.get('http://82.180.146.4:8001/api/document-print-orders/', { headers: { Authorization: `Bearer ${newToken}` } }),
                 axios.get('http://82.180.146.4:8001/api/orders/', { headers: { Authorization: `Bearer ${newToken}` } }),
+                axios.get('http://82.180.146.4:8001/themes/', { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get('http://82.180.146.4:8001/backgrounds/', { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get('http://82.180.146.4:8001/stickers/', { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get('http://82.180.146.4:8001/photobook-papers/', { headers: { Authorization: `Bearer ${newToken}` } }),
               ]);
               setFrames(framesResponse.data);
               setUsers(usersResponse.data);
@@ -228,6 +253,10 @@ function Details() {
               setGiftOrders(giftOrdersResponse.data);
               setDocumentOrders(documentOrdersResponse.data);
               setSimpleDocumentOrders(simpleDocumentOrdersResponse.data);
+              setThemes(themesResponse.data);
+              setBackgrounds(backgroundsResponse.data);
+              setStickers(stickersResponse.data);
+              setPhotoBookPapers(photoBookPapersResponse.data);
             } catch (retryErr) {
               setError('Session expired. Please log in again.');
               navigate('/login');
@@ -454,6 +483,39 @@ function Details() {
         break;
       default:
         return;
+      case 'theme':
+        payload = {
+          theme_name: data.get('theme_name'),
+        };
+        url = `http://82.180.146.4:8001/themes/${id}/`;
+        break;
+      case 'background':
+        isMultipart = true;
+        payload = new FormData();
+        payload.append('name', data.get('name'));
+        payload.append('theme', data.get('theme'));
+        const bgImage = data.get('image');
+        if (bgImage && bgImage.size > 0) payload.append('image', bgImage);
+        url = `http://82.180.146.4:8001/backgrounds/${id}/`;
+        break;
+      case 'sticker':
+        isMultipart = true;
+        payload = new FormData();
+        payload.append('name', data.get('name'));
+        payload.append('theme', data.get('theme'));
+        const stickerImage = data.get('image');
+        if (stickerImage && stickerImage.size > 0) payload.append('image', stickerImage);
+        url = `http://82.180.146.4:8001/stickers/${id}/`;
+        break;
+      case 'photobookpaper':
+        isMultipart = true;
+        payload = new FormData();
+        payload.append('size', data.get('size'));
+        payload.append('price', Number(data.get('price')));
+        const paperImage = data.get('image');
+        if (paperImage && paperImage.size > 0) payload.append('image', paperImage);
+        url = `http://82.180.146.4:8001/photobook-papers/${id}/`;
+        break;
     }
 
     console.log('Data being sent:', payload);
@@ -505,7 +567,10 @@ function Details() {
         setPaperTypes(paperTypes.map((p) => (p.id === id ? response.data : p)));
       } else if (type === 'laminationtype') {
         setLaminationTypes(laminationTypes.map((l) => (l.id === id ? response.data : l)));
-      } else {
+      } else if (type === 'photobookpaper') {
+        setPhotoBookPapers(photoBookPapers.map((p) => (p.id === id ? response.data : p)));
+      }
+      else {
         const framesResponse = await axios.get('http://82.180.146.4:8001/frames/', {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -659,6 +724,18 @@ function Details() {
       case 'simpleDocumentOrder':
         url = `http://82.180.146.4:8001/api/orders/${id}/`;
         break;
+      case 'theme':
+        url = `http://82.180.146.4:8001/themes/${id}/`;
+        break;
+      case 'background':
+        url = `http://82.180.146.4:8001/backgrounds/${id}/`;
+        break;
+      case 'sticker':
+        url = `http://82.180.146.4:8001/stickers/${id}/`;
+        break;
+      case 'photobookpaper':
+        url = `http://82.180.146.4:8001/photobook-papers/${id}/`;
+        break;
       default:
         return;
     }
@@ -718,6 +795,22 @@ function Details() {
         setDocumentOrders(documentOrders.filter((o) => o.id !== id));
       } else if (type === 'simpleDocumentOrder') {
         setSimpleDocumentOrders(simpleDocumentOrders.filter((o) => o.id !== id));
+      }
+      else if (type === 'theme') {
+        setThemes(themes.filter((t) => t.id !== id));
+      } else if (type === 'background') {
+        setBackgrounds(backgrounds.filter((b) => b.id !== id));
+        // Refresh themes
+        const themesResponse = await axios.get('http://82.180.146.4:8001/themes/', { headers: { Authorization: `Bearer ${token}` } });
+        setThemes(themesResponse.data);
+      } else if (type === 'sticker') {
+        setStickers(stickers.filter((s) => s.id !== id));
+        // Refresh themes
+        const themesResponse = await axios.get('http://82.180.146.4:8001/themes/', { headers: { Authorization: `Bearer ${token}` } });
+        setThemes(themesResponse.data);
+      }
+      else if (type === 'photobookpaper') {
+        setPhotoBookPapers(photoBookPapers.filter((p) => p.id !== id));
       } else {
         const framesResponse = await axios.get('http://82.180.146.4:8001/frames/', {
           headers: { Authorization: `Bearer ${token}` },
@@ -820,6 +913,8 @@ function Details() {
       case 'frameOrders': return <ShoppingCart className="framedetails-tab-icon" />;
       case 'giftOrders': return <Gift className="framedetails-tab-icon" />;
       case 'simpleDocumentOrders': return <FileText className="framedetails-tab-icon" />;
+      case 'themes': return <Palette className="framedetails-tab-icon" />;
+      case 'photobookpapers': return <FileText className="framedetails-tab-icon" />;
       default: return <Package className="framedetails-tab-icon" />;
     }
   };
@@ -968,6 +1063,20 @@ function Details() {
             >
               {getTabIcon('simpleDocumentOrders')}
               <span>Document Orders</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'themes' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('themes')}
+            >
+              {getTabIcon('themes')}
+              <span>Themes</span>
+            </button>
+            <button
+              className={`framedetails-nav-item ${activeTab === 'photobookpapers' ? 'framedetails-nav-item-active' : ''}`}
+              onClick={() => setActiveTab('photobookpapers')}
+            >
+              {getTabIcon('photobookpapers')}
+              <span>Photo Book Papers</span>
             </button>
           </nav>
         </div>
@@ -2097,6 +2206,155 @@ function Details() {
                 )}
               </div>
             )}
+            {activeTab === 'themes' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <Palette className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Theme Details</h2>
+                </div>
+                {themes.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <Palette className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No themes available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
+                          <tr>
+                            <th>Name</th>
+                            <th>Created At</th>
+                            <th>Backgrounds</th>
+                            <th>Stickers</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {themes.map((theme) => (
+                            <tr key={theme.id} className="framedetails-table-row">
+                              <td className="framedetails-name-cell">{theme.theme_name}</td>
+                              <td>{new Date(theme.created_at).toLocaleDateString()}</td>
+                              <td>
+                                <div className="framedetails-variants-list">
+                                  {theme.backgrounds.map((bg) => (
+                                    <div key={bg.id} className="framedetails-variant-item">
+                                      <span className="framedetails-variant-name">{bg.name}</span>
+                                      <img
+                                        src={getImageUrl(bg.image)}
+                                        alt={bg.name}
+                                        className="framedetails-variant-image"
+                                        onError={handleImageError}
+                                      />
+                                      <button
+                                        className="framedetails-variant-edit-btn"
+                                        onClick={() => handleSelectItem(bg, 'background')}
+                                      >
+                                        <Edit className="framedetails-btn-icon" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                              <td>
+                                <div className="framedetails-variants-list">
+                                  {theme.stickers.map((sticker) => (
+                                    <div key={sticker.id} className="framedetails-variant-item">
+                                      <span className="framedetails-variant-name">{sticker.name}</span>
+                                      <img
+                                        src={getImageUrl(sticker.image)}
+                                        alt={sticker.name}
+                                        className="framedetails-variant-image"
+                                        onError={handleImageError}
+                                      />
+                                      <button
+                                        className="framedetails-variant-edit-btn"
+                                        onClick={() => handleSelectItem(sticker, 'sticker')}
+                                      >
+                                        <Edit className="framedetails-btn-icon" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                              <td>
+                                <button
+                                  className="framedetails-action-btn framedetails-edit-btn"
+                                  onClick={() => handleSelectItem(theme, 'theme')}
+                                >
+                                  <Edit className="framedetails-btn-icon" />
+                                  Edit
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {activeTab === 'photobookpapers' && (
+              <div>
+                <div className="framedetails-section-header">
+                  <FileText className="framedetails-section-icon" />
+                  <h2 className="framedetails-section-title">Photo Book Papers</h2>
+                </div>
+                {photoBookPapers.length === 0 ? (
+                  <div className="framedetails-empty-state">
+                    <FileText className="framedetails-empty-icon" />
+                    <p className="framedetails-empty-text">No photo book papers available</p>
+                  </div>
+                ) : (
+                  <div className="framedetails-table-container">
+                    <div className="framedetails-table-wrapper">
+                      <table className="framedetails-table">
+                        <thead className="framedetails-table-header">
+                          <tr>
+                            <th>Size</th>
+                            <th>Image</th>
+                            <th>Price</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {photoBookPapers.map((paper) => (
+                            <tr key={paper.id} className="framedetails-table-row">
+                              <td className="framedetails-name-cell">{paper.size}</td>
+                              <td>
+                                {paper.image ? (
+                                  <img
+                                    src={getImageUrl(paper.image)}
+                                    alt={paper.size}
+                                    className="framedetails-image"
+                                    onError={handleImageError}
+                                  />
+                                ) : (
+                                  <span className="framedetails-no-data">No image</span>
+                                )}
+                              </td>
+                              <td className="framedetails-price-cell">${paper.price}</td>
+                              <td>{new Date(paper.created_at).toLocaleDateString()}</td>
+                              <td>
+                                <button
+                                  className="framedetails-action-btn framedetails-edit-btn"
+                                  onClick={() => handleSelectItem(paper, 'photobookpaper')}
+                                >
+                                  <Edit className="framedetails-btn-icon" />
+                                  Edit
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -2130,6 +2388,10 @@ function Details() {
                 {modalType === 'frameOrder' && 'Frame Order Details'}
                 {modalType === 'giftOrder' && 'Gift Order Details'}
                 {modalType === 'simpleDocumentOrder' && 'Simple Document Order Details'}
+                {modalType === 'theme' && 'Theme Details'}
+                {modalType === 'background' && 'Background Details'}
+                {modalType === 'sticker' && 'Sticker Details'}
+                {modalType === 'photobookpaper' && 'Photo Book Paper Details'}
               </h3>
               <button className="framedetails-modal-close" onClick={handleCloseModal}>
                 <X className="framedetails-close-icon" />
@@ -3633,6 +3895,234 @@ function Details() {
                   </div>
                 </div>
               )}
+              {modalType === 'theme' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'theme', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Theme Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="theme_name"
+                      defaultValue={selectedItem.theme_name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'theme')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'background' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'background', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="name"
+                      defaultValue={selectedItem.name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Theme</label>
+                    <select
+                      className="framedetails-form-select"
+                      name="theme"
+                      defaultValue={selectedItem.theme.id}
+                      required
+                    >
+                      {themes.map((theme) => (
+                        <option key={theme.id} value={theme.id}>
+                          {theme.theme_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'background')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {modalType === 'sticker' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'sticker', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Name</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="name"
+                      defaultValue={selectedItem.name}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Theme</label>
+                    <select
+                      className="framedetails-form-select"
+                      name="theme"
+                      defaultValue={selectedItem.theme.id}
+                      required
+                    >
+                      {themes.map((theme) => (
+                        <option key={theme.id} value={theme.id}>
+                          {theme.theme_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.name}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'sticker')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+              {modalType === 'photobookpaper' && (
+                <form
+                  className="framedetails-form"
+                  onSubmit={(e) => {
+                    const formData = new FormData(e.target);
+                    handleUpdate(e, selectedItem.id, 'photobookpaper', formData);
+                  }}
+                >
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Size</label>
+                    <input
+                      type="text"
+                      className="framedetails-form-input"
+                      name="size"
+                      defaultValue={selectedItem.size}
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Price</label>
+                    <input
+                      type="number"
+                      className="framedetails-form-input"
+                      name="price"
+                      defaultValue={selectedItem.price}
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                  <div className="framedetails-form-group">
+                    <label className="framedetails-form-label">Image (Optional)</label>
+                    <input type="file" className="framedetails-form-file" name="image" accept="image/*" />
+                    {selectedItem.image && (
+                      <img
+                        src={getImageUrl(selectedItem.image)}
+                        alt={selectedItem.size}
+                        className="framedetails-preview-image"
+                        onError={handleImageError}
+                      />
+                    )}
+                  </div>
+                  <div className="framedetails-modal-footer">
+                    <button type="submit" className="framedetails-btn framedetails-btn-primary">
+                      <CheckCircle className="framedetails-btn-icon" />
+                      Update
+                    </button>
+                    <button
+                      type="button"
+                      className="framedetails-btn framedetails-btn-danger"
+                      onClick={() => handleDelete(selectedItem.id, 'photobookpaper')}
+                    >
+                      <Trash2 className="framedetails-btn-icon" />
+                      Delete
+                    </button>
+                    <button type="button" className="framedetails-btn framedetails-btn-secondary" onClick={handleCloseModal}>
+                      Close
+                    </button>
+                  </div>
+                </form>
+              )}
+
             </div>
           </div>
         </div>

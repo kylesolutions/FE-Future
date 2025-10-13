@@ -87,6 +87,17 @@ function Admin() {
   const [success, setSuccess] = useState(null);
   const [colorVariantData, setColorVariantData] = useState({ mack_board: '', color_name: '', image: null });
   const [activeSection, setActiveSection] = useState('frames');
+  const [themes, setThemes] = useState([]);
+  const [backgrounds, setBackgrounds] = useState([]);
+  const [stickers, setStickers] = useState([]);
+  const [themeData, setThemeData] = useState({ theme_name: '' });
+  const [backgroundData, setBackgroundData] = useState({ theme: '', name: '', image: null });
+  const [stickerData, setStickerData] = useState({ theme: '', name: '', image: null });
+  const [selectedThemeId, setSelectedThemeId] = useState('');
+  const [themeMode, setThemeMode] = useState('create'); // 'create' or 'edit' for themes
+  const [photoBookPapers, setPhotoBookPapers] = useState([]);
+  const [photoBookPaperData, setPhotoBookPaperData] = useState({ size: '', price: '', image: null });
+
   // Redirect if not admin
   useEffect(() => {
     if (!user.username || user.type !== 'admin') {
@@ -103,7 +114,7 @@ function Admin() {
         const [
           framesResponse, categoriesResponse, mackBoardsResponse, mugsResponse, capsResponse,
           tshirtsResponse, tilesResponse, pensResponse, printTypesResponse, printSizesResponse,
-          paperTypesResponse, laminationTypesResponse
+          paperTypesResponse, laminationTypesResponse, themesResponse, backgroundsResponse, stickersResponse,photoBookPapersResponse
         ] = await Promise.all([
           axios.get(`${BASE_URL}/frames/`, config),
           axios.get(`${BASE_URL}/categories/`, config),
@@ -117,6 +128,10 @@ function Admin() {
           axios.get(`${BASE_URL}/api/print-sizes/`, config),
           axios.get(`${BASE_URL}/api/paper-types/`, config),
           axios.get(`${BASE_URL}/api/lamination-types/`, config),
+          axios.get(`${BASE_URL}/themes/`, config),
+          axios.get(`${BASE_URL}/backgrounds/`, config),
+          axios.get(`${BASE_URL}/stickers/`, config),
+          axios.get(`${BASE_URL}/photobook-papers/`, config),
         ]);
         setFrames(framesResponse.data);
         setCategories(categoriesResponse.data);
@@ -130,6 +145,10 @@ function Admin() {
         setPrintSizes(printSizesResponse.data);
         setPaperTypes(paperTypesResponse.data);
         setLaminationTypes(laminationTypesResponse.data);
+        setThemes(themesResponse.data);
+        setBackgrounds(backgroundsResponse.data);
+        setStickers(stickersResponse.data);
+        setPhotoBookPapers(photoBookPapersResponse.data);
       } catch (err) {
         console.error('Failed to fetch data:', err);
         if (err.response?.status === 401) {
@@ -144,6 +163,7 @@ function Admin() {
     };
     fetchData();
   }, [navigate]);
+
   // Clear messages after 5 seconds
   useEffect(() => {
     if (error || success) {
@@ -277,6 +297,79 @@ function Admin() {
   const handleColorVariantDataChange = (e) => {
     const { name, value, files } = e.target;
     setColorVariantData({ ...colorVariantData, [name]: files ? files[0] : value });
+  };
+  const handleThemeChange = (e) => {
+    const { name, value } = e.target;
+    setThemeData({ ...themeData, [name]: value });
+  };
+
+  const handleBackgroundChange = (e) => {
+    const { name, value, files } = e.target;
+    setBackgroundData({ ...backgroundData, [name]: files ? files[0] : value });
+  };
+
+  const handleStickerChange = (e) => {
+    const { name, value, files } = e.target;
+    setStickerData({ ...stickerData, [name]: files ? files[0] : value });
+  };
+
+  const handlePhotoBookPaperChange = (e) => {
+  const { name, value, files } = e.target;
+  setPhotoBookPaperData({ ...photoBookPaperData, [name]: files ? files[0] : value });
+};
+
+
+  const handleThemeSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Session expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      if (themeMode === 'create') {
+        const response = await axios.post(`${BASE_URL}/themes/`, themeData, config);
+        setThemes([...themes, response.data]);
+        setSuccess('Theme created successfully!');
+        setThemeData({ theme_name: '' });
+      } else if (themeMode === 'edit') {
+        if (!selectedThemeId) {
+          setError('Please select a theme to edit.');
+          return;
+        }
+        const response = await axios.put(`${BASE_URL}/themes/${selectedThemeId}/`, themeData, config);
+        setThemes(themes.map((t) => (t.id === Number(selectedThemeId) ? response.data : t)));
+        setSuccess('Theme updated successfully!');
+        setThemeData({ theme_name: '' });
+        setSelectedThemeId('');
+        setThemeMode('create');
+      }
+    } catch (error) {
+      console.error('Theme submission error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        const newToken = await refreshToken();
+        if (!newToken) {
+          setError('Session expired. Please log in again.');
+          navigate('/login');
+        }
+      } else if (error.response?.status === 403) {
+        setError('Only admins can perform this action.');
+      } else {
+        const errorMessage = error.response?.data
+          ? Object.keys(error.response.data)
+            .map((key) => `${key}: ${Array.isArray(error.response.data[key]) ? error.response.data[key].join(', ') : error.response.data[key]}`)
+            .join('; ')
+          : error.message;
+        setError(`Failed to submit: ${errorMessage}`);
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
   // T-shirt submit handler
   const handleTshirtSubmit = async (e) => {
@@ -555,6 +648,7 @@ function Admin() {
         else if (endpoint.includes('print-sizes')) setPrintSizes((prev) => [...prev, response.data]);
         else if (endpoint.includes('paper-types')) setPaperTypes((prev) => [...prev, response.data]);
         else if (endpoint.includes('lamination-types')) setLaminationTypes((prev) => [...prev, response.data]);
+        else if (endpoint.includes('photobook-papers')) setPhotoBookPapers((prev) => [...prev, response.data]);
       } catch (error) {
         console.error('Submission error:', error.response?.data || error.message);
         if (error.response?.status === 401) {
@@ -644,12 +738,34 @@ function Admin() {
     'Lamination Type created successfully!',
     () => setLaminationTypeData({ name: '', price: '', image: null })
   );
- const handleColorVariantSubmit = createSubmitHandler(
-  '/mack_board_color_variants/',
-  colorVariantData,
-  'Color variant created successfully!',
-  () => setColorVariantData({ mack_board: '', color_name: '', image: null })
+  const handleColorVariantSubmit = createSubmitHandler(
+    '/mack_board_color_variants/',
+    colorVariantData,
+    'Color variant created successfully!',
+    () => setColorVariantData({ mack_board: '', color_name: '', image: null })
+  );
+  const handleBackgroundSubmit = createSubmitHandler(
+    '/backgrounds/',
+    backgroundData,
+    'Background created successfully!',
+    () => setBackgroundData({ theme: '', name: '', image: null })
+  );
+
+  const handleStickerSubmit = createSubmitHandler(
+    '/stickers/',
+    stickerData,
+    'Sticker created successfully!',
+    () => setStickerData({ theme: '', name: '', image: null })
+  );
+  
+  const handlePhotoBookPaperSubmit = createSubmitHandler(
+  '/photobook-papers/',
+  photoBookPaperData,
+  'Photo Book Paper created successfully!',
+  () => setPhotoBookPaperData({ size: '', price: '', image: null })
 );
+
+
   // Frame submission handler
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -805,6 +921,38 @@ function Admin() {
     }
   };
 
+  const handleEditTheme = async (themeId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${BASE_URL}/themes/${themeId}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setThemeData({ theme_name: response.data.theme_name });
+      setSelectedThemeId(themeId);
+      setThemeMode('edit');
+    } catch (error) {
+      console.error('Error fetching theme:', error);
+      setError('Failed to load theme data.');
+    }
+  };
+
+  const handleDeleteTheme = async (themeId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${BASE_URL}/themes/${themeId}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setThemes(themes.filter((t) => t.id !== Number(themeId)));
+      setSuccess('Theme deleted successfully!');
+      setThemeData({ theme_name: '' });
+      setSelectedThemeId('');
+      setThemeMode('create');
+    } catch (error) {
+      console.error('Error deleting theme:', error);
+      setError('Failed to delete theme.');
+    }
+  };
+
   const handleEditFrame = async (frameId) => {
     try {
       const token = localStorage.getItem('token');
@@ -848,6 +996,7 @@ function Admin() {
     categories: Layers,
     gifts: Package,
     printing: Printer,
+    photobook: Palette,
   };
 
   const giftIcons = {
@@ -2017,6 +2166,306 @@ function Admin() {
               </div>
             </div>
           )}
+          {activeSection === 'photobook' && (
+  <div className="admin-section">
+    <div className="admin-section-header">
+      <Palette size={24} />
+      <h2>Photobook Management</h2>
+    </div>
+    {/* Theme Management */}
+    <div className="admin-card">
+      <div className="admin-section-header">
+        <Palette size={20} />
+        <h3>Theme Management</h3>
+      </div>
+      <div className="admin-mode-selector">
+        <div className="admin-form-group">
+          <label className="admin-label">Mode</label>
+          <select
+            className="admin-select"
+            value={themeMode}
+            onChange={(e) => setThemeMode(e.target.value)}
+          >
+            <option value="create">Create New Theme</option>
+            <option value="edit">Edit Existing Theme</option>
+          </select>
+        </div>
+      </div>
+      <form onSubmit={handleThemeSubmit} className="admin-form">
+        <div className="admin-form-grid">
+          <div className="admin-form-group">
+            <label className="admin-label">Theme Name</label>
+            <input
+              type="text"
+              name="theme_name"
+              value={themeData.theme_name}
+              onChange={handleThemeChange}
+              className="admin-input"
+              required
+            />
+          </div>
+          {themeMode === 'edit' && (
+            <div className="admin-form-group">
+              <label className="admin-label">Select Theme</label>
+              <select
+                className="admin-select"
+                value={selectedThemeId}
+                onChange={(e) => handleEditTheme(e.target.value)}
+                required
+              >
+                <option value="">-- Select Theme --</option>
+                {themes.map((theme) => (
+                  <option key={theme.id} value={theme.id}>
+                    {theme.theme_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+        <div className="admin-form-actions">
+          <button type="submit" className="admin-btn admin-btn-primary" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader size={16} className="admin-spinner" />
+                {themeMode === 'create' ? 'Creating...' : 'Updating...'}
+              </>
+            ) : (
+              <>
+                <Save size={16} />
+                {themeMode === 'create' ? 'Create Theme' : 'Update Theme'}
+              </>
+            )}
+          </button>
+          {themeMode === 'edit' && selectedThemeId && (
+            <button
+              type="button"
+              className="admin-btn admin-btn-danger"
+              onClick={() => handleDeleteTheme(selectedThemeId)}
+            >
+              <Trash2 size={16} />
+              Delete Theme
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
+    {/* Background Management */}
+    <div className="admin-card">
+      <div className="admin-card-header">
+        <Layers size={20} />
+        <h3>Create Background</h3>
+      </div>
+      <form onSubmit={handleBackgroundSubmit} className="admin-form">
+        <div className="admin-form-grid">
+          <div className="admin-form-group">
+            <label className="admin-label">Select Theme</label>
+            <select
+              name="theme"
+              value={backgroundData.theme}
+              onChange={handleBackgroundChange}
+              className="admin-select"
+              required
+            >
+              <option value="">-- Select Theme --</option>
+              {themes.map((theme) => (
+                <option key={theme.id} value={theme.id}>
+                  {theme.theme_name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="admin-form-group">
+            <label className="admin-label">Background Name</label>
+            <input
+              type="text"
+              name="name"
+              value={backgroundData.name}
+              onChange={handleBackgroundChange}
+              className="admin-input"
+              required
+            />
+          </div>
+          <div className="admin-form-group">
+            <label className="admin-label">Image</label>
+            <div className="admin-file-input">
+              <Upload size={16} />
+              <input
+                type="file"
+                name="image"
+                onChange={handleBackgroundChange}
+                accept="image/*"
+                required
+              />
+              <span>Choose background image</span>
+            </div>
+          </div>
+        </div>
+        <div className="admin-form-actions">
+          <button type="submit" className="admin-btn admin-btn-primary" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader size={16} className="admin-spinner" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Plus size={16} />
+                Create Background
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+    {/* Sticker Management */}
+    <div className="admin-card">
+      <div className="admin-card-header">
+        <Sparkles size={20} />
+        <h3>Create Sticker</h3>
+      </div>
+      <form onSubmit={handleStickerSubmit} className="admin-form">
+        <div className="admin-form-grid">
+          <div className="admin-form-group">
+            <label className="admin-label">Select Theme</label>
+            <select
+              name="theme"
+              value={stickerData.theme}
+              onChange={handleStickerChange}
+              className="admin-select"
+              required
+            >
+              <option value="">-- Select Theme --</option>
+              {themes.map((theme) => (
+                <option key={theme.id} value={theme.id}>
+                  {theme.theme_name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="admin-form-group">
+            <label className="admin-label">Sticker Name</label>
+            <input
+              type="text"
+              name="name"
+              value={stickerData.name}
+              onChange={handleStickerChange}
+              className="admin-input"
+              required
+            />
+          </div>
+          <div className="admin-form-group">
+            <label className="admin-label">Image</label>
+            <div className="admin-file-input">
+              <Upload size={16} />
+              <input
+                type="file"
+                name="image"
+                onChange={handleStickerChange}
+                accept="image/*"
+                required
+              />
+              <span>Choose sticker image</span>
+            </div>
+          </div>
+        </div>
+        <div className="admin-form-actions">
+          <button type="submit" className="admin-btn admin-btn-primary" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader size={16} className="admin-spinner" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Plus size={16} />
+                Create Sticker
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+    {/* PhotoBookPaper Management */}
+    <div className="admin-card">
+      <div className="admin-card-header">
+        <FileText size={20} />
+        <h3>Create Photo Book Paper</h3>
+      </div>
+      <form onSubmit={handlePhotoBookPaperSubmit} className="admin-form">
+        <div className="admin-form-grid">
+          <div className="admin-form-group">
+            <label className="admin-label">Size</label>
+            <input
+              type="text"
+              name="size"
+              value={photoBookPaperData.size}
+              onChange={handlePhotoBookPaperChange}
+              className="admin-input"
+              required
+              placeholder="e.g., A4"
+            />
+          </div>
+          <div className="admin-form-group">
+            <label className="admin-label">Price</label>
+            <input
+              type="number"
+              name="price"
+              value={photoBookPaperData.price}
+              onChange={handlePhotoBookPaperChange}
+              className="admin-input"
+              required
+              step="0.01"
+              placeholder="e.g., 5.00"
+            />
+          </div>
+          <div className="admin-form-group">
+            <label className="admin-label">Image (Optional)</label>
+            <div className="admin-file-input">
+              <Upload size={16} />
+              <input
+                type="file"
+                name="image"
+                onChange={handlePhotoBookPaperChange}
+                accept="image/*"
+              />
+              <span>Choose paper image</span>
+            </div>
+          </div>
+        </div>
+        <div className="admin-form-actions">
+          <button type="submit" className="admin-btn admin-btn-primary" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader size={16} className="admin-spinner" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Plus size={16} />
+                Create Photo Book Paper
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+    {/* PhotoBookPapers List */}
+    <div className="admin-card">
+      <div className="admin-card-header">
+        <FileText size={20} />
+        <h3>Photo Book Papers</h3>
+      </div>
+      <div className="admin-list">
+        {photoBookPapers.map((paper) => (
+          <div key={paper.id} className="admin-list-item">
+            <span>{paper.size} - ${paper.price}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
         </div>
       </div>
     </div>

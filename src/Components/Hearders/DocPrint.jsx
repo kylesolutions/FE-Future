@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FileText, Printer, Package, Truck, Save } from 'lucide-react';
-axios.defaults.baseURL = 'http://localhost:8000';
+axios.defaults.baseURL = 'http://82.180.146.4:8001';
 
 function DocPrint() {
   const [files, setFiles] = useState([]);

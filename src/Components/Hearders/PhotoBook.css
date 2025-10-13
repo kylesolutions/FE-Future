@@ -1,0 +1,203 @@
+.photobook-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.theme-list, .paper-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.theme-item, .paper-item {
+  border: 1px solid #ddd;
+  padding: 10px;
+  cursor: pointer;
+  width: 150px;
+  text-align: center;
+}
+
+.theme-item img, .paper-item img {
+  max-width: 100%;
+  height: auto;
+}
+
+.editor-container {
+  display: flex;
+  max-width: 1200px;
+  margin: 0 auto;
+  height: calc(100vh - 40px);
+}
+
+.sidebar {
+  width: 300px;
+  padding: 20px;
+  background: #f5f5f5;
+  overflow-y: auto;
+}
+
+.tab-buttons {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 20px;
+}
+
+.tab-buttons button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: #e0e0e0;
+  cursor: pointer;
+}
+
+.tab-buttons button.active {
+  background: #007bff;
+  color: white;
+}
+
+.tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.photos-section h4, .themes-section h4, .stickers-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.item-list {
+  display: grid;
+  gap: 10px;
+}
+
+.draggable-item {
+  max-width: 100%;
+  height: auto;
+  cursor: move;
+}
+
+.editor-main {
+  flex-grow: 1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.book-spread {
+  flex-grow: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  padding: 20px;
+  position: relative;
+  width: 800px; /* Total width for two pages */
+  height: 600px; /* Fixed height */
+}
+
+.book-spread::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  background: #000;
+  z-index: 1;
+}
+
+.page {
+  position: absolute;
+  width: 400px;
+  height: 600px;
+  border: 1px solid #ccc;
+  transition: opacity 0.3s;
+}
+
+.page.left {
+  left: 0;
+}
+
+.page.right {
+  left: 400px; /* Align next to left page */
+}
+
+.page.active {
+  opacity: 1;
+  z-index: 2;
+}
+
+.page:not(.active) {
+  opacity: 0.5;
+  z-index: 1;
+}
+
+.page-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.element {
+  position: absolute;
+  cursor: move;
+}
+
+.element img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.element-controls {
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 5px;
+}
+
+.delete-btn {
+  background: red;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.element-controls button {
+  background: #fff;
+  border: 1px solid #ddd;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.editor-controls {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.editor-controls button {
+  margin: 0 5px;
+  padding: 5px 10px;
+}
+
+input[type="file"] {
+  margin-bottom: 10px;
+}

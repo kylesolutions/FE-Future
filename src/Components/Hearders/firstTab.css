@@ -143,6 +143,9 @@
 .bg-gradient-from-rose-500 {
   background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
 }
+.bg-gradient-from-red-500 {
+  background: linear-gradient(135deg, #ecef44 0%, #d9dc26 100%);
+}
 
 .service-title {
   font-size: 1.25rem;

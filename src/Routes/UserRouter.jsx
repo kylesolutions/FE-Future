@@ -16,6 +16,7 @@ import GiftPrintingPage from '../Pages/GiftPrintingPage';
 import GiftOrderViewPage from '../Pages/GiftOrderViewPage';
 import DocumentOrderViewPage from '../Pages/DocumentOrderViewPage';
 import DocPrintPage from '../Pages/DocPrintPage';
+import PhotoBookPage from '../Pages/PhotoBookPage';
 
 function ProtectedAdminRoute({ children }) {
   const user = useSelector(state => state.user);
@@ -40,6 +41,7 @@ function UserRouter() {
       <Route path='document' element={<DocPrintPage/>}/>
       <Route path='giftorder' element={<GiftOrderViewPage/>}/>
       <Route path='documentorder' element={<DocumentOrderViewPage/>}/>
+      <Route path='photobook' element={<PhotoBookPage/>}/>
     </Routes>
   );
 }
