@@ -148,6 +148,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
   const [resizeStart, setResizeStart] = useState({ width: 0, height: 0, x: 0, y: 0 });
   const elementRef = useRef(null);
   const textareaRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -170,8 +171,10 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
   const handleMouseDown = (e) => {
     if (e.button !== 0) return;
     e.stopPropagation();
+    e.preventDefault();
     setIsSelected(true);
     if (element.type === 'text' && e.detail === 2) {
+      console.log('Double-click detected, enabling text edit');
       setIsEditing(true);
       return;
     }
@@ -211,6 +214,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
 
   const handleResizeStart = (e) => {
     e.stopPropagation();
+    e.preventDefault();
     setIsResizing(true);
     setResizeStart({
       width: element.width,
@@ -274,7 +278,32 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
   };
 
   const handleTextChange = (e) => {
+    console.log('Text changed:', e.target.value);
     onUpdate(pageId, element.id, { content: e.target.value });
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const token = localStorage.getItem('token');
+    const config = token ? { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } } : {};
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const response = await axios.post(`${BASE_URL}/upload-images/`, formData, config);
+      const imageUrl = getImageUrl(response.data.image);
+      console.log('Image uploaded for placeholder:', imageUrl);
+      onUpdate(pageId, element.id, { content: imageUrl, type: 'image' });
+    } catch (err) {
+      console.error('Image upload failed:', err);
+      alert('Failed to upload image. Please try again.');
+    }
+  };
+
+  const handleUploadClick = (e) => {
+    e.stopPropagation();
+    console.log('Upload icon clicked, triggering file input');
+    fileInputRef.current.click();
   };
 
   const renderContent = () => {
@@ -285,7 +314,11 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
             ref={textareaRef}
             value={element.content}
             onChange={handleTextChange}
-            onBlur={() => setIsEditing(false)}
+            onBlur={() => {
+              console.log('Textarea blurred, ending edit');
+              setIsEditing(false);
+            }}
+            onClick={(e) => e.stopPropagation()}
             className="text-editor"
             style={{
               width: '100%',
@@ -309,12 +342,29 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
     }
     if (element.type === 'placeholder') {
       return (
-        <img
-          src={element.content || PLACEHOLDER_IMAGE}
-          alt=""
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          draggable={false}
-        />
+        <div className="placeholder-frame">
+          <img
+            src={element.content || PLACEHOLDER_IMAGE}
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            draggable={false}
+          />
+          {!element.content && (
+            <div className="upload-overlay">
+              <button className="upload-icon-btn" onClick={handleUploadClick}>
+                <Upload size={24} />
+                <span>Upload Image</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                style={{ display: 'none' }}
+              />
+            </div>
+          )}
+        </div>
       );
     }
     return (
@@ -339,10 +389,10 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
         height: `${element.height}px`,
         transform: `rotate(${element.rotation}deg)`,
         zIndex: element.zIndex,
-        cursor: isDraggingElement ? 'grabbing' : 'grab',
+        cursor: isDraggingElement ? 'grabbing' : isEditing ? 'text' : 'grab',
         userSelect: 'none',
       }}
-      onMouseDown={handleMouseDown}
+      onMouseDown={isEditing ? null : handleMouseDown}
     >
       {renderContent()}
       {isSelected && !isEditing && (
@@ -587,8 +637,38 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
 // PhotoBookEditor Component
 function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   const [pages, setPages] = useState([
-    { id: 1, elements: [] },
-    { id: 2, elements: [] },
+    {
+      id: 1,
+      elements: [
+        {
+          id: `${Date.now()}-${Math.random()}`,
+          type: 'placeholder',
+          content: '',
+          x: 100,
+          y: 100,
+          width: 200,
+          height: 200,
+          rotation: 0,
+          zIndex: 1,
+        },
+      ],
+    },
+    {
+      id: 2,
+      elements: [
+        {
+          id: `${Date.now()}-${Math.random()}`,
+          type: 'placeholder',
+          content: '',
+          x: 100,
+          y: 100,
+          width: 200,
+          height: 200,
+          rotation: 0,
+          zIndex: 1,
+        },
+      ],
+    },
   ]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [uploadedImages, setUploadedImages] = useState([]);
@@ -604,8 +684,8 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   // Price calculation
   const calculateTotalPrice = () => {
     const basePrice = parseFloat(paper.price || 0);
-    const pagePrice = 2.00; // $2 per page
-    const stickerPrice = 0.50; // $0.50 per sticker
+    const pagePrice = 2.00;
+    const stickerPrice = 0.50;
     const totalPages = pages.length;
     const totalStickers = pages.reduce((count, page) => 
       count + page.elements.filter(el => el.type === 'sticker').length, 0);
@@ -631,6 +711,20 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
       });
       const uploaded = await Promise.all(uploadPromises);
       setUploadedImages([...uploadedImages, ...uploaded]);
+      uploaded.forEach((img) => {
+        const currentPage = pages[currentPageIndex];
+        if (currentPage) {
+          addElementToPage(currentPage.id, {
+            type: 'image',
+            content: img.url,
+            x: 100,
+            y: 100,
+            width: 200,
+            height: 200,
+            rotation: 0,
+          });
+        }
+      });
     } catch (err) {
       console.error('Image upload failed:', err);
       setSaveError('Failed to upload images. Please try again.');
@@ -660,6 +754,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   };
 
   const updateElement = (pageId, elementId, updates) => {
+    console.log('Updating element:', { pageId, elementId, updates });
     setPages((prevPages) =>
       prevPages.map((page) => {
         if (page.id === pageId) {
@@ -708,6 +803,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   const addImagePlaceholder = () => {
     const currentPage = pages[currentPageIndex];
     if (currentPage) {
+      console.log('Adding image placeholder to page:', currentPage.id);
       addElementToPage(currentPage.id, {
         type: 'placeholder',
         content: '',
@@ -724,8 +820,38 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
     const lastPageId = pages[pages.length - 1].id;
     setPages([
       ...pages,
-      { id: lastPageId + 1, elements: [] },
-      { id: lastPageId + 2, elements: [] },
+      {
+        id: lastPageId + 1,
+        elements: [
+          {
+            id: `${Date.now()}-${Math.random()}`,
+            type: 'placeholder',
+            content: '',
+            x: 100,
+            y: 100,
+            width: 200,
+            height: 200,
+            rotation: 0,
+            zIndex: 1,
+          },
+        ],
+      },
+      {
+        id: lastPageId + 2,
+        elements: [
+          {
+            id: `${Date.now()}-${Math.random()}`,
+            type: 'placeholder',
+            content: '',
+            x: 100,
+            y: 100,
+            width: 200,
+            height: 200,
+            rotation: 0,
+            zIndex: 1,
+          },
+        ],
+      },
     ]);
   };
 
@@ -757,7 +883,6 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
       const token = localStorage.getItem('token');
       const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 
-      // Filter out pages with no elements to avoid unnecessary data
       const validPages = pages.filter(page => page.elements.length > 0);
 
       const orderData = {
@@ -769,7 +894,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
           background_id: selectedBackground ? selectedBackground.id : null,
           elements: page.elements.map((el) => ({
             type: el.type,
-            content: el.content, // Send server-side URLs for images
+            content: el.content,
             x: el.x,
             y: el.y,
             width: el.width,
