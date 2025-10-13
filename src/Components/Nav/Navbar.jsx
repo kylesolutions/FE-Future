@@ -103,6 +103,9 @@ function Navbar() {
                 <li className="nav-item">
                   <Link className="nav-link" to="/documentorder">Doc Order List</Link>
                 </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/photobookorders">Photobook Order List</Link>
+                </li>
               </>
             )}
           </ul>

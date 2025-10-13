@@ -596,6 +596,24 @@
   cursor: not-allowed;
 }
 
+.price-display {
+  font-size: 14px;
+  color: #2563eb;
+  font-weight: 600;
+  margin-top: 4px;
+  display: block;
+}
+
+.error-message {
+  background: #fff5f5;
+  color: #e53e3e;
+  padding: 10px;
+  margin: 10px 24px;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 14px;
+}
+
 @media (max-width: 1024px) {
   .editor-main {
     flex-direction: column;

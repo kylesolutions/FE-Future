@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { Plus, Image as ImageIcon, Sparkles, Sticker as StickerIcon, Upload, ArrowLeft, Type, ChevronLeft, ChevronRight, Trash2, ZoomIn, ZoomOut, RotateCw, Maximize2 } from 'lucide-react';
+import { Plus, Image as ImageIcon, Sparkles, Sticker as StickerIcon, Upload, ArrowLeft, Type, ChevronLeft, ChevronRight, Trash2, ZoomIn, ZoomOut, RotateCw, Maximize2, Save } from 'lucide-react';
 import './PhotoBook.css';
 
 const BASE_URL = 'http://82.180.146.4:8001';
@@ -417,7 +417,7 @@ function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, 
       className={`page ${position} ${isOver ? 'drag-over' : ''}`}
       style={{
         aspectRatio: getAspectRatio(paperSize),
-        backgroundColor: '#fff',
+        background: 'transparent',
       }}
     >
       <div className="page-content">
@@ -445,7 +445,7 @@ function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, 
         backgroundImage: background ? `url(${background})` : 'none',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat', // Ensure no repeat issues
+        backgroundRepeat: 'no-repeat',
       }}
     >
       <div className="book-spine"></div>
@@ -522,7 +522,7 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
             {uploadedImages.length > 0 ? (
               <div className="item-grid">
                 {uploadedImages.map((img, index) => (
-                  <DraggableItem key={index} src={img} type="image" />
+                  <DraggableItem key={index} src={img.url} type="image" />
                 ))}
               </div>
             ) : (
@@ -545,7 +545,7 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
                     className="theme-bg-item"
                     onClick={() => onBackgroundSelect(bg)}
                   >
-                    <img src={bg} alt={`Background ${index + 1}`} />
+                    <img src={bg.url} alt={`Background ${index + 1}`} />
                     <div className="overlay">
                       <span>Apply</span>
                     </div>
@@ -567,7 +567,7 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
             {stickers.length > 0 ? (
               <div className="item-grid">
                 {stickers.map((sticker, index) => (
-                  <DraggableItem key={index} src={sticker} type="sticker" />
+                  <DraggableItem key={index} src={sticker.url} type="sticker" />
                 ))}
               </div>
             ) : (
@@ -593,17 +593,48 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [selectedBackground, setSelectedBackground] = useState(
-    theme.backgrounds && Array.isArray(theme.backgrounds) && theme.backgrounds[0] ? getImageUrl(theme.backgrounds[0].image) : ''
+    theme.backgrounds && Array.isArray(theme.backgrounds) && theme.backgrounds[0]
+      ? { id: theme.backgrounds[0].id, url: getImageUrl(theme.backgrounds[0].image) }
+      : null
   );
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const user = useSelector((state) => state.user);
+
+  // Price calculation
+  const calculateTotalPrice = () => {
+    const basePrice = parseFloat(paper.price || 0);
+    const pagePrice = 2.00; // $2 per page
+    const stickerPrice = 0.50; // $0.50 per sticker
+    const totalPages = pages.length;
+    const totalStickers = pages.reduce((count, page) => 
+      count + page.elements.filter(el => el.type === 'sticker').length, 0);
+    const totalPrice = basePrice + (totalPages * pagePrice) + (totalStickers * stickerPrice);
+    return totalPrice.toFixed(2);
+  };
 
   useEffect(() => {
     console.log('Selected background:', selectedBackground);
   }, [selectedBackground]);
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files || []);
-    const newImages = files.map((file) => URL.createObjectURL(file));
-    setUploadedImages([...uploadedImages, ...newImages]);
+    const token = localStorage.getItem('token');
+    const config = token ? { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } } : {};
+
+    try {
+      const uploadPromises = files.map(async (file) => {
+        const formData = new FormData();
+        formData.append('image', file);
+        const response = await axios.post(`${BASE_URL}/upload-images/`, formData, config);
+        return { id: response.data.id, url: getImageUrl(response.data.image) };
+      });
+      const uploaded = await Promise.all(uploadPromises);
+      setUploadedImages([...uploadedImages, ...uploaded]);
+    } catch (err) {
+      console.error('Image upload failed:', err);
+      setSaveError('Failed to upload images. Please try again.');
+    }
   };
 
   const addElementToPage = (pageId, element) => {
@@ -661,7 +692,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   const addTextElement = () => {
     const currentPage = pages[currentPageIndex];
     if (currentPage) {
-      console.log('Adding text element to page:', currentPage.id); // Debug log
+      console.log('Adding text element to page:', currentPage.id);
       addElementToPage(currentPage.id, {
         type: 'text',
         content: 'Double click to edit',
@@ -713,6 +744,53 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
     }
   };
 
+  const handleSaveOrder = async () => {
+    if (!user) {
+      setSaveError('You must be logged in to save an order.');
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+
+      // Filter out pages with no elements to avoid unnecessary data
+      const validPages = pages.filter(page => page.elements.length > 0);
+
+      const orderData = {
+        theme_id: theme.id,
+        paper_id: paper.id,
+        total_price: calculateTotalPrice(),
+        pages: validPages.map((page, index) => ({
+          page_number: index + 1,
+          background_id: selectedBackground ? selectedBackground.id : null,
+          elements: page.elements.map((el) => ({
+            type: el.type,
+            content: el.content, // Send server-side URLs for images
+            x: el.x,
+            y: el.y,
+            width: el.width,
+            height: el.height,
+            rotation: el.rotation,
+            z_index: el.zIndex,
+          })),
+        })),
+      };
+
+      const response = await axios.post(`${BASE_URL}/orders/create/`, orderData, config);
+      console.log('Order saved:', response.data);
+      alert('Order saved successfully!');
+    } catch (err) {
+      console.error('Order save failed:', err.response?.data || err.message);
+      setSaveError('Failed to save order. Please check your connection or try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const leftPage = pages[currentPageIndex];
   const rightPage = pages[currentPageIndex + 1];
 
@@ -728,6 +806,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
           <span className="page-indicator">
             Pages {currentPageIndex + 1}-{currentPageIndex + 2} of {pages.length}
           </span>
+          <span className="price-display">Total Price: ${calculateTotalPrice()}</span>
         </div>
         <div className="header-actions">
           <button className="action-btn" onClick={addTextElement}>
@@ -738,13 +817,22 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
             <Plus size={18} />
             Add Frame
           </button>
+          <button className="action-btn" onClick={handleSaveOrder} disabled={isSaving}>
+            <Save size={18} />
+            {isSaving ? 'Saving...' : 'Save Order'}
+          </button>
         </div>
       </div>
+      {saveError && <div className="error-message">{saveError}</div>}
       <div className="editor-main">
         <Sidebar
           uploadedImages={uploadedImages}
-          themeBackgrounds={theme.backgrounds && Array.isArray(theme.backgrounds) ? theme.backgrounds.map((bg) => getImageUrl(bg.image)) : []}
-          stickers={Array.isArray(stickers) ? stickers.map((s) => getImageUrl(s.image)) : []}
+          themeBackgrounds={theme.backgrounds && Array.isArray(theme.backgrounds)
+            ? theme.backgrounds.map((bg) => ({ id: bg.id, url: getImageUrl(bg.image) }))
+            : []}
+          stickers={Array.isArray(stickers)
+            ? stickers.map((s) => ({ id: s.id, url: getImageUrl(s.image) }))
+            : []}
           onImageUpload={handleImageUpload}
           onBackgroundSelect={(bg) => {
             console.log('Applying background:', bg);
@@ -756,7 +844,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
             <BookSpread
               leftPage={leftPage}
               rightPage={rightPage}
-              background={selectedBackground}
+              background={selectedBackground ? selectedBackground.url : ''}
               paperSize={paper.size}
               onAddElement={addElementToPage}
               onUpdateElement={updateElement}
