@@ -4,56 +4,835 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { Plus, Image as ImageIcon, Trash2, Type } from 'lucide-react';
+import { Plus, Image as ImageIcon, Sparkles, Sticker as StickerIcon, Upload, ArrowLeft, Type, ChevronLeft, ChevronRight, Trash2, ZoomIn, ZoomOut, RotateCw, Maximize2 } from 'lucide-react';
 import './PhotoBook.css';
 
 const BASE_URL = 'http://82.180.146.4:8001';
-const FALLBACK_IMAGE = 'https://via.placeholder.com/150?text=No+Image';
+const FALLBACK_IMAGE = 'https://via.placeholder.com/300x200?text=No+Image';
+const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23e0e0e0" stroke="%23999" stroke-width="2" stroke-dasharray="5,5"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="14" fill="%23999"%3EDrop Photo Here%3C/text%3E%3C/svg%3E';
+
 const ItemTypes = {
   IMAGE: 'image',
   STICKER: 'sticker',
-  TEXT: 'text',
-  PLACEHOLDER: 'placeholder',
+  ELEMENT: 'element',
 };
 
+const getImageUrl = (path) => {
+  if (!path) return FALLBACK_IMAGE;
+  if (path.startsWith('http')) return path;
+  return `${BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+
+const getAspectRatio = (size) => {
+  const ratios = { 'A4': '210/297', '8x10': '8/10' };
+  return ratios[size] || '1';
+};
+
+// ThemeSelector Component
+function ThemeSelector({ themes, onSelect }) {
+  const safeThemes = Array.isArray(themes) ? themes : [];
+
+  return (
+    <div className="photobook-container">
+      <div className="header-section">
+        <h1>Personalize Your Photobook</h1>
+        <p className="subtitle">Create beautiful memories with our photobook printing service</p>
+      </div>
+      <div className="selection-section">
+        <h2>Select Your Photobook Theme</h2>
+        {safeThemes.length === 0 ? (
+          <div className="empty-state">
+            <Sparkles size={48} />
+            <p>No themes available</p>
+            <p className="hint">Please check your connection or try again later</p>
+          </div>
+        ) : (
+          <div className="theme-grid">
+            {safeThemes.map((theme) => (
+              <div
+                key={theme.id}
+                className="theme-card"
+                onClick={() => onSelect(theme)}
+              >
+                <div className="theme-image-wrapper">
+                  <img
+                    src={theme.backgrounds && theme.backgrounds[0] ? getImageUrl(theme.backgrounds[0].image) : FALLBACK_IMAGE}
+                    alt={theme.theme_name || 'Theme'}
+                  />
+                </div>
+                <div className="theme-info">
+                  <h3>{theme.theme_name || 'Unnamed Theme'}</h3>
+                  <p>{theme.backgrounds ? theme.backgrounds.length : 0} backgrounds available</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// PaperSelector Component
+function PaperSelector({ papers, onSelect, onBack }) {
+  const safePapers = Array.isArray(papers) ? papers : [];
+
+  return (
+    <div className="photobook-container">
+      <button className="back-button" onClick={onBack}>
+        <ArrowLeft size={20} />
+        Back to Themes
+      </button>
+      <div className="header-section">
+        <h1>Choose Your Photobook Size</h1>
+        <p className="subtitle">Select the perfect size for your memories</p>
+      </div>
+      <div className="selection-section">
+        {safePapers.length === 0 ? (
+          <div className="empty-state">
+            <p>No paper sizes available</p>
+            <p className="hint">Please check your connection or try again later</p>
+          </div>
+        ) : (
+          <div className="paper-grid">
+            {safePapers.map((paper) => (
+              <div
+                key={paper.id}
+                className="paper-card"
+                onClick={() => onSelect(paper)}
+              >
+                <div className="paper-image-wrapper">
+                  <img src={getImageUrl(paper.image)} alt={paper.size || 'Paper'} />
+                </div>
+                <div className="paper-info">
+                  <h3>{paper.size || 'Unknown Size'}</h3>
+                  <p className="price">${Number(paper.price || 0).toFixed(2)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// DraggableItem Component
+function DraggableItem({ src, type }) {
+  const [{ isDragging }, drag] = useDrag(() => ({
+    type: type === 'image' ? ItemTypes.IMAGE : ItemTypes.STICKER,
+    item: { src, type },
+    collect: (monitor) => ({
+      isDragging: !!monitor.isDragging(),
+    }),
+  }), [src, type]);
+
+  return (
+    <div
+      ref={drag}
+      className="draggable-item"
+      style={{ opacity: isDragging ? 0.5 : 1 }}
+    >
+      <img src={src} alt="" draggable={false} />
+    </div>
+  );
+}
+
+// DraggableElement Component
+function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
+  const [isSelected, setIsSelected] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDraggingElement, setIsDraggingElement] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeStart, setResizeStart] = useState({ width: 0, height: 0, x: 0, y: 0 });
+  const elementRef = useRef(null);
+  const textareaRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (elementRef.current && !elementRef.current.contains(e.target)) {
+        setIsSelected(false);
+        setIsEditing(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleMouseDown = (e) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    setIsSelected(true);
+    if (element.type === 'text' && e.detail === 2) {
+      setIsEditing(true);
+      return;
+    }
+    setIsDraggingElement(true);
+    const pageRect = pageRef.current.getBoundingClientRect();
+    setDragStart({
+      x: e.clientX - element.x - pageRect.left,
+      y: e.clientY - element.y - pageRect.top,
+    });
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDraggingElement || !pageRef.current) return;
+    const pageRect = pageRef.current.getBoundingClientRect();
+    const newX = e.clientX - pageRect.left - dragStart.x;
+    const newY = e.clientY - pageRect.top - dragStart.y;
+    const constrainedX = Math.max(0, Math.min(newX, pageRect.width - element.width));
+    const constrainedY = Math.max(0, Math.min(newY, pageRect.height - element.height));
+    console.log('Moving element:', { newX, newY, constrainedX, constrainedY });
+    onUpdate(pageId, element.id, { x: constrainedX, y: constrainedY });
+  };
+
+  const handleMouseUp = () => {
+    setIsDraggingElement(false);
+  };
+
+  useEffect(() => {
+    if (isDraggingElement) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDraggingElement, dragStart]);
+
+  const handleResizeStart = (e) => {
+    e.stopPropagation();
+    setIsResizing(true);
+    setResizeStart({
+      width: element.width,
+      height: element.height,
+      x: e.clientX,
+      y: e.clientY,
+    });
+  };
+
+  const handleResizeMove = (e) => {
+    if (!isResizing) return;
+    const deltaX = e.clientX - resizeStart.x;
+    const deltaY = e.clientY - resizeStart.y;
+    const delta = Math.max(deltaX, deltaY);
+    const newWidth = Math.max(50, resizeStart.width + delta);
+    const newHeight = Math.max(50, resizeStart.height + delta);
+    onUpdate(pageId, element.id, { width: newWidth, height: newHeight });
+  };
+
+  const handleResizeEnd = () => {
+    setIsResizing(false);
+  };
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResizeMove);
+      document.addEventListener('mouseup', handleResizeEnd);
+      return () => {
+        document.removeEventListener('mousemove', handleResizeMove);
+        document.removeEventListener('mouseup', handleResizeEnd);
+      };
+    }
+  }, [isResizing, resizeStart]);
+
+  const handleZoomIn = (e) => {
+    e.stopPropagation();
+    onUpdate(pageId, element.id, {
+      width: element.width * 1.1,
+      height: element.height * 1.1,
+    });
+  };
+
+  const handleZoomOut = (e) => {
+    e.stopPropagation();
+    onUpdate(pageId, element.id, {
+      width: Math.max(50, element.width * 0.9),
+      height: Math.max(50, element.height * 0.9),
+    });
+  };
+
+  const handleRotate = (e) => {
+    e.stopPropagation();
+    onUpdate(pageId, element.id, {
+      rotation: (element.rotation + 15) % 360,
+    });
+  };
+
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    onDelete(pageId, element.id);
+  };
+
+  const handleTextChange = (e) => {
+    onUpdate(pageId, element.id, { content: e.target.value });
+  };
+
+  const renderContent = () => {
+    if (element.type === 'text') {
+      if (isEditing) {
+        return (
+          <textarea
+            ref={textareaRef}
+            value={element.content}
+            onChange={handleTextChange}
+            onBlur={() => setIsEditing(false)}
+            className="text-editor"
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 'none',
+              background: 'transparent',
+              resize: 'none',
+              outline: 'none',
+              fontSize: '16px',
+              fontFamily: 'Arial, sans-serif',
+              padding: '8px',
+            }}
+          />
+        );
+      }
+      return (
+        <div className="text-content" style={{ padding: '8px', fontSize: '16px' }}>
+          {element.content || 'Double click to edit'}
+        </div>
+      );
+    }
+    if (element.type === 'placeholder') {
+      return (
+        <img
+          src={element.content || PLACEHOLDER_IMAGE}
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          draggable={false}
+        />
+      );
+    }
+    return (
+      <img
+        src={element.content}
+        alt=""
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        draggable={false}
+      />
+    );
+  };
+
+  return (
+    <div
+      ref={elementRef}
+      className={`draggable-element ${isSelected ? 'selected' : ''} ${element.type === 'text' ? 'text-element' : ''}`}
+      style={{
+        position: 'absolute',
+        left: `${element.x}px`,
+        top: `${element.y}px`,
+        width: `${element.width}px`,
+        height: `${element.height}px`,
+        transform: `rotate(${element.rotation}deg)`,
+        zIndex: element.zIndex,
+        cursor: isDraggingElement ? 'grabbing' : 'grab',
+        userSelect: 'none',
+      }}
+      onMouseDown={handleMouseDown}
+    >
+      {renderContent()}
+      {isSelected && !isEditing && (
+        <>
+          <div className="element-border"></div>
+          <div className="resize-handle" onMouseDown={handleResizeStart}>
+            <Maximize2 size={12} />
+          </div>
+          <div className="element-toolbar">
+            {element.type !== 'text' && (
+              <>
+                <button className="toolbar-btn" onClick={handleZoomIn} title="Zoom In">
+                  <ZoomIn size={14} />
+                </button>
+                <button className="toolbar-btn" onClick={handleZoomOut} title="Zoom Out">
+                  <ZoomOut size={14} />
+                </button>
+                <button className="toolbar-btn" onClick={handleRotate} title="Rotate">
+                  <RotateCw size={14} />
+                </button>
+              </>
+            )}
+            <button className="toolbar-btn delete" onClick={handleDelete} title="Delete">
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// PageCanvas Component
+function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, onDeleteElement }) {
+  const pageRef = useRef(null);
+  const [{ isOver }, drop] = useDrop(
+    () => ({
+      accept: [ItemTypes.IMAGE, ItemTypes.STICKER],
+      drop: (item, monitor) => {
+        const offset = monitor.getSourceClientOffset();
+        if (!offset || !pageRef.current) return;
+        const pageRect = pageRef.current.getBoundingClientRect();
+        const elementWidth = item.type === 'sticker' ? 150 : 200;
+        const elementHeight = item.type === 'sticker' ? 150 : 200;
+        const x = offset.x - pageRect.left - elementWidth / 2;
+        const y = offset.y - pageRect.top - elementHeight / 2;
+        console.log('Drop coordinates:', { offsetX: offset.x, offsetY: offset.y, pageRect, x, y });
+        const newElement = {
+          type: item.type,
+          content: item.src,
+          x: Math.max(0, Math.min(x, pageRect.width - elementWidth)),
+          y: Math.max(0, Math.min(y, pageRect.height - elementHeight)),
+          width: elementWidth,
+          height: elementHeight,
+          rotation: 0,
+          zIndex: Math.max(0, ...page.elements.map((el) => el.zIndex || 0)) + 1,
+        };
+        onAddElement(page.id, newElement);
+      },
+      collect: (monitor) => ({
+        isOver: !!monitor.isOver(),
+      }),
+    }),
+    [page.id]
+  );
+
+  drop(pageRef);
+
+  return (
+    <div
+      ref={pageRef}
+      className={`page ${position} ${isOver ? 'drag-over' : ''}`}
+      style={{
+        aspectRatio: getAspectRatio(paperSize),
+        backgroundColor: '#fff',
+      }}
+    >
+      <div className="page-content">
+        {page.elements.map((element) => (
+          <DraggableElement
+            key={element.id}
+            element={element}
+            pageId={page.id}
+            onUpdate={onUpdateElement}
+            onDelete={onDeleteElement}
+            pageRef={pageRef}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// BookSpread Component
+function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, onUpdateElement, onDeleteElement }) {
+  return (
+    <div
+      className="book-spread"
+      style={{
+        backgroundImage: background ? `url(${background})` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat', // Ensure no repeat issues
+      }}
+    >
+      <div className="book-spine"></div>
+      {leftPage && (
+        <PageCanvas
+          page={leftPage}
+          position="left"
+          paperSize={paperSize}
+          onAddElement={onAddElement}
+          onUpdateElement={onUpdateElement}
+          onDeleteElement={onDeleteElement}
+        />
+      )}
+      {rightPage && (
+        <PageCanvas
+          page={rightPage}
+          position="right"
+          paperSize={paperSize}
+          onAddElement={onAddElement}
+          onUpdateElement={onUpdateElement}
+          onDeleteElement={onDeleteElement}
+        />
+      )}
+    </div>
+  );
+}
+
+// Sidebar Component
+function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, onBackgroundSelect }) {
+  const [activeTab, setActiveTab] = useState('photos');
+
+  return (
+    <div className="sidebar">
+      <div className="tab-buttons">
+        <button
+          className={`tab-btn ${activeTab === 'photos' ? 'active' : ''}`}
+          onClick={() => setActiveTab('photos')}
+        >
+          <ImageIcon size={18} />
+          Photos
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'themes' ? 'active' : ''}`}
+          onClick={() => setActiveTab('themes')}
+        >
+          <Sparkles size={18} />
+          Themes
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'stickers' ? 'active' : ''}`}
+          onClick={() => setActiveTab('stickers')}
+        >
+          <StickerIcon size={18} />
+          Stickers
+        </button>
+      </div>
+      <div className="tab-content">
+        {activeTab === 'photos' && (
+          <div className="tab-panel">
+            <div className="upload-section">
+              <label htmlFor="file-upload" className="upload-btn">
+                <Upload size={18} />
+                Upload Photos
+              </label>
+              <input
+                id="file-upload"
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={onImageUpload}
+                style={{ display: 'none' }}
+              />
+            </div>
+            {uploadedImages.length > 0 ? (
+              <div className="item-grid">
+                {uploadedImages.map((img, index) => (
+                  <DraggableItem key={index} src={img} type="image" />
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <ImageIcon size={48} />
+                <p>No photos uploaded yet</p>
+                <p className="hint">Upload photos to get started</p>
+              </div>
+            )}
+          </div>
+        )}
+        {activeTab === 'themes' && (
+          <div className="tab-panel">
+            <h3 className="panel-title">Theme Backgrounds</h3>
+            {themeBackgrounds.length > 0 ? (
+              <div className="item-grid">
+                {themeBackgrounds.map((bg, index) => (
+                  <div
+                    key={index}
+                    className="theme-bg-item"
+                    onClick={() => onBackgroundSelect(bg)}
+                  >
+                    <img src={bg} alt={`Background ${index + 1}`} />
+                    <div className="overlay">
+                      <span>Apply</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <Sparkles size={48} />
+                <p>No backgrounds available</p>
+                <p className="hint">Select a theme with backgrounds</p>
+              </div>
+            )}
+          </div>
+        )}
+        {activeTab === 'stickers' && (
+          <div className="tab-panel">
+            <h3 className="panel-title">Stickers & Decorations</h3>
+            {stickers.length > 0 ? (
+              <div className="item-grid">
+                {stickers.map((sticker, index) => (
+                  <DraggableItem key={index} src={sticker} type="sticker" />
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <StickerIcon size={48} />
+                <p>No stickers available</p>
+                <p className="hint">Add stickers to decorate your photobook</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// PhotoBookEditor Component
+function PhotoBookEditor({ theme, paper, stickers, onBack }) {
+  const [pages, setPages] = useState([
+    { id: 1, elements: [] },
+    { id: 2, elements: [] },
+  ]);
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [uploadedImages, setUploadedImages] = useState([]);
+  const [selectedBackground, setSelectedBackground] = useState(
+    theme.backgrounds && Array.isArray(theme.backgrounds) && theme.backgrounds[0] ? getImageUrl(theme.backgrounds[0].image) : ''
+  );
+
+  useEffect(() => {
+    console.log('Selected background:', selectedBackground);
+  }, [selectedBackground]);
+
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    const newImages = files.map((file) => URL.createObjectURL(file));
+    setUploadedImages([...uploadedImages, ...newImages]);
+  };
+
+  const addElementToPage = (pageId, element) => {
+    setPages((prevPages) =>
+      prevPages.map((page) => {
+        if (page.id === pageId) {
+          const maxZIndex = Math.max(0, ...page.elements.map((el) => el.zIndex || 0));
+          return {
+            ...page,
+            elements: [
+              ...page.elements,
+              {
+                ...element,
+                id: `${Date.now()}-${Math.random()}`,
+                zIndex: maxZIndex + 1,
+              },
+            ],
+          };
+        }
+        return page;
+      })
+    );
+  };
+
+  const updateElement = (pageId, elementId, updates) => {
+    setPages((prevPages) =>
+      prevPages.map((page) => {
+        if (page.id === pageId) {
+          return {
+            ...page,
+            elements: page.elements.map((el) =>
+              el.id === elementId ? { ...el, ...updates } : el
+            ),
+          };
+        }
+        return page;
+      })
+    );
+  };
+
+  const deleteElement = (pageId, elementId) => {
+    setPages((prevPages) =>
+      prevPages.map((page) => {
+        if (page.id === pageId) {
+          return {
+            ...page,
+            elements: page.elements.filter((el) => el.id !== elementId),
+          };
+        }
+        return page;
+      })
+    );
+  };
+
+  const addTextElement = () => {
+    const currentPage = pages[currentPageIndex];
+    if (currentPage) {
+      console.log('Adding text element to page:', currentPage.id); // Debug log
+      addElementToPage(currentPage.id, {
+        type: 'text',
+        content: 'Double click to edit',
+        x: 150,
+        y: 150,
+        width: 200,
+        height: 60,
+        rotation: 0,
+      });
+    }
+  };
+
+  const addImagePlaceholder = () => {
+    const currentPage = pages[currentPageIndex];
+    if (currentPage) {
+      addElementToPage(currentPage.id, {
+        type: 'placeholder',
+        content: '',
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 200,
+        rotation: 0,
+      });
+    }
+  };
+
+  const addNewPages = () => {
+    const lastPageId = pages[pages.length - 1].id;
+    setPages([
+      ...pages,
+      { id: lastPageId + 1, elements: [] },
+      { id: lastPageId + 2, elements: [] },
+    ]);
+  };
+
+  const goToPreviousSpread = () => {
+    if (currentPageIndex >= 2) {
+      setCurrentPageIndex(currentPageIndex - 2);
+    }
+  };
+
+  const goToNextSpread = () => {
+    if (currentPageIndex + 2 < pages.length) {
+      setCurrentPageIndex(currentPageIndex + 2);
+    } else {
+      addNewPages();
+      setCurrentPageIndex(currentPageIndex + 2);
+    }
+  };
+
+  const leftPage = pages[currentPageIndex];
+  const rightPage = pages[currentPageIndex + 1];
+
+  return (
+    <div className="editor-container">
+      <div className="editor-header">
+        <button className="back-button" onClick={onBack}>
+          <ArrowLeft size={20} />
+          Back
+        </button>
+        <div className="header-info">
+          <h2>{theme.theme_name || 'Unnamed Theme'} - {paper.size || 'Unknown Size'}</h2>
+          <span className="page-indicator">
+            Pages {currentPageIndex + 1}-{currentPageIndex + 2} of {pages.length}
+          </span>
+        </div>
+        <div className="header-actions">
+          <button className="action-btn" onClick={addTextElement}>
+            <Type size={18} />
+            Add Text
+          </button>
+          <button className="action-btn" onClick={addImagePlaceholder}>
+            <Plus size={18} />
+            Add Frame
+          </button>
+        </div>
+      </div>
+      <div className="editor-main">
+        <Sidebar
+          uploadedImages={uploadedImages}
+          themeBackgrounds={theme.backgrounds && Array.isArray(theme.backgrounds) ? theme.backgrounds.map((bg) => getImageUrl(bg.image)) : []}
+          stickers={Array.isArray(stickers) ? stickers.map((s) => getImageUrl(s.image)) : []}
+          onImageUpload={handleImageUpload}
+          onBackgroundSelect={(bg) => {
+            console.log('Applying background:', bg);
+            setSelectedBackground(bg);
+          }}
+        />
+        <div className="canvas-area">
+          <div className="canvas-wrapper">
+            <BookSpread
+              leftPage={leftPage}
+              rightPage={rightPage}
+              background={selectedBackground}
+              paperSize={paper.size}
+              onAddElement={addElementToPage}
+              onUpdateElement={updateElement}
+              onDeleteElement={deleteElement}
+            />
+          </div>
+          <div className="pagination-controls">
+            <button
+              className="nav-btn"
+              onClick={goToPreviousSpread}
+              disabled={currentPageIndex === 0}
+            >
+              <ChevronLeft size={20} />
+              Previous
+            </button>
+            <button className="nav-btn" onClick={goToNextSpread}>
+              Next
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Main PhotoBook Component
 function PhotoBook() {
   const navigate = useNavigate();
   const user = useSelector((state) => state.user);
-  const [step, setStep] = useState(1); // 1: themes, 2: papers, 3: editor
+  const [step, setStep] = useState(1);
   const [themes, setThemes] = useState([]);
   const [papers, setPapers] = useState([]);
   const [selectedTheme, setSelectedTheme] = useState(null);
   const [selectedPaper, setSelectedPaper] = useState(null);
-  const [uploadedImages, setUploadedImages] = useState([]);
   const [stickers, setStickers] = useState([]);
-  const [pages, setPages] = useState([{ id: 1, elements: [] }, { id: 2, elements: [] }]);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [activeTab, setActiveTab] = useState('photos');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  const getImageUrl = (path) => {
-    if (!path) return FALLBACK_IMAGE;
-    if (path.startsWith('http')) return path;
-    return `${BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
-  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
         const token = localStorage.getItem('token');
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-        const [themesRes, papersRes, stickersRes] = await Promise.all([
-          axios.get(`${BASE_URL}/themes/`, config),
-          axios.get(`${BASE_URL}/photobook-papers/`, config),
-          axios.get(`${BASE_URL}/stickers/`, config),
-        ]);
-        setThemes(themesRes.data);
-        setPapers(papersRes.data);
-        setStickers(stickersRes.data);
+        const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+
+        // Fetch themes
+        const themesRes = await axios.get(`${BASE_URL}/themes/`, config).catch((err) => {
+          console.error('Failed to fetch themes:', err);
+          return { data: [] };
+        });
+
+        // Fetch papers
+        const papersRes = await axios.get(`${BASE_URL}/photobook-papers/`, config).catch((err) => {
+          console.error('Failed to fetch papers:', err);
+          return { data: [] };
+        });
+
+        // Fetch stickers
+        const stickersRes = await axios.get(`${BASE_URL}/stickers/`, config).catch((err) => {
+          console.error('Failed to fetch stickers:', err);
+          return { data: [] };
+        });
+
+        // Set states with safe defaults
+        setThemes(Array.isArray(themesRes.data) ? themesRes.data : []);
+        setPapers(Array.isArray(papersRes.data) ? papersRes.data : []);
+        setStickers(Array.isArray(stickersRes.data) ? stickersRes.data : []);
+
+        // Set error if all API calls failed
+        if (!themesRes.data.length && !papersRes.data.length && !stickersRes.data.length) {
+          setError('Failed to load data from all endpoints. Please check your connection or try again.');
+        }
       } catch (err) {
-        setError('Failed to load data. Please try again.');
+        console.error('Unexpected error during data fetch:', err);
+        setError('An unexpected error occurred. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -71,285 +850,57 @@ function PhotoBook() {
     setStep(3);
   };
 
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
-    const newImages = files.map(file => URL.createObjectURL(file));
-    setUploadedImages([...uploadedImages, ...newImages]);
+  const handleBackToThemes = () => {
+    setStep(1);
+    setSelectedTheme(null);
+    setSelectedPaper(null);
   };
 
-  const addElementToPage = (type, content, pageId, x = 50, y = 50) => {
-    const pageIndex = pages.findIndex(p => p.id === pageId);
-    const newPages = [...pages];
-    newPages[pageIndex].elements.push({
-      type,
-      content,
-      x,
-      y,
-      width: type === 'placeholder' ? 150 : 200,
-      height: type === 'placeholder' ? 150 : 200,
-      scale: 1,
-    });
-    setPages(newPages);
+  const handleBackToPapers = () => {
+    setStep(2);
+    setSelectedPaper(null);
   };
 
-  const updateElement = (pageId, elementIndex, updates) => {
-    const pageIndex = pages.findIndex(p => p.id === pageId);
-    const newPages = [...pages];
-    newPages[pageIndex].elements[elementIndex] = { ...newPages[pageIndex].elements[elementIndex], ...updates };
-    setPages(newPages);
-  };
-
-  const deleteElement = (pageId, elementIndex) => {
-    const pageIndex = pages.findIndex(p => p.id === pageId);
-    const newPages = [...pages];
-    newPages[pageIndex].elements.splice(elementIndex, 1);
-    setPages(newPages);
-  };
-
-  const applyThemeBackground = (themeImage) => {
-    const bookSpread = document.querySelector('.book-spread');
-    if (bookSpread) {
-      bookSpread.style.backgroundImage = `url(${themeImage})`;
-      bookSpread.style.backgroundSize = '800px 600px'; // Match total width and height
-      bookSpread.style.backgroundRepeat = 'no-repeat';
-    }
-  };
-
-  const resizeElement = (pageId, elementIndex, delta) => {
-    const pageIndex = pages.findIndex(p => p.id === pageId);
-    const newPages = [...pages];
-    const element = newPages[pageIndex].elements[elementIndex];
-    newPages[pageIndex].elements[elementIndex] = {
-      ...element,
-      width: Math.max(50, element.width + delta),
-      height: Math.max(50, element.height + delta),
-    };
-    setPages(newPages);
-  };
-
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>{error}</div>;
-
-  if (step === 1) {
+  if (isLoading) {
     return (
-      <div className="photobook-container">
-        <h1>Personalize Photobook Online</h1>
-        <h2>Photobook Printing Online</h2>
-        <h3>Select your photobook theme</h3>
-        <div className="theme-list">
-          {themes.map((theme) => (
-            <div key={theme.id} className="theme-item" onClick={() => handleThemeSelect(theme)}>
-              <img src={theme.backgrounds[0] ? getImageUrl(theme.backgrounds[0].image) : FALLBACK_IMAGE} alt={theme.theme_name} />
-              <p>{theme.theme_name}</p>
-            </div>
-          ))}
-        </div>
+      <div className="loading-container">
+        <div className="spinner"></div>
+        <p>Loading...</p>
       </div>
     );
+  }
+
+  if (error) {
+    return (
+      <div className="error-container">
+        <p>{error}</p>
+        <button onClick={() => window.location.reload()}>Retry</button>
+      </div>
+    );
+  }
+
+  if (step === 1) {
+    return <ThemeSelector themes={themes} onSelect={handleThemeSelect} />;
   }
 
   if (step === 2) {
-    return (
-      <div className="photobook-container">
-        <h3>Select your photobook size</h3>
-        <div className="paper-list">
-          {papers.map((paper) => (
-            <div key={paper.id} className="paper-item" onClick={() => handlePaperSelect(paper)}>
-              <img src={getImageUrl(paper.image)} alt={paper.size} />
-              <p>{paper.size}</p>
-              <p>${paper.price}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    return <PaperSelector papers={papers} onSelect={handlePaperSelect} onBack={handleBackToThemes} />;
   }
 
-  if (step === 3) {
+  if (step === 3 && selectedTheme && selectedPaper) {
     return (
       <DndProvider backend={HTML5Backend}>
-        <div className="editor-container">
-          <div className="sidebar">
-            <div className="tab-buttons">
-              <button className={activeTab === 'photos' ? 'active' : ''} onClick={() => setActiveTab('photos')}>
-                <ImageIcon /> Photos
-              </button>
-              <button className={activeTab === 'themes' ? 'active' : ''} onClick={() => setActiveTab('themes')}>
-                <ImageIcon /> Themes
-              </button>
-              <button className={activeTab === 'stickers' ? 'active' : ''} onClick={() => setActiveTab('stickers')}>
-                <ImageIcon /> Stickers
-              </button>
-            </div>
-            <div className="tab-content">
-              {activeTab === 'photos' && (
-                <div className="photos-section">
-                  <h4><Plus /> Add Photos</h4>
-                  <input type="file" multiple onChange={handleImageUpload} />
-                  <div className="item-list">
-                    {uploadedImages.map((img, index) => (
-                      <DraggableImage key={index} src={img} />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {activeTab === 'themes' && (
-                <div className="themes-section">
-                  <h4>Themes</h4>
-                  <div className="item-list">
-                    {selectedTheme.backgrounds.map((bg) => (
-                      <DraggableImage key={bg.id} src={getImageUrl(bg.image)} onClick={() => applyThemeBackground(getImageUrl(bg.image))} />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {activeTab === 'stickers' && (
-                <div className="stickers-section">
-                  <h4>Stickers</h4>
-                  <div className="item-list">
-                    {stickers.map((sticker) => (
-                      <DraggableSticker key={sticker.id} src={getImageUrl(sticker.image)} />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="editor-main">
-            <div className="book-spread">
-              <Page
-                page={pages[0]}
-                paperSize={selectedPaper.size}
-                isActive={currentPage === 0}
-                updateElement={(i, u) => updateElement(pages[0].id, i, u)}
-                deleteElement={(i) => deleteElement(pages[0].id, i)}
-                addElement={(t, c) => addElementToPage(t, c, pages[0].id)}
-                resizeElement={(i, d) => resizeElement(pages[0].id, i, d)}
-                side="left"
-              />
-              <Page
-                page={pages[1]}
-                paperSize={selectedPaper.size}
-                isActive={currentPage === 1}
-                updateElement={(i, u) => updateElement(pages[1].id, i, u)}
-                deleteElement={(i) => deleteElement(pages[1].id, i)}
-                addElement={(t, c) => addElementToPage(t, c, pages[1].id)}
-                resizeElement={(i, d) => resizeElement(pages[1].id, i, d)}
-                side="right"
-              />
-            </div>
-            <div className="editor-controls">
-              <button onClick={() => addElementToPage('placeholder', FALLBACK_IMAGE, pages[currentPage].id)}>Add Image Space</button>
-              <button onClick={() => addElementToPage('text', 'New Text', pages[currentPage].id)}><Type /> Add Text</button>
-              <button onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}>Previous Page</button>
-              <button onClick={() => setCurrentPage(Math.min(pages.length - 1, currentPage + 1))}>Next Page</button>
-            </div>
-          </div>
-        </div>
+        <PhotoBookEditor
+          theme={selectedTheme}
+          paper={selectedPaper}
+          stickers={stickers}
+          onBack={handleBackToPapers}
+        />
       </DndProvider>
     );
   }
+
+  return null;
 }
-
-const DraggableImage = ({ src, onClick }) => {
-  const [{ isDragging }, drag] = useDrag(() => ({
-    type: ItemTypes.IMAGE,
-    item: { src, type: 'image' },
-    collect: (monitor) => ({ isDragging: !!monitor.isDragging() }),
-  }));
-
-  return (
-    <img
-      ref={drag}
-      src={src}
-      alt="draggable"
-      className="draggable-item"
-      style={{ opacity: isDragging ? 0.5 : 1 }}
-      onClick={onClick}
-    />
-  );
-};
-
-const DraggableSticker = ({ src }) => {
-  const [{ isDragging }, drag] = useDrag(() => ({
-    type: ItemTypes.STICKER,
-    item: { src, type: 'sticker' },
-    collect: (monitor) => ({ isDragging: !!monitor.isDragging() }),
-  }));
-
-  return (
-    <img ref={drag} src={src} alt="draggable" className="draggable-item" style={{ opacity: isDragging ? 0.5 : 1 }} />
-  );
-};
-
-const Page = ({ page, paperSize, isActive, updateElement, deleteElement, addElement, resizeElement, side }) => {
-  const ref = useRef(null);
-  const [, drop] = useDrop(() => ({
-    accept: [ItemTypes.IMAGE, ItemTypes.STICKER, ItemTypes.TEXT, ItemTypes.PLACEHOLDER],
-    drop: (item, monitor) => {
-      const rect = ref.current.getBoundingClientRect();
-      const delta = monitor.getDifferenceFromInitialOffset();
-      const x = Math.round(delta.x + (monitor.getInitialClientOffset().x - rect.left));
-      const y = Math.round(delta.y + (monitor.getInitialClientOffset().y - rect.top));
-      addElement(item.type, item.src || item.content, page.id, x, y);
-    },
-  }));
-
-  const handleDrag = (index, e) => {
-    if (!isActive) return;
-    const rect = ref.current.getBoundingClientRect();
-    const x = e.clientX - rect.left - page.elements[index].width / 2;
-    const y = e.clientY - rect.top - page.elements[index].height / 2;
-    updateElement(page.id, index, { x, y });
-  };
-
-  return (
-    <div
-      ref={ref}
-      className={`page ${isActive ? 'active' : ''} ${side}`}
-      style={{ aspectRatio: getAspectRatio(paperSize) }}
-    >
-      <div ref={drop} className="page-content">
-        {page.elements.map((el, index) => (
-          <div
-            key={index}
-            className="element"
-            style={{ left: `${el.x}px`, top: `${el.y}px`, width: `${el.width}px`, height: `${el.height}px` }}
-            draggable={isActive}
-            onDrag={(e) => handleDrag(index, e)}
-          >
-            {el.type === 'text' ? (
-              <textarea
-                value={el.content}
-                onChange={(e) => updateElement(page.id, index, { content: e.target.value })}
-                style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', resize: 'none' }}
-              />
-            ) : (
-              <img src={el.content} alt="" style={{ objectFit: 'contain', width: '100%', height: '100%' }} />
-            )}
-            {isActive && (
-              <div className="element-controls">
-                <button className="delete-btn" onClick={() => deleteElement(page.id, index)}>
-                  <Trash2 />
-                </button>
-                {(el.type === 'sticker' || el.type === 'image') && (
-                  <>
-                    <button onClick={() => resizeElement(page.id, index, 20)}>Zoom In</button>
-                    <button onClick={() => resizeElement(page.id, index, -20)}>Zoom Out</button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const getAspectRatio = (size) => {
-  const ratios = { 'A4': '210/297', '8x10': '8/10' };
-  return ratios[size] || '1';
-};
 
 export default PhotoBook;
