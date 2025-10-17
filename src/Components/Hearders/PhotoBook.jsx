@@ -6,6 +6,8 @@ import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Plus, Image as ImageIcon, Sparkles, Sticker as StickerIcon, Upload, ArrowLeft, Type, ChevronLeft, ChevronRight, Trash2, ZoomIn, ZoomOut, RotateCw, Maximize2, Save } from 'lucide-react';
 import './PhotoBook.css';
+import html2canvas from 'html2canvas';
+import domtoimage from 'dom-to-image';
 
 const BASE_URL = 'http://82.180.146.4:8001';
 const FALLBACK_IMAGE = 'https://via.placeholder.com/300x200?text=No+Image';
@@ -172,6 +174,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
     if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
+    console.log('Mouse down on element:', { type: element.type, id: element.id, content: element.content });
     setIsSelected(true);
     if (element.type === 'text' && e.detail === 2) {
       console.log('Double-click detected, enabling text edit');
@@ -391,42 +394,43 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
         zIndex: element.zIndex,
         cursor: isDraggingElement ? 'grabbing' : isEditing ? 'text' : 'grab',
         userSelect: 'none',
+        transformOrigin: 'center center',
       }}
       onMouseDown={isEditing ? null : handleMouseDown}
     >
-      {renderContent()}
-      {isSelected && !isEditing && (
-        <>
-          <div className="element-border"></div>
-          <div className="resize-handle" onMouseDown={handleResizeStart}>
-            <Maximize2 size={12} />
-          </div>
-          <div className="element-toolbar">
-            {element.type !== 'text' && (
-              <>
-                <button className="toolbar-btn" onClick={handleZoomIn} title="Zoom In">
-                  <ZoomIn size={14} />
-                </button>
-                <button className="toolbar-btn" onClick={handleZoomOut} title="Zoom Out">
-                  <ZoomOut size={14} />
-                </button>
-                <button className="toolbar-btn" onClick={handleRotate} title="Rotate">
-                  <RotateCw size={14} />
-                </button>
-              </>
-            )}
-            <button className="toolbar-btn delete" onClick={handleDelete} title="Delete">
-              <Trash2 size={14} />
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
+    {renderContent()}
+    {isSelected && !isEditing && (
+      <>
+        <div className="element-border"></div>
+        <div className="resize-handle" onMouseDown={handleResizeStart}>
+          <Maximize2 size={12} />
+        </div>
+        <div className="element-toolbar">
+          {element.type !== 'text' && (
+            <>
+              <button className="toolbar-btn" onClick={handleZoomIn} title="Zoom In">
+                <ZoomIn size={14} />
+              </button>
+              <button className="toolbar-btn" onClick={handleZoomOut} title="Zoom Out">
+                <ZoomOut size={14} />
+              </button>
+              <button className="toolbar-btn" onClick={handleRotate} title="Rotate">
+                <RotateCw size={14} />
+              </button>
+            </>
+          )}
+          <button className="toolbar-btn delete" onClick={handleDelete} title="Delete">
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </>
+    )}
+  </div>
+);
 }
 
 // PageCanvas Component
-function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, onDeleteElement }) {
+function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, onDeleteElement, pageRefs }) {
   const pageRef = useRef(null);
   const [{ isOver }, drop] = useDrop(
     () => ({
@@ -439,7 +443,6 @@ function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, 
         const elementHeight = item.type === 'sticker' ? 150 : 200;
         const x = offset.x - pageRect.left - elementWidth / 2;
         const y = offset.y - pageRect.top - elementHeight / 2;
-        console.log('Drop coordinates:', { offsetX: offset.x, offsetY: offset.y, pageRect, x, y });
         const newElement = {
           type: item.type,
           content: item.src,
@@ -458,6 +461,14 @@ function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, 
     }),
     [page.id]
   );
+
+  // Assign ref to pageRefs
+  useEffect(() => {
+    pageRefs.current[page.id] = pageRef.current;
+    return () => {
+      delete pageRefs.current[page.id];
+    };
+  }, [page.id]);
 
   drop(pageRef);
 
@@ -487,7 +498,7 @@ function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, 
 }
 
 // BookSpread Component
-function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, onUpdateElement, onDeleteElement }) {
+function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, onUpdateElement, onDeleteElement, pageRefs }) {
   return (
     <div
       className="book-spread"
@@ -507,6 +518,7 @@ function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, 
           onAddElement={onAddElement}
           onUpdateElement={onUpdateElement}
           onDeleteElement={onDeleteElement}
+          pageRefs={pageRefs}
         />
       )}
       {rightPage && (
@@ -517,6 +529,7 @@ function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, 
           onAddElement={onAddElement}
           onUpdateElement={onUpdateElement}
           onDeleteElement={onDeleteElement}
+          pageRefs={pageRefs}
         />
       )}
     </div>
@@ -634,6 +647,7 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
   );
 }
 
+
 // PhotoBookEditor Component
 function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   const [pages, setPages] = useState([
@@ -680,22 +694,69 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const user = useSelector((state) => state.user);
+  const pageRefs = useRef({});
+  const spreadRef = useRef(null);
 
-  // Price calculation
   const calculateTotalPrice = () => {
     const basePrice = parseFloat(paper.price || 0);
     const pagePrice = 2.00;
     const stickerPrice = 0.50;
     const totalPages = pages.length;
-    const totalStickers = pages.reduce((count, page) => 
-      count + page.elements.filter(el => el.type === 'sticker').length, 0);
-    const totalPrice = basePrice + (totalPages * pagePrice) + (totalStickers * stickerPrice);
-    return totalPrice.toFixed(2);
+    const totalStickers = pages.reduce(
+      (count, page) => count + page.elements.filter((el) => el.type === 'sticker').length,
+      0
+    );
+    return (basePrice + totalPages * pagePrice + totalStickers * stickerPrice).toFixed(2);
   };
 
-  useEffect(() => {
-    console.log('Selected background:', selectedBackground);
-  }, [selectedBackground]);
+  const generateSpreadPreview = async (leftPageId, rightPageId, spreadIndex) => {
+  if (!spreadRef.current) {
+    console.error('Spread element not found');
+    return null;
+  }
+  try {
+    const images = spreadRef.current.getElementsByTagName('img');
+    const imagePromises = Array.from(images).map((img) => {
+      return new Promise((resolve, reject) => {
+        if (img.complete && img.naturalWidth !== 0) {
+          console.log(`Image loaded: ${img.src}`);
+          resolve();
+        } else {
+          img.crossOrigin = 'Anonymous';
+          img.onload = () => {
+            console.log(`Image loaded: ${img.src}`);
+            resolve();
+          };
+          img.onerror = () => reject(new Error(`Failed to load image: ${img.src}`));
+          img.src = img.src;
+        }
+      });
+    });
+
+    console.log(`Preloading ${imagePromises.length} images for spread ${spreadIndex + 1}`);
+    await Promise.all(imagePromises).catch((err) => {
+      console.error('Image preload failed:', err);
+    });
+
+    const dataUrl = await domtoimage.toJpeg(spreadRef.current, {
+      quality: 0.8,
+      bgcolor: null,
+    });
+    console.log(`Generated spread preview for spread ${spreadIndex + 1}`);
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = `spread_${spreadIndex + 1}_preview.jpg`;
+    link.click();
+    return {
+      spreadIndex,
+      pageIds: [leftPageId, rightPageId].filter(Boolean),
+      dataUrl,
+    };
+  } catch (err) {
+    console.error(`Failed to generate spread preview for pages ${leftPageId}, ${rightPageId}:`, err);
+    return null;
+  }
+};
 
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -754,15 +815,12 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   };
 
   const updateElement = (pageId, elementId, updates) => {
-    console.log('Updating element:', { pageId, elementId, updates });
     setPages((prevPages) =>
       prevPages.map((page) => {
         if (page.id === pageId) {
           return {
             ...page,
-            elements: page.elements.map((el) =>
-              el.id === elementId ? { ...el, ...updates } : el
-            ),
+            elements: page.elements.map((el) => (el.id === elementId ? { ...el, ...updates } : el)),
           };
         }
         return page;
@@ -787,7 +845,6 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   const addTextElement = () => {
     const currentPage = pages[currentPageIndex];
     if (currentPage) {
-      console.log('Adding text element to page:', currentPage.id);
       addElementToPage(currentPage.id, {
         type: 'text',
         content: 'Double click to edit',
@@ -803,7 +860,6 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   const addImagePlaceholder = () => {
     const currentPage = pages[currentPageIndex];
     if (currentPage) {
-      console.log('Adding image placeholder to page:', currentPage.id);
       addElementToPage(currentPage.id, {
         type: 'placeholder',
         content: '',
@@ -871,50 +927,89 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   };
 
   const handleSaveOrder = async () => {
-    if (!user) {
-      setSaveError('You must be logged in to save an order.');
-      return;
-    }
+  if (!user) {
+    setSaveError('You must be logged in to save an order.');
+    return;
+  }
 
-    setIsSaving(true);
-    setSaveError(null);
+  setIsSaving(true);
+  setSaveError(null);
 
-    try {
-      const token = localStorage.getItem('token');
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+  try {
+    const token = localStorage.getItem('token');
+    const config = {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+    };
 
-      const validPages = pages.filter(page => page.elements.length > 0);
+    const validPages = pages.filter((page) => page.elements.length > 0);
 
-      const orderData = {
-        theme_id: theme.id,
-        paper_id: paper.id,
-        total_price: calculateTotalPrice(),
-        pages: validPages.map((page, index) => ({
-          page_number: index + 1,
-          background_id: selectedBackground ? selectedBackground.id : null,
-          elements: page.elements.map((el) => ({
-            type: el.type,
-            content: el.content,
-            x: el.x,
-            y: el.y,
-            width: el.width,
-            height: el.height,
-            rotation: el.rotation,
-            z_index: el.zIndex,
-          })),
+    // Generate previews for spreads only
+    const spreadPreviews = await Promise.all(
+      Array.from({ length: Math.ceil(validPages.length / 2) }, async (_, index) => {
+        const leftPage = validPages[index * 2];
+        const rightPage = validPages[index * 2 + 1];
+        const preview = await generateSpreadPreview(leftPage?.id, rightPage?.id, index);
+        if (!preview) return null;
+        const response = await fetch(preview.dataUrl);
+        const blob = await response.blob();
+        const file = new File([blob], `spread_${index + 1}_preview.jpg`, { type: 'image/jpeg' });
+        console.log(`Generated file for spread ${index + 1}:`, { name: file.name, size: file.size, type: file.type });
+        return { pageIds: preview.pageIds, file };
+      })
+    );
+
+    const validPreviews = spreadPreviews.filter((preview) => preview !== null);
+
+    const formData = new FormData();
+    formData.append('theme_id', theme.id);
+    formData.append('paper_id', paper.id);
+    formData.append('total_price', calculateTotalPrice());
+
+    validPages.forEach((page, index) => {
+      const pageData = {
+        page_number: index + 1,
+        background_id: selectedBackground ? selectedBackground.id : null,
+        elements: page.elements.map((el) => ({
+          type: el.type,
+          content: el.content,
+          x: el.x,
+          y: el.y,
+          width: el.width,
+          height: el.height,
+          rotation: el.rotation,
+          z_index: el.zIndex,
         })),
+        client_page_id: page.id, // Include client_page_id
       };
+      formData.append(`pages[${index}]`, JSON.stringify(pageData));
+      console.log(`Appended page data for index ${index}:`, pageData);
+    });
 
-      const response = await axios.post(`${BASE_URL}/orders/create/`, orderData, config);
-      console.log('Order saved:', response.data);
-      alert('Order saved successfully!');
-    } catch (err) {
-      console.error('Order save failed:', err.response?.data || err.message);
-      setSaveError('Failed to save order. Please check your connection or try again.');
-    } finally {
-      setIsSaving(false);
+    validPreviews.forEach((preview) => {
+      preview.pageIds.forEach((pageId) => {
+        console.log(`Appending page_previews[${pageId}]:`, { name: preview.file.name, size: preview.file.size });
+        formData.append(`page_previews[${pageId}]`, preview.file);
+      });
+    });
+
+    // Log FormData contents
+    for (let [key, value] of formData.entries()) {
+      console.log(`FormData entry: ${key} = ${value instanceof File ? `${value.name} (${value.size} bytes)` : value}`);
     }
-  };
+
+    const response = await axios.post(`${BASE_URL}/orders/create/`, formData, config);
+    console.log('Order saved:', response.data);
+    alert('Order saved successfully!');
+  } catch (err) {
+    console.error('Order save failed:', err.response?.data || err.message);
+    setSaveError('Failed to save order. Please check your connection or try again.');
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const leftPage = pages[currentPageIndex];
   const rightPage = pages[currentPageIndex + 1];
@@ -927,7 +1022,9 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
           Back
         </button>
         <div className="header-info">
-          <h2>{theme.theme_name || 'Unnamed Theme'} - {paper.size || 'Unknown Size'}</h2>
+          <h2>
+            {theme.theme_name || 'Unnamed Theme'} - {paper.size || 'Unknown Size'}
+          </h2>
           <span className="page-indicator">
             Pages {currentPageIndex + 1}-{currentPageIndex + 2} of {pages.length}
           </span>
@@ -952,12 +1049,12 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
       <div className="editor-main">
         <Sidebar
           uploadedImages={uploadedImages}
-          themeBackgrounds={theme.backgrounds && Array.isArray(theme.backgrounds)
-            ? theme.backgrounds.map((bg) => ({ id: bg.id, url: getImageUrl(bg.image) }))
-            : []}
-          stickers={Array.isArray(stickers)
-            ? stickers.map((s) => ({ id: s.id, url: getImageUrl(s.image) }))
-            : []}
+          themeBackgrounds={
+            theme.backgrounds && Array.isArray(theme.backgrounds)
+              ? theme.backgrounds.map((bg) => ({ id: bg.id, url: getImageUrl(bg.image) }))
+              : []
+          }
+          stickers={Array.isArray(stickers) ? stickers.map((s) => ({ id: s.id, url: getImageUrl(s.image) })) : []}
           onImageUpload={handleImageUpload}
           onBackgroundSelect={(bg) => {
             console.log('Applying background:', bg);
@@ -966,22 +1063,21 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
         />
         <div className="canvas-area">
           <div className="canvas-wrapper">
-            <BookSpread
-              leftPage={leftPage}
-              rightPage={rightPage}
-              background={selectedBackground ? selectedBackground.url : ''}
-              paperSize={paper.size}
-              onAddElement={addElementToPage}
-              onUpdateElement={updateElement}
-              onDeleteElement={deleteElement}
-            />
+            <div ref={spreadRef} className="spread-wrapper">
+              <BookSpread
+                leftPage={leftPage}
+                rightPage={rightPage}
+                background={selectedBackground ? selectedBackground.url : ''}
+                paperSize={paper.size}
+                onAddElement={addElementToPage}
+                onUpdateElement={updateElement}
+                onDeleteElement={deleteElement}
+                pageRefs={pageRefs}
+              />
+            </div>
           </div>
           <div className="pagination-controls">
-            <button
-              className="nav-btn"
-              onClick={goToPreviousSpread}
-              disabled={currentPageIndex === 0}
-            >
+            <button className="nav-btn" onClick={goToPreviousSpread} disabled={currentPageIndex === 0}>
               <ChevronLeft size={20} />
               Previous
             </button>

@@ -42,6 +42,7 @@ function PhotoBookOrdersView() {
       }
 
       const data = await response.json();
+      console.log('Fetched orders:', data);
       setOrders(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch orders:', err);
@@ -57,6 +58,17 @@ function PhotoBookOrdersView() {
 
   const toggleOrderExpansion = (orderId) => {
     setExpandedOrder(expandedOrder === orderId ? null : orderId);
+  };
+
+  // Group pages into spreads (pairs of pages)
+  const getSpreads = (pages) => {
+    const spreads = [];
+    for (let i = 0; i < pages.length; i += 2) {
+      const leftPage = pages[i];
+      const rightPage = pages[i + 1];
+      spreads.push({ leftPage, rightPage });
+    }
+    return spreads;
   };
 
   if (isLoading) {
@@ -164,37 +176,39 @@ function PhotoBookOrdersView() {
                     <div className="pages-section">
                       <h4 className="pages-title">
                         <FileText size={18} />
-                        Pages Preview
+                        Spreads Preview
                       </h4>
                       <div className="pages-grid">
-                        {order.pages.map((page) => (
-                          <div key={page.page_number} className="page-card">
-                            <div className="page-number-badge">
-                              Page {page.page_number}
+                        {getSpreads(order.pages).map((spread, index) => (
+                          <div key={index} className="spread-card">
+                            <div className="spread-number-badge">
+                              Spread {index + 1} (Pages {spread.leftPage?.page_number || ''}{spread.rightPage ? `-${spread.rightPage.page_number}` : ''})
                             </div>
 
-                            {page.background && (
-                              <div className="page-background">
+                            {spread.leftPage?.preview_image && (
+                              <div className="spread-preview">
                                 <img
-                                  src={getImageUrl(page.background.image)}
-                                  alt={`Page ${page.page_number} background`}
+                                  src={getImageUrl(spread.leftPage.preview_image)}
+                                  alt={`Spread ${index + 1} preview`}
+                                  className="spread-preview-image"
                                   onError={(e) => {
+                                    console.error(`Failed to load preview image: ${spread.leftPage.preview_image}`);
                                     e.target.src = FALLBACK_IMAGE;
                                   }}
                                 />
                               </div>
                             )}
 
-                            {page.elements && page.elements.length > 0 && (
+                            {(spread.leftPage?.elements || spread.rightPage?.elements) && (
                               <div className="elements-section">
                                 <div className="elements-header">
                                   <span className="elements-count">
-                                    {page.elements.length} {page.elements.length === 1 ? 'element' : 'elements'}
+                                    {((spread.leftPage?.elements?.length || 0) + (spread.rightPage?.elements?.length || 0))} elements
                                   </span>
                                 </div>
                                 <div className="elements-list">
-                                  {page.elements.map((element, idx) => (
-                                    <div key={idx} className="element-item">
+                                  {spread.leftPage?.elements?.map((element, idx) => (
+                                    <div key={`left-${idx}`} className="element-item">
                                       {element.type === 'image' && (
                                         <>
                                           <div className="element-icon">
@@ -210,6 +224,7 @@ function PhotoBookOrdersView() {
                                               alt="Element"
                                               className="element-thumbnail"
                                               onError={(e) => {
+                                                console.error(`Failed to load element image: ${element.content}`);
                                                 e.target.src = FALLBACK_IMAGE;
                                               }}
                                             />
@@ -231,6 +246,77 @@ function PhotoBookOrdersView() {
                                               alt="Sticker"
                                               className="element-thumbnail"
                                               onError={(e) => {
+                                                console.error(`Failed to load sticker image: ${element.content}`);
+                                                e.target.src = FALLBACK_IMAGE;
+                                              }}
+                                            />
+                                          </a>
+                                        </>
+                                      )}
+                                      {element.type === 'text' && (
+                                        <>
+                                          <div className="element-icon">
+                                            <Type size={16} />
+                                          </div>
+                                          <div className="element-text-preview">
+                                            {element.content || 'Text element'}
+                                          </div>
+                                        </>
+                                      )}
+                                      {element.type === 'placeholder' && (
+                                        <>
+                                          <div className="element-icon placeholder">
+                                            <ImageIcon size={16} />
+                                          </div>
+                                          <img
+                                            src={element.content || PLACEHOLDER_IMAGE}
+                                            alt="Placeholder"
+                                            className="element-thumbnail placeholder"
+                                          />
+                                        </>
+                                      )}
+                                    </div>
+                                  ))}
+                                  {spread.rightPage?.elements?.map((element, idx) => (
+                                    <div key={`right-${idx}`} className="element-item">
+                                      {element.type === 'image' && (
+                                        <>
+                                          <div className="element-icon">
+                                            <ImageIcon size={16} />
+                                          </div>
+                                          <a
+                                            href={getImageUrl(element.content)}
+                                            download
+                                            title="Click to download image"
+                                          >
+                                            <img
+                                              src={getImageUrl(element.content)}
+                                              alt="Element"
+                                              className="element-thumbnail"
+                                              onError={(e) => {
+                                                console.error(`Failed to load element image: ${element.content}`);
+                                                e.target.src = FALLBACK_IMAGE;
+                                              }}
+                                            />
+                                          </a>
+                                        </>
+                                      )}
+                                      {element.type === 'sticker' && (
+                                        <>
+                                          <div className="element-icon">
+                                            <Sticker size={16} />
+                                          </div>
+                                          <a
+                                            href={getImageUrl(element.content)}
+                                            download
+                                            title="Click to download sticker"
+                                          >
+                                            <img
+                                              src={getImageUrl(element.content)}
+                                              alt="Sticker"
+                                              className="element-thumbnail"
+                                              onError={(e) => {
+                                                console.error(`Failed to load sticker image: ${element.content}`);
                                                 e.target.src = FALLBACK_IMAGE;
                                               }}
                                             />
@@ -265,7 +351,7 @@ function PhotoBookOrdersView() {
                               </div>
                             )}
 
-                            {(!page.elements || page.elements.length === 0) && (
+                            {(!spread.leftPage?.elements && !spread.rightPage?.elements) && (
                               <div className="no-elements">
                                 No elements added
                               </div>
