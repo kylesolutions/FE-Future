@@ -1,10 +1,10 @@
-.orders-view {
+.photobook-orders-view {
   min-height: 100vh;
   background: linear-gradient(to bottom right, #f8fafc, #e2e8f0);
   padding: 32px 20px;
 }
 
-.orders-header {
+.photobook-orders-header {
   max-width: 1200px;
   margin: 0 auto 40px;
   display: flex;
@@ -13,7 +13,7 @@
   gap: 24px;
 }
 
-.back-button {
+.photobook-back-button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -29,23 +29,23 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.back-button:hover {
+.photobook-back-button:hover {
   background: #f8fafc;
   border-color: #cbd5e0;
   transform: translateY(-1px);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
 }
 
-.back-button:active {
+.photobook-back-button:active {
   transform: translateY(0);
 }
 
-.header-content {
+.photobook-header-content {
   flex: 1;
   text-align: center;
 }
 
-.header-title {
+.photobook-header-title {
   font-size: 36px;
   font-weight: 700;
   color: #0f172a;
@@ -53,14 +53,14 @@
   letter-spacing: -0.02em;
 }
 
-.header-subtitle {
+.photobook-header-subtitle {
   font-size: 16px;
   color: #64748b;
   margin: 0;
   font-weight: 400;
 }
 
-.orders-count {
+.photobook-orders-count {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -74,8 +74,8 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.loading-state,
-.error-state {
+.photobook-loading-state,
+.photobook-error-state {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -84,7 +84,7 @@
   gap: 20px;
 }
 
-.loading-spinner {
+.photobook-loading-spinner {
   width: 60px;
   height: 60px;
   border: 4px solid #e2e8f0;
@@ -97,38 +97,38 @@
   to { transform: rotate(360deg); }
 }
 
-.loading-text {
+.photobook-loading-text {
   font-size: 16px;
   color: #64748b;
   font-weight: 500;
 }
 
-.error-state {
+.photobook-error-state {
   text-align: center;
   padding: 40px 20px;
 }
 
-.error-icon {
+.photobook-error-icon {
   font-size: 64px;
   margin-bottom: 16px;
 }
 
-.error-state h2 {
+.photobook-error-state h2 {
   font-size: 28px;
   font-weight: 700;
   color: #0f172a;
   margin: 0 0 12px 0;
 }
 
-.error-message {
+.photobook-error-message {
   font-size: 16px;
   color: #64748b;
   margin: 0 0 24px 0;
   max-width: 400px;
 }
 
-.retry-button,
-.create-button {
+.photobook-retry-button,
+.photobook-create-button {
   padding: 12px 32px;
   background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: white;
@@ -141,18 +141,18 @@
   box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
 }
 
-.retry-button:hover,
-.create-button:hover {
+.photobook-retry-button:hover,
+.photobook-create-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 12px rgba(37, 99, 235, 0.3);
 }
 
-.retry-button:active,
-.create-button:active {
+.photobook-retry-button:active,
+.photobook-create-button:active {
   transform: translateY(0);
 }
 
-.empty-state {
+.photobook-empty-state {
   max-width: 500px;
   margin: 80px auto;
   text-align: center;
@@ -162,26 +162,26 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
 }
 
-.empty-icon {
+.photobook-empty-icon {
   font-size: 80px;
   margin-bottom: 24px;
 }
 
-.empty-state h2 {
+.photobook-empty-state h2 {
   font-size: 28px;
   font-weight: 700;
   color: #0f172a;
   margin: 0 0 12px 0;
 }
 
-.empty-state p {
+.photobook-empty-state p {
   font-size: 16px;
   color: #64748b;
   margin: 0 0 32px 0;
   line-height: 1.6;
 }
 
-.orders-grid {
+.photobook-orders-grid {
   max-width: 1200px;
   margin: 0 auto;
   display: grid;
@@ -189,7 +189,7 @@
   gap: 24px;
 }
 
-.order-card {
+.photobook-order-card {
   background: white;
   border-radius: 16px;
   padding: 24px;
@@ -198,12 +198,12 @@
   border: 1px solid #f1f5f9;
 }
 
-.order-card:hover {
+.photobook-order-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
 }
 
-.order-header {
+.photobook-order-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -212,24 +212,24 @@
   border-bottom: 1px solid #f1f5f9;
 }
 
-.order-info {
+.photobook-order-info {
   flex: 1;
 }
 
-.order-title {
+.photobook-order-title {
   font-size: 20px;
   font-weight: 700;
   color: #0f172a;
   margin: 0 0 8px 0;
 }
 
-.order-meta {
+.photobook-order-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
 }
 
-.meta-item {
+.photobook-meta-item {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -238,14 +238,14 @@
   font-weight: 500;
 }
 
-.order-price {
+.photobook-order-price {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 4px;
 }
 
-.price-label {
+.photobook-price-label {
   font-size: 12px;
   color: #94a3b8;
   text-transform: uppercase;
@@ -253,39 +253,39 @@
   font-weight: 600;
 }
 
-.price-value {
+.photobook-price-value {
   font-size: 24px;
   font-weight: 700;
   color: #10b981;
 }
 
-.order-details {
+.photobook-order-details {
   display: flex;
   flex-direction: column;
   gap: 12px;
   margin-bottom: 20px;
 }
 
-.detail-row {
+.photobook-detail-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 10px 0;
 }
 
-.detail-label {
+.photobook-detail-label {
   font-size: 14px;
   color: #64748b;
   font-weight: 500;
 }
 
-.detail-value {
+.photobook-detail-value {
   font-size: 14px;
   color: #0f172a;
   font-weight: 600;
 }
 
-.expand-button {
+.photobook-expand-button {
   width: 100%;
   padding: 12px 20px;
   background: linear-gradient(135deg, #f8fafc, #f1f5f9);
@@ -298,18 +298,18 @@
   transition: all 0.2s ease;
 }
 
-.expand-button:hover {
+.photobook-expand-button:hover {
   background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
   border-color: #cbd5e0;
 }
 
-.pages-section {
+.photobook-pages-section {
   margin-top: 20px;
   padding-top: 20px;
   border-top: 1px solid #f1f5f9;
 }
 
-.pages-title {
+.photobook-pages-title {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -319,19 +319,19 @@
   margin: 0 0 16px 0;
 }
 
-.pages-grid {
+.photobook-pages-grid {
   display: grid;
   gap: 16px;
 }
 
-.page-card {
+.photobook-spread-card {
   background: #f8fafc;
   border-radius: 12px;
   padding: 16px;
   border: 1px solid #e2e8f0;
 }
 
-.page-number-badge {
+.photobook-spread-number-badge {
   display: inline-block;
   padding: 6px 14px;
   background: linear-gradient(135deg, #3b82f6, #2563eb);
@@ -345,34 +345,40 @@
   box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
 }
 
-.page-background {
+.photobook-spread-preview {
   width: 100%;
-  height: 200px;
+  height: 300px;
   border-radius: 10px;
   overflow: hidden;
   margin-bottom: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: relative;
+  cursor: pointer;
 }
 
-.page-background img {
+.photobook-spread-preview-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.2s ease;
 }
 
-.elements-section {
+.photobook-spread-preview-image:hover {
+  transform: scale(1.02);
+}
+
+.photobook-elements-section {
   background: white;
   border-radius: 10px;
   padding: 12px;
   border: 1px solid #e2e8f0;
-  
 }
 
-.elements-header {
+.photobook-elements-header {
   margin-bottom: 12px;
 }
 
-.elements-count {
+.photobook-elements-count {
   font-size: 12px;
   color: #64748b;
   font-weight: 600;
@@ -380,13 +386,13 @@
   letter-spacing: 0.05em;
 }
 
-.elements-list {
+.photobook-elements-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
   gap: 10px;
 }
 
-.element-item {
+.photobook-element-item {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -394,7 +400,7 @@
   gap: 6px;
 }
 
-.element-icon {
+.photobook-element-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -406,11 +412,11 @@
   box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
 }
 
-.element-icon.placeholder {
+.photobook-element-icon.placeholder {
   background: linear-gradient(135deg, #94a3b8, #64748b);
 }
 
-.element-thumbnail {
+.photobook-element-thumbnail {
   width: 80px;
   height: 80px;
   object-fit: cover;
@@ -420,16 +426,16 @@
   transition: transform 0.2s ease;
 }
 
-.element-thumbnail:hover {
+.photobook-element-thumbnail:hover {
   transform: scale(1.05);
 }
 
-.element-thumbnail.placeholder {
+.photobook-element-thumbnail.placeholder {
   border-style: dashed;
   opacity: 0.7;
 }
 
-.element-text-preview {
+.photobook-element-text-preview {
   width: 80px;
   height: 80px;
   display: flex;
@@ -448,7 +454,7 @@
   line-height: 1.4;
 }
 
-.no-elements {
+.photobook-no-elements {
   padding: 24px;
   text-align: center;
   color: #94a3b8;
@@ -456,175 +462,12 @@
   font-style: italic;
 }
 
-.element-item a {
+.photobook-element-item a {
   display: block;
   cursor: pointer;
 }
 
-@media (max-width: 768px) {
-  .orders-view {
-    padding: 20px 16px;
-  }
-
-  .orders-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 16px;
-  }
-
-  .back-button,
-  .orders-count {
-    align-self: flex-start;
-  }
-
-  .header-content {
-    text-align: left;
-  }
-
-  .header-title {
-    font-size: 28px;
-  }
-
-  .header-subtitle {
-    font-size: 14px;
-  }
-
-  .orders-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-
-  .order-header {
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .order-price {
-    align-items: flex-start;
-  }
-
-  .elements-list {
-    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
-  }
-
-  .element-thumbnail,
-  .element-text-preview {
-    width: 70px;
-    height: 70px;
-  }
-}
-
-@media (max-width: 480px) {
-  .header-title {
-    font-size: 24px;
-  }
-
-  .order-card {
-    padding: 16px;
-  }
-
-  .page-background {
-    height: 150px;
-  }
-}
-.page-preview {
-  width: 100%;
-  height: 200px;
-  border-radius: 10px;
-  overflow: hidden;
-  margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  position: relative;
-}
-
-.page-preview-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* Ensure page-background and page-preview have consistent styling */
-.page-background {
-  width: 100%;
-  height: 200px;
-  border-radius: 10px;
-  overflow: hidden;
-  margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-/* Adjust responsive styles */
-@media (max-width: 480px) {
-  .page-preview,
-  .page-background {
-    height: 150px;
-  }
-}
-
-.spread-card {
-  background: #f8fafc;
-  border-radius: 12px;
-  padding: 16px;
-  border: 1px solid #e2e8f0;
-}
-
-/* Style for spread number badge */
-.spread-number-badge {
-  display: inline-block;
-  padding: 6px 14px;
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  color: white;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 12px;
-  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
-}
-
-/* Style for spread preview image */
-.spread-preview {
-  width: 100%;
-  height: 300px;
-  border-radius: 10px;
-  overflow: hidden;
-  margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  position: relative;
-  cursor: pointer;
-}
-
-.spread-preview-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
-  image-rendering: pixelated;
-  transition: transform 0.2s ease;
-}
-
-.spread-preview-image:hover {
-  transform: scale(1.02);
-}
-
-@media (max-width: 480px) {
-  .spread-preview {
-    height: 200px;
-  }
-
-  .modal-content {
-    max-width: 98vw;
-    max-height: 98vh;
-  }
-
-  .modal-preview-image {
-    max-height: 85vh;
-  }
-}
-
-.preview-modal {
+.photobook-preview-modal {
   position: fixed;
   top: 0;
   left: 0;
@@ -634,22 +477,21 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  backdrop-filter: blur(2px); /* Optional: subtle background blur */
 }
 
-.modal-overlay {
+.photobook-modal-overlay {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.8); /* Darker overlay for better contrast */
+  background: rgba(0, 0, 0, 0.8);
   cursor: pointer;
 }
 
-.modal-content {
+.photobook-modal-content {
   position: relative;
-  max-width: 95vw; /* Slightly larger to accommodate high-res images */
+  max-width: 95vw;
   max-height: 95vh;
   background: white;
   border-radius: 12px;
@@ -660,23 +502,22 @@
   justify-content: center;
 }
 
-.modal-preview-image {
+.photobook-modal-preview-image {
   max-width: 100%;
-  max-height: 90vh; /* Increased to use more vertical space */
+  max-height: 90vh;
+  width: auto;
+  height: auto;
   object-fit: contain;
   display: block;
-  image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
-  image-rendering: pixelated; /* Fallback for some browsers */
   opacity: 0;
   transition: opacity 0.3s ease;
 }
 
-.modal-preview-image.loaded {
+.photobook-modal-preview-image.loaded {
   opacity: 1;
 }
 
-.modal-loading {
+.photobook-modal-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -687,7 +528,7 @@
   font-weight: 500;
 }
 
-.modal-loading .loading-spinner {
+.photobook-modal-loading .loading-spinner {
   width: 40px;
   height: 40px;
   border: 3px solid #e2e8f0;
@@ -697,7 +538,7 @@
   margin-bottom: 12px;
 }
 
-.modal-close-button {
+.photobook-modal-close-button {
   position: absolute;
   top: 12px;
   right: 12px;
@@ -711,6 +552,86 @@
   z-index: 10;
 }
 
-.modal-close-button:hover {
+.photobook-modal-close-button:hover {
   background: rgba(0, 0, 0, 0.9);
+}
+
+@media (max-width: 768px) {
+  .photobook-orders-view {
+    padding: 20px 16px;
+  }
+
+  .photobook-orders-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .photobook-back-button,
+  .photobook-orders-count {
+    align-self: flex-start;
+  }
+
+  .photobook-header-content {
+    text-align: left;
+  }
+
+  .photobook-header-title {
+    font-size: 28px;
+  }
+
+  .photobook-header-subtitle {
+    font-size: 14px;
+  }
+
+  .photobook-orders-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .photobook-order-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .photobook-order-price {
+    align-items: flex-start;
+  }
+
+  .photobook-elements-list {
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  }
+
+  .photobook-element-thumbnail,
+  .photobook-element-text-preview {
+    width: 70px;
+    height: 70px;
+  }
+
+  .photobook-spread-preview {
+    height: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .photobook-header-title {
+    font-size: 24px;
+  }
+
+  .photobook-order-card {
+    padding: 16px;
+  }
+
+  .photobook-spread-preview {
+    height: 150px;
+  }
+
+  .photobook-modal-content {
+    max-width: 98vw;
+    max-height: 98vh;
+  }
+
+  .photobook-modal-preview-image {
+    max-height: 85vh;
+  }
 }

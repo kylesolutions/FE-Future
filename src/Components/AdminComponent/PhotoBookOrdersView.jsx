@@ -18,11 +18,21 @@ const formatDate = (dateString) => {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
-// Modal Component for Enlarged Preview
 function PreviewModal({ imageUrl, onClose }) {
   const [isImageLoaded, setIsImageLoaded] = useState(false);
 
   useEffect(() => {
+    const img = new Image();
+    img.src = imageUrl;
+    img.onload = () => {
+      console.log(`Modal image preloaded: ${imageUrl}`);
+      setIsImageLoaded(true);
+    };
+    img.onerror = () => {
+      console.error(`Failed to preload modal image: ${imageUrl}`);
+      setIsImageLoaded(true);
+    };
+
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         onClose();
@@ -30,26 +40,25 @@ function PreviewModal({ imageUrl, onClose }) {
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [imageUrl, onClose]);
 
   return (
-    <div className="preview-modal">
-      <div className="modal-overlay" onClick={onClose}></div>
-      <div className="modal-content">
-        <button className="modal-close-button" onClick={onClose} title="Close">
+    <div className="photobook-preview-modal">
+      <div className="photobook-modal-overlay" onClick={onClose}></div>
+      <div className="photobook-modal-content">
+        <button className="photobook-modal-close-button" onClick={onClose} title="Close">
           <X size={24} />
         </button>
         {!isImageLoaded && (
-          <div className="modal-loading">
-            <div className="loading-spinner"></div>
+          <div className="photobook-modal-loading">
+            <div className="photobook-loading-spinner"></div>
             <p>Loading preview...</p>
           </div>
         )}
         <img
           src={imageUrl}
           alt="Spread Preview"
-          className={`modal-preview-image ${isImageLoaded ? 'loaded' : ''}`}
-          onLoad={() => setIsImageLoaded(true)}
+          className={`photobook-modal-preview-image ${isImageLoaded ? 'loaded' : ''}`}
           onError={(e) => {
             console.error(`Failed to load modal preview image: ${imageUrl}`);
             e.target.src = FALLBACK_IMAGE;
@@ -112,7 +121,6 @@ function PhotoBookOrdersView() {
     setSelectedPreview(null);
   };
 
-  // Group pages into spreads (pairs of pages)
   const getSpreads = (pages) => {
     const spreads = [];
     for (let i = 0; i < pages.length; i += 2) {
@@ -125,10 +133,10 @@ function PhotoBookOrdersView() {
 
   if (isLoading) {
     return (
-      <div className="orders-view">
-        <div className="loading-state">
-          <div className="loading-spinner"></div>
-          <p className="loading-text">Loading your orders...</p>
+      <div className="photobook-orders-view">
+        <div className="photobook-loading-state">
+          <div className="photobook-loading-spinner"></div>
+          <p className="photobook-loading-text">Loading your orders...</p>
         </div>
       </div>
     );
@@ -136,12 +144,12 @@ function PhotoBookOrdersView() {
 
   if (error) {
     return (
-      <div className="orders-view">
-        <div className="error-state">
-          <div className="error-icon">⚠️</div>
+      <div className="photobook-orders-view">
+        <div className="photobook-error-state">
+          <div className="photobook-error-icon">⚠️</div>
           <h2>Oops! Something went wrong</h2>
-          <p className="error-message">{error}</p>
-          <button onClick={fetchOrders} className="retry-button">
+          <p className="photobook-error-message">{error}</p>
+          <button onClick={fetchOrders} className="photobook-retry-button">
             Try Again
           </button>
         </div>
@@ -150,99 +158,99 @@ function PhotoBookOrdersView() {
   }
 
   return (
-    <div className="orders-view">
-      <div className="orders-header">
-        <button className="back-button" onClick={handleBack}>
+    <div className="photobook-orders-view">
+      <div className="photobook-orders-header">
+        <button className="photobook-back-button" onClick={handleBack}>
           <ArrowLeft size={20} />
           <span>Back</span>
         </button>
-        <div className="header-content">
-          <h1 className="header-title">My Photobook Orders</h1>
-          <p className="header-subtitle">View and manage all your photobook creations</p>
+        <div className="photobook-header-content">
+          <h1 className="photobook-header-title">My Photobook Orders</h1>
+          <p className="photobook-header-subtitle">View and manage all your photobook creations</p>
         </div>
-        <div className="orders-count">
+        <div className="photobook-orders-count">
           <Package size={20} />
           <span>{orders.length} {orders.length === 1 ? 'Order' : 'Orders'}</span>
         </div>
       </div>
 
       {orders.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">📚</div>
+        <div className="photobook-empty-state">
+          <div className="photobook-empty-icon">📚</div>
           <h2>No orders yet</h2>
           <p>Your photobook orders will appear here once you create them.</p>
-          <button onClick={handleBack} className="create-button">
+          <button onClick={handleBack} className="photobook-create-button">
             Create Your First Photobook
           </button>
         </div>
       ) : (
-        <div className="orders-grid">
+        <div className="photobook-orders-grid">
           {orders.map((order) => (
-            <div key={order.id} className="order-card">
-              <div className="order-header">
-                <div className="order-info">
-                  <h3 className="order-title">Order #{order.id}</h3>
-                  <div className="order-meta">
-                    <span className="meta-item">
+            <div key={order.id} className="photobook-order-card">
+              <div className="photobook-order-header">
+                <div className="photobook-order-info">
+                  <h3 className="photobook-order-title">Order #{order.id}</h3>
+                  <div className="photobook-order-meta">
+                    <span className="photobook-meta-item">
                       <Calendar size={14} />
                       {formatDate(order.created_at)}
                     </span>
                     {order.user && (
-                      <span className="meta-item">
+                      <span className="photobook-meta-item">
                         👤 {order.user}
                       </span>
                     )}
                   </div>
                 </div>
-                <div className="order-price">
-                  <span className="price-label">Total</span>
-                  <span className="price-value">${Number(order.total_price || 0).toFixed(2)}</span>
+                <div className="photobook-order-price">
+                  <span className="photobook-price-label">Total</span>
+                  <span className="photobook-price-value">${Number(order.total_price || 0).toFixed(2)}</span>
                 </div>
               </div>
 
-              <div className="order-details">
-                <div className="detail-row">
-                  <span className="detail-label">Theme:</span>
-                  <span className="detail-value">{order.theme?.theme_name || 'Classic'}</span>
+              <div className="photobook-order-details">
+                <div className="photobook-detail-row">
+                  <span className="photobook-detail-label">Theme:</span>
+                  <span className="photobook-detail-value">{order.theme?.theme_name || 'Classic'}</span>
                 </div>
-                <div className="detail-row">
-                  <span className="detail-label">Paper Size:</span>
-                  <span className="detail-value">{order.paper?.size || 'Standard'}</span>
+                <div className="photobook-detail-row">
+                  <span className="photobook-detail-label">Paper Size:</span>
+                  <span className="photobook-detail-value">{order.paper?.size || 'Standard'}</span>
                 </div>
-                <div className="detail-row">
-                  <span className="detail-label">Pages:</span>
-                  <span className="detail-value">{order.pages?.length || 0} pages</span>
+                <div className="photobook-detail-row">
+                  <span className="photobook-detail-label">Pages:</span>
+                  <span className="photobook-detail-value">{order.pages?.length || 0} pages</span>
                 </div>
               </div>
 
               {order.pages && order.pages.length > 0 && (
                 <>
                   <button
-                    className="expand-button"
+                    className="photobook-expand-button"
                     onClick={() => toggleOrderExpansion(order.id)}
                   >
                     {expandedOrder === order.id ? 'Hide Pages' : 'View Pages'}
                   </button>
 
                   {expandedOrder === order.id && (
-                    <div className="pages-section">
-                      <h4 className="pages-title">
+                    <div className="photobook-pages-section">
+                      <h4 className="photobook-pages-title">
                         <FileText size={18} />
                         Spreads Preview
                       </h4>
-                      <div className="pages-grid">
+                      <div className="photobook-pages-grid">
                         {getSpreads(order.pages).map((spread, index) => (
-                          <div key={index} className="spread-card">
-                            <div className="spread-number-badge">
+                          <div key={index} className="photobook-spread-card">
+                            <div className="photobook-spread-number-badge">
                               Spread {index + 1} (Pages {spread.leftPage?.page_number || ''}{spread.rightPage ? `-${spread.rightPage.page_number}` : ''})
                             </div>
 
                             {spread.leftPage?.preview_image && (
-                              <div className="spread-preview">
+                              <div className="photobook-spread-preview">
                                 <img
                                   src={getImageUrl(spread.leftPage.preview_image)}
                                   alt={`Spread ${index + 1} preview`}
-                                  className="spread-preview-image"
+                                  className="photobook-spread-preview-image"
                                   onClick={() => handlePreviewClick(getImageUrl(spread.leftPage.preview_image))}
                                   onError={(e) => {
                                     console.error(`Failed to load preview image: ${spread.leftPage.preview_image}`);
@@ -253,18 +261,18 @@ function PhotoBookOrdersView() {
                             )}
 
                             {(spread.leftPage?.elements || spread.rightPage?.elements) && (
-                              <div className="elements-section">
-                                <div className="elements-header">
-                                  <span className="elements-count">
+                              <div className="photobook-elements-section">
+                                <div className="photobook-elements-header">
+                                  <span className="photobook-elements-count">
                                     {((spread.leftPage?.elements?.length || 0) + (spread.rightPage?.elements?.length || 0))} elements
                                   </span>
                                 </div>
-                                <div className="elements-list">
+                                <div className="photobook-elements-list">
                                   {spread.leftPage?.elements?.map((element, idx) => (
-                                    <div key={`left-${idx}`} className="element-item">
+                                    <div key={`left-${idx}`} className="photobook-element-item">
                                       {element.type === 'image' && (
                                         <>
-                                          <div className="element-icon">
+                                          <div className="photobook-element-icon">
                                             <ImageIcon size={16} />
                                           </div>
                                           <a
@@ -275,7 +283,7 @@ function PhotoBookOrdersView() {
                                             <img
                                               src={getImageUrl(element.content)}
                                               alt="Element"
-                                              className="element-thumbnail"
+                                              className="photobook-element-thumbnail"
                                               onError={(e) => {
                                                 console.error(`Failed to load element image: ${element.content}`);
                                                 e.target.src = FALLBACK_IMAGE;
@@ -286,7 +294,7 @@ function PhotoBookOrdersView() {
                                       )}
                                       {element.type === 'sticker' && (
                                         <>
-                                          <div className="element-icon">
+                                          <div className="photobook-element-icon">
                                             <Sticker size={16} />
                                           </div>
                                           <a
@@ -297,7 +305,7 @@ function PhotoBookOrdersView() {
                                             <img
                                               src={getImageUrl(element.content)}
                                               alt="Sticker"
-                                              className="element-thumbnail"
+                                              className="photobook-element-thumbnail"
                                               onError={(e) => {
                                                 console.error(`Failed to load sticker image: ${element.content}`);
                                                 e.target.src = FALLBACK_IMAGE;
@@ -308,33 +316,33 @@ function PhotoBookOrdersView() {
                                       )}
                                       {element.type === 'text' && (
                                         <>
-                                          <div className="element-icon">
+                                          <div className="photobook-element-icon">
                                             <Type size={16} />
                                           </div>
-                                          <div className="element-text-preview">
+                                          <div className="photobook-element-text-preview">
                                             {element.content || 'Text element'}
                                           </div>
                                         </>
                                       )}
                                       {element.type === 'placeholder' && (
                                         <>
-                                          <div className="element-icon placeholder">
+                                          <div className="photobook-element-icon placeholder">
                                             <ImageIcon size={16} />
                                           </div>
                                           <img
                                             src={element.content || PLACEHOLDER_IMAGE}
                                             alt="Placeholder"
-                                            className="element-thumbnail placeholder"
+                                            className="photobook-element-thumbnail placeholder"
                                           />
                                         </>
                                       )}
                                     </div>
                                   ))}
                                   {spread.rightPage?.elements?.map((element, idx) => (
-                                    <div key={`right-${idx}`} className="element-item">
+                                    <div key={`right-${idx}`} className="photobook-element-item">
                                       {element.type === 'image' && (
                                         <>
-                                          <div className="element-icon">
+                                          <div className="photobook-element-icon">
                                             <ImageIcon size={16} />
                                           </div>
                                           <a
@@ -345,7 +353,7 @@ function PhotoBookOrdersView() {
                                             <img
                                               src={getImageUrl(element.content)}
                                               alt="Element"
-                                              className="element-thumbnail"
+                                              className="photobook-element-thumbnail"
                                               onError={(e) => {
                                                 console.error(`Failed to load element image: ${element.content}`);
                                                 e.target.src = FALLBACK_IMAGE;
@@ -356,7 +364,7 @@ function PhotoBookOrdersView() {
                                       )}
                                       {element.type === 'sticker' && (
                                         <>
-                                          <div className="element-icon">
+                                          <div className="photobook-element-icon">
                                             <Sticker size={16} />
                                           </div>
                                           <a
@@ -367,7 +375,7 @@ function PhotoBookOrdersView() {
                                             <img
                                               src={getImageUrl(element.content)}
                                               alt="Sticker"
-                                              className="element-thumbnail"
+                                              className="photobook-element-thumbnail"
                                               onError={(e) => {
                                                 console.error(`Failed to load sticker image: ${element.content}`);
                                                 e.target.src = FALLBACK_IMAGE;
@@ -378,23 +386,23 @@ function PhotoBookOrdersView() {
                                       )}
                                       {element.type === 'text' && (
                                         <>
-                                          <div className="element-icon">
+                                          <div className="photobook-element-icon">
                                             <Type size={16} />
                                           </div>
-                                          <div className="element-text-preview">
+                                          <div className="photobook-element-text-preview">
                                             {element.content || 'Text element'}
                                           </div>
                                         </>
                                       )}
                                       {element.type === 'placeholder' && (
                                         <>
-                                          <div className="element-icon placeholder">
+                                          <div className="photobook-element-icon placeholder">
                                             <ImageIcon size={16} />
                                           </div>
                                           <img
                                             src={element.content || PLACEHOLDER_IMAGE}
                                             alt="Placeholder"
-                                            className="element-thumbnail placeholder"
+                                            className="photobook-element-thumbnail placeholder"
                                           />
                                         </>
                                       )}
@@ -405,7 +413,7 @@ function PhotoBookOrdersView() {
                             )}
 
                             {(!spread.leftPage?.elements && !spread.rightPage?.elements) && (
-                              <div className="no-elements">
+                              <div className="photobook-no-elements">
                                 No elements added
                               </div>
                             )}

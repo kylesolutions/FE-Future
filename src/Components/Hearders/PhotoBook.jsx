@@ -793,14 +793,14 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
         console.error('Image preload failed:', err);
       });
 
-      const scale = 2; // Increase resolution for better quality
+      const scale = 3; // Increase resolution for better quality
       const node = spreadRef.current;
       const style = window.getComputedStyle(node);
       const width = parseInt(style.width) * scale;
       const height = parseInt(style.height) * scale;
 
       const dataUrl = await domtoimage.toJpeg(spreadRef.current, {
-        quality: 0.95, // High quality
+        quality: 1.0, // High quality
         width,
         height,
         style: {
