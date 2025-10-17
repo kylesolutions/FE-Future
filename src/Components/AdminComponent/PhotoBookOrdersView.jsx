@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Package, Calendar, FileText, Image as ImageIcon, Type, Sticker } from 'lucide-react';
+import { ArrowLeft, Package, Calendar, FileText, Image as ImageIcon, Type, Sticker, X } from 'lucide-react';
 import './PhotoBookOrdersView.css';
 
 const BASE_URL = 'http://82.180.146.4:8001';
-const FALLBACK_IMAGE = 'https://images.pexels.com/photos/1762851/pexels-photo-1762851.jpeg?auto=compress&cs=tinysrgb&w=300';
+const FALLBACK_IMAGE = 'https://images.pexels.com/photos/1762851/pexels-photo-1762851.jpeg?auto=compress&cs=tinysrgb&w=600';
 const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23f0f0f0" stroke="%23cbd5e0" stroke-width="2" stroke-dasharray="8,4"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="14" fill="%23a0aec0"%3EDrop Photo%3C/text%3E%3C/svg%3E';
 
 const getImageUrl = (path) => {
@@ -18,11 +18,55 @@ const formatDate = (dateString) => {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
+// Modal Component for Enlarged Preview
+function PreviewModal({ imageUrl, onClose }) {
+  const [isImageLoaded, setIsImageLoaded] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="preview-modal">
+      <div className="modal-overlay" onClick={onClose}></div>
+      <div className="modal-content">
+        <button className="modal-close-button" onClick={onClose} title="Close">
+          <X size={24} />
+        </button>
+        {!isImageLoaded && (
+          <div className="modal-loading">
+            <div className="loading-spinner"></div>
+            <p>Loading preview...</p>
+          </div>
+        )}
+        <img
+          src={imageUrl}
+          alt="Spread Preview"
+          className={`modal-preview-image ${isImageLoaded ? 'loaded' : ''}`}
+          onLoad={() => setIsImageLoaded(true)}
+          onError={(e) => {
+            console.error(`Failed to load modal preview image: ${imageUrl}`);
+            e.target.src = FALLBACK_IMAGE;
+            setIsImageLoaded(true);
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function PhotoBookOrdersView() {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedOrder, setExpandedOrder] = useState(null);
+  const [selectedPreview, setSelectedPreview] = useState(null);
 
   useEffect(() => {
     fetchOrders();
@@ -58,6 +102,14 @@ function PhotoBookOrdersView() {
 
   const toggleOrderExpansion = (orderId) => {
     setExpandedOrder(expandedOrder === orderId ? null : orderId);
+  };
+
+  const handlePreviewClick = (imageUrl) => {
+    setSelectedPreview(imageUrl);
+  };
+
+  const closePreviewModal = () => {
+    setSelectedPreview(null);
   };
 
   // Group pages into spreads (pairs of pages)
@@ -191,6 +243,7 @@ function PhotoBookOrdersView() {
                                   src={getImageUrl(spread.leftPage.preview_image)}
                                   alt={`Spread ${index + 1} preview`}
                                   className="spread-preview-image"
+                                  onClick={() => handlePreviewClick(getImageUrl(spread.leftPage.preview_image))}
                                   onError={(e) => {
                                     console.error(`Failed to load preview image: ${spread.leftPage.preview_image}`);
                                     e.target.src = FALLBACK_IMAGE;
@@ -366,6 +419,9 @@ function PhotoBookOrdersView() {
             </div>
           ))}
         </div>
+      )}
+      {selectedPreview && (
+        <PreviewModal imageUrl={selectedPreview} onClose={closePreviewModal} />
       )}
     </div>
   );

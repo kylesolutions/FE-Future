@@ -4,10 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { Plus, Image as ImageIcon, Sparkles, Sticker as StickerIcon, Upload, ArrowLeft, Type, ChevronLeft, ChevronRight, Trash2, ZoomIn, ZoomOut, RotateCw, Maximize2, Save } from 'lucide-react';
+import { Plus, Image as ImageIcon, Sparkles, Sticker as StickerIcon, Upload, ArrowLeft, Type, ChevronLeft, ChevronRight, Trash2, ZoomIn, ZoomOut, RotateCw, Maximize2, Save, Scissors } from 'lucide-react';
 import './PhotoBook.css';
 import html2canvas from 'html2canvas';
 import domtoimage from 'dom-to-image';
+import { removeBackground } from '@imgly/background-removal'; // Import the library
 
 const BASE_URL = 'http://82.180.146.4:8001';
 const FALLBACK_IMAGE = 'https://via.placeholder.com/300x200?text=No+Image';
@@ -30,7 +31,7 @@ const getAspectRatio = (size) => {
   return ratios[size] || '1';
 };
 
-// ThemeSelector Component
+// ThemeSelector Component (unchanged)
 function ThemeSelector({ themes, onSelect }) {
   const safeThemes = Array.isArray(themes) ? themes : [];
 
@@ -75,7 +76,7 @@ function ThemeSelector({ themes, onSelect }) {
   );
 }
 
-// PaperSelector Component
+// PaperSelector Component (unchanged)
 function PaperSelector({ papers, onSelect, onBack }) {
   const safePapers = Array.isArray(papers) ? papers : [];
 
@@ -119,7 +120,7 @@ function PaperSelector({ papers, onSelect, onBack }) {
   );
 }
 
-// DraggableItem Component
+// DraggableItem Component (unchanged)
 function DraggableItem({ src, type }) {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: type === 'image' ? ItemTypes.IMAGE : ItemTypes.STICKER,
@@ -140,7 +141,7 @@ function DraggableItem({ src, type }) {
   );
 }
 
-// DraggableElement Component
+// DraggableElement Component (Updated with Background Removal)
 function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
   const [isSelected, setIsSelected] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -148,6 +149,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isResizing, setIsResizing] = useState(false);
   const [resizeStart, setResizeStart] = useState({ width: 0, height: 0, x: 0, y: 0 });
+  const [isRemovingBackground, setIsRemovingBackground] = useState(false);
   const elementRef = useRef(null);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -303,6 +305,40 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
     }
   };
 
+  const handleRemoveBackground = async (e) => {
+    e.stopPropagation();
+    if (element.type !== 'image') return;
+
+    setIsRemovingBackground(true);
+    try {
+      console.log('Removing background for image:', element.content);
+      const response = await fetch(element.content);
+      const blob = await response.blob();
+      const resultBlob = await removeBackground(blob, {
+        output: { format: 'image/png' }, // Ensure PNG output for transparency
+      });
+      console.log('Background removed successfully, blob size:', resultBlob.size);
+
+      // Convert resultBlob to a File for upload
+      const file = new File([resultBlob], `nobg_${Date.now()}.png`, { type: 'image/png' });
+      const token = localStorage.getItem('token');
+      const config = token ? { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } } : {};
+      const formData = new FormData();
+      formData.append('image', file);
+      const uploadResponse = await axios.post(`${BASE_URL}/upload-images/`, formData, config);
+      const newImageUrl = getImageUrl(uploadResponse.data.image);
+      console.log('Uploaded background-removed image:', newImageUrl);
+
+      // Update element with new image URL
+      onUpdate(pageId, element.id, { content: newImageUrl });
+    } catch (err) {
+      console.error('Background removal failed:', err);
+      alert('Failed to remove background. Please try again or use a different image.');
+    } finally {
+      setIsRemovingBackground(false);
+    }
+  };
+
   const handleUploadClick = (e) => {
     e.stopPropagation();
     console.log('Upload icon clicked, triggering file input');
@@ -374,7 +410,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
       <img
         src={element.content}
         alt=""
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        style={{ width: '100%', height: '100%', objectFit: 'contain' }} // Changed to 'contain' to preserve transparency
         draggable={false}
       />
     );
@@ -398,38 +434,59 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
       }}
       onMouseDown={isEditing ? null : handleMouseDown}
     >
-    {renderContent()}
-    {isSelected && !isEditing && (
-      <>
-        <div className="element-border"></div>
-        <div className="resize-handle" onMouseDown={handleResizeStart}>
-          <Maximize2 size={12} />
-        </div>
-        <div className="element-toolbar">
-          {element.type !== 'text' && (
-            <>
-              <button className="toolbar-btn" onClick={handleZoomIn} title="Zoom In">
-                <ZoomIn size={14} />
-              </button>
-              <button className="toolbar-btn" onClick={handleZoomOut} title="Zoom Out">
-                <ZoomOut size={14} />
-              </button>
-              <button className="toolbar-btn" onClick={handleRotate} title="Rotate">
-                <RotateCw size={14} />
-              </button>
-            </>
-          )}
-          <button className="toolbar-btn delete" onClick={handleDelete} title="Delete">
-            <Trash2 size={14} />
-          </button>
-        </div>
-      </>
-    )}
-  </div>
-);
+      {renderContent()}
+      {isSelected && !isEditing && (
+        <>
+          <div className="element-border"></div>
+          <div className="resize-handle" onMouseDown={handleResizeStart}>
+            <Maximize2 size={12} />
+          </div>
+          <div className="element-toolbar">
+            {element.type === 'image' && (
+              <>
+                <button
+                  className="toolbar-btn"
+                  onClick={handleRemoveBackground}
+                  title="Remove Background"
+                  disabled={isRemovingBackground}
+                >
+                  <Scissors size={14} />
+                </button>
+                <button className="toolbar-btn" onClick={handleZoomIn} title="Zoom In">
+                  <ZoomIn size={14} />
+                </button>
+                <button className="toolbar-btn" onClick={handleZoomOut} title="Zoom Out">
+                  <ZoomOut size={14} />
+                </button>
+                <button className="toolbar-btn" onClick={handleRotate} title="Rotate">
+                  <RotateCw size={14} />
+                </button>
+              </>
+            )}
+            {element.type !== 'text' && element.type !== 'image' && (
+              <>
+                <button className="toolbar-btn" onClick={handleZoomIn} title="Zoom In">
+                  <ZoomIn size={14} />
+                </button>
+                <button className="toolbar-btn" onClick={handleZoomOut} title="Zoom Out">
+                  <ZoomOut size={14} />
+                </button>
+                <button className="toolbar-btn" onClick={handleRotate} title="Rotate">
+                  <RotateCw size={14} />
+                </button>
+              </>
+            )}
+            <button className="toolbar-btn delete" onClick={handleDelete} title="Delete">
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
-// PageCanvas Component
+// PageCanvas Component (unchanged)
 function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, onDeleteElement, pageRefs }) {
   const pageRef = useRef(null);
   const [{ isOver }, drop] = useDrop(
@@ -462,7 +519,6 @@ function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, 
     [page.id]
   );
 
-  // Assign ref to pageRefs
   useEffect(() => {
     pageRefs.current[page.id] = pageRef.current;
     return () => {
@@ -497,7 +553,7 @@ function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, 
   );
 }
 
-// BookSpread Component
+// BookSpread Component (unchanged)
 function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, onUpdateElement, onDeleteElement, pageRefs }) {
   return (
     <div
@@ -536,7 +592,7 @@ function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, 
   );
 }
 
-// Sidebar Component
+// Sidebar Component (unchanged)
 function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, onBackgroundSelect }) {
   const [activeTab, setActiveTab] = useState('photos');
 
@@ -647,8 +703,7 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
   );
 }
 
-
-// PhotoBookEditor Component
+// PhotoBookEditor Component (Updated to Handle PNG Uploads)
 function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   const [pages, setPages] = useState([
     {
@@ -710,53 +765,63 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   };
 
   const generateSpreadPreview = async (leftPageId, rightPageId, spreadIndex) => {
-  if (!spreadRef.current) {
-    console.error('Spread element not found');
-    return null;
-  }
-  try {
-    const images = spreadRef.current.getElementsByTagName('img');
-    const imagePromises = Array.from(images).map((img) => {
-      return new Promise((resolve, reject) => {
-        if (img.complete && img.naturalWidth !== 0) {
-          console.log(`Image loaded: ${img.src}`);
-          resolve();
-        } else {
-          img.crossOrigin = 'Anonymous';
-          img.onload = () => {
+    if (!spreadRef.current) {
+      console.error('Spread element not found');
+      return null;
+    }
+    try {
+      const images = spreadRef.current.getElementsByTagName('img');
+      const imagePromises = Array.from(images).map((img) => {
+        return new Promise((resolve, reject) => {
+          if (img.complete && img.naturalWidth !== 0) {
             console.log(`Image loaded: ${img.src}`);
             resolve();
-          };
-          img.onerror = () => reject(new Error(`Failed to load image: ${img.src}`));
-          img.src = img.src;
-        }
+          } else {
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+              console.log(`Image loaded: ${img.src}`);
+              resolve();
+            };
+            img.onerror = () => reject(new Error(`Failed to load image: ${img.src}`));
+            img.src = img.src;
+          }
+        });
       });
-    });
 
-    console.log(`Preloading ${imagePromises.length} images for spread ${spreadIndex + 1}`);
-    await Promise.all(imagePromises).catch((err) => {
-      console.error('Image preload failed:', err);
-    });
+      console.log(`Preloading ${imagePromises.length} images for spread ${spreadIndex + 1}`);
+      await Promise.all(imagePromises).catch((err) => {
+        console.error('Image preload failed:', err);
+      });
 
-    const dataUrl = await domtoimage.toJpeg(spreadRef.current, {
-      quality: 0.8,
-      bgcolor: null,
-    });
-    console.log(`Generated spread preview for spread ${spreadIndex + 1}`);
-    const link = document.createElement('a');
-    link.href = dataUrl;
-    link.download = `spread_${spreadIndex + 1}_preview.jpg`;
-    link.click();
-    return {
-      spreadIndex,
-      pageIds: [leftPageId, rightPageId].filter(Boolean),
-      dataUrl,
-    };
-  } catch (err) {
-    console.error(`Failed to generate spread preview for pages ${leftPageId}, ${rightPageId}:`, err);
-    return null;
-  }
-};
+      const scale = 2; // Increase resolution for better quality
+      const node = spreadRef.current;
+      const style = window.getComputedStyle(node);
+      const width = parseInt(style.width) * scale;
+      const height = parseInt(style.height) * scale;
+
+      const dataUrl = await domtoimage.toJpeg(spreadRef.current, {
+        quality: 0.95, // High quality
+        width,
+        height,
+        style: {
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left',
+          width: `${width}px`,
+          height: `${height}px`,
+        },
+        cacheBust: true,
+      });
+      console.log(`Generated spread preview for spread ${spreadIndex + 1}`);
+      return {
+        spreadIndex,
+        pageIds: [leftPageId, rightPageId].filter(Boolean),
+        dataUrl,
+      };
+    } catch (err) {
+      console.error(`Failed to generate spread preview for pages ${leftPageId}, ${rightPageId}:`, err);
+      return null;
+    }
+  };
 
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -927,89 +992,87 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   };
 
   const handleSaveOrder = async () => {
-  if (!user) {
-    setSaveError('You must be logged in to save an order.');
-    return;
-  }
-
-  setIsSaving(true);
-  setSaveError(null);
-
-  try {
-    const token = localStorage.getItem('token');
-    const config = {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data',
-      },
-    };
-
-    const validPages = pages.filter((page) => page.elements.length > 0);
-
-    // Generate previews for spreads only
-    const spreadPreviews = await Promise.all(
-      Array.from({ length: Math.ceil(validPages.length / 2) }, async (_, index) => {
-        const leftPage = validPages[index * 2];
-        const rightPage = validPages[index * 2 + 1];
-        const preview = await generateSpreadPreview(leftPage?.id, rightPage?.id, index);
-        if (!preview) return null;
-        const response = await fetch(preview.dataUrl);
-        const blob = await response.blob();
-        const file = new File([blob], `spread_${index + 1}_preview.jpg`, { type: 'image/jpeg' });
-        console.log(`Generated file for spread ${index + 1}:`, { name: file.name, size: file.size, type: file.type });
-        return { pageIds: preview.pageIds, file };
-      })
-    );
-
-    const validPreviews = spreadPreviews.filter((preview) => preview !== null);
-
-    const formData = new FormData();
-    formData.append('theme_id', theme.id);
-    formData.append('paper_id', paper.id);
-    formData.append('total_price', calculateTotalPrice());
-
-    validPages.forEach((page, index) => {
-      const pageData = {
-        page_number: index + 1,
-        background_id: selectedBackground ? selectedBackground.id : null,
-        elements: page.elements.map((el) => ({
-          type: el.type,
-          content: el.content,
-          x: el.x,
-          y: el.y,
-          width: el.width,
-          height: el.height,
-          rotation: el.rotation,
-          z_index: el.zIndex,
-        })),
-        client_page_id: page.id, // Include client_page_id
-      };
-      formData.append(`pages[${index}]`, JSON.stringify(pageData));
-      console.log(`Appended page data for index ${index}:`, pageData);
-    });
-
-    validPreviews.forEach((preview) => {
-      preview.pageIds.forEach((pageId) => {
-        console.log(`Appending page_previews[${pageId}]:`, { name: preview.file.name, size: preview.file.size });
-        formData.append(`page_previews[${pageId}]`, preview.file);
-      });
-    });
-
-    // Log FormData contents
-    for (let [key, value] of formData.entries()) {
-      console.log(`FormData entry: ${key} = ${value instanceof File ? `${value.name} (${value.size} bytes)` : value}`);
+    if (!user) {
+      setSaveError('You must be logged in to save an order.');
+      return;
     }
 
-    const response = await axios.post(`${BASE_URL}/orders/create/`, formData, config);
-    console.log('Order saved:', response.data);
-    alert('Order saved successfully!');
-  } catch (err) {
-    console.error('Order save failed:', err.response?.data || err.message);
-    setSaveError('Failed to save order. Please check your connection or try again.');
-  } finally {
-    setIsSaving(false);
-  }
-};
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      const config = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      };
+
+      const validPages = pages.filter((page) => page.elements.length > 0);
+
+      const spreadPreviews = await Promise.all(
+        Array.from({ length: Math.ceil(validPages.length / 2) }, async (_, index) => {
+          const leftPage = validPages[index * 2];
+          const rightPage = validPages[index * 2 + 1];
+          const preview = await generateSpreadPreview(leftPage?.id, rightPage?.id, index);
+          if (!preview) return null;
+          const response = await fetch(preview.dataUrl);
+          const blob = await response.blob();
+          const file = new File([blob], `spread_${index + 1}_preview.jpg`, { type: 'image/jpeg' });
+          console.log(`Generated file for spread ${index + 1}:`, { name: file.name, size: file.size, type: file.type });
+          return { pageIds: preview.pageIds, file };
+        })
+      );
+
+      const validPreviews = spreadPreviews.filter((preview) => preview !== null);
+
+      const formData = new FormData();
+      formData.append('theme_id', theme.id);
+      formData.append('paper_id', paper.id);
+      formData.append('total_price', calculateTotalPrice());
+
+      validPages.forEach((page, index) => {
+        const pageData = {
+          page_number: index + 1,
+          background_id: selectedBackground ? selectedBackground.id : null,
+          elements: page.elements.map((el) => ({
+            type: el.type,
+            content: el.content,
+            x: el.x,
+            y: el.y,
+            width: el.width,
+            height: el.height,
+            rotation: el.rotation,
+            z_index: el.zIndex,
+          })),
+          client_page_id: page.id,
+        };
+        formData.append(`pages[${index}]`, JSON.stringify(pageData));
+        console.log(`Appended page data for index ${index}:`, pageData);
+      });
+
+      validPreviews.forEach((preview) => {
+        preview.pageIds.forEach((pageId) => {
+          console.log(`Appending page_previews[${pageId}]:`, { name: preview.file.name, size: preview.file.size });
+          formData.append(`page_previews[${pageId}]`, preview.file);
+        });
+      });
+
+      for (let [key, value] of formData.entries()) {
+        console.log(`FormData entry: ${key} = ${value instanceof File ? `${value.name} (${value.size} bytes)` : value}`);
+      }
+
+      const response = await axios.post(`${BASE_URL}/orders/create/`, formData, config);
+      console.log('Order saved:', response.data);
+      alert('Order saved successfully!');
+    } catch (err) {
+      console.error('Order save failed:', err.response?.data || err.message);
+      setSaveError('Failed to save order. Please check your connection or try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const leftPage = pages[currentPageIndex];
   const rightPage = pages[currentPageIndex + 1];
@@ -1092,7 +1155,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   );
 }
 
-// Main PhotoBook Component
+// Main PhotoBook Component (unchanged)
 function PhotoBook() {
   const navigate = useNavigate();
   const user = useSelector((state) => state.user);
@@ -1112,30 +1175,25 @@ function PhotoBook() {
         const token = localStorage.getItem('token');
         const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 
-        // Fetch themes
         const themesRes = await axios.get(`${BASE_URL}/themes/`, config).catch((err) => {
           console.error('Failed to fetch themes:', err);
           return { data: [] };
         });
 
-        // Fetch papers
         const papersRes = await axios.get(`${BASE_URL}/photobook-papers/`, config).catch((err) => {
           console.error('Failed to fetch papers:', err);
           return { data: [] };
         });
 
-        // Fetch stickers
         const stickersRes = await axios.get(`${BASE_URL}/stickers/`, config).catch((err) => {
           console.error('Failed to fetch stickers:', err);
           return { data: [] };
         });
 
-        // Set states with safe defaults
         setThemes(Array.isArray(themesRes.data) ? themesRes.data : []);
         setPapers(Array.isArray(papersRes.data) ? papersRes.data : []);
         setStickers(Array.isArray(stickersRes.data) ? stickersRes.data : []);
 
-        // Set error if all API calls failed
         if (!themesRes.data.length && !papersRes.data.length && !stickersRes.data.length) {
           setError('Failed to load data from all endpoints. Please check your connection or try again.');
         }
@@ -1213,3 +1271,4 @@ function PhotoBook() {
 }
 
 export default PhotoBook;
+
