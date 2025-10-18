@@ -635,3 +635,32 @@
     max-height: 85vh;
   }
 }
+.photobook-order-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.photobook-delete-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: #e53e3e; /* Red for delete action */
+  border: none;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.photobook-delete-button:hover {
+  background: #c53030;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+}
+
+.photobook-delete-button:active {
+  transform: translateY(0);
+}

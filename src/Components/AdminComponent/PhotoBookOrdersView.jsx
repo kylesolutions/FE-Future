@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Package, Calendar, FileText, Image as ImageIcon, Type, Sticker, X } from 'lucide-react';
+import { ArrowLeft, Package, Calendar, FileText, Image as ImageIcon, Type, Sticker, X, Trash2 } from 'lucide-react';
 import './PhotoBookOrdersView.css';
 
 const BASE_URL = 'http://82.180.146.4:8001';
@@ -60,7 +60,7 @@ function PreviewModal({ imageUrl, onClose }) {
         )}
         <img
           src={imageUrl}
-          alt="Spread Preview"
+          alt="Page Preview"
           className={`photobook-modal-preview-image ${isImageLoaded ? 'loaded' : ''}`}
           onError={(e) => {
             console.error(`Failed to load modal preview image: ${imageUrl}`);
@@ -108,6 +108,37 @@ function PhotoBookOrdersView() {
     }
   };
 
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm(`Are you sure you want to delete Order #${orderId}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}/orders/${orderId}/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to delete order: ${response.status}`);
+      }
+
+      // Update state to remove the deleted order
+      setOrders(orders.filter((order) => order.id !== orderId));
+      console.log(`Order ${orderId} deleted successfully`);
+      if (expandedOrder === orderId) {
+        setExpandedOrder(null);
+      }
+    } catch (err) {
+      console.error(`Failed to delete order ${orderId}:`, err);
+      setError(`Failed to delete order: ${err.message}`);
+    }
+  };
+
   const handleBack = () => {
     window.history.back();
   };
@@ -129,9 +160,12 @@ function PhotoBookOrdersView() {
     for (let i = 0; i < pages.length; i += 2) {
       const leftPage = pages[i];
       const rightPage = pages[i + 1] || null;
-      const previewUrl = leftPage?.preview_image ? getImageUrl(leftPage.preview_image) : FALLBACK_IMAGE;
-      console.log(`Spread ${i / 2 + 1}: leftPage=${leftPage?.id || 'none'}, rightPage=${rightPage?.id || 'none'}, preview=${previewUrl}`);
-      spreads.push({ leftPage, rightPage, preview: previewUrl });
+      const leftPreview = leftPage?.preview_image ? getImageUrl(leftPage.preview_image) : FALLBACK_IMAGE;
+      const rightPreview = rightPage?.preview_image ? getImageUrl(rightPage.preview_image) : null;
+      console.log(
+        `Spread ${i / 2 + 1}: leftPage=${leftPage?.id || 'none'}, rightPage=${rightPage?.id || 'none'}, leftPreview=${leftPreview}, rightPreview=${rightPreview || 'none'}`
+      );
+      spreads.push({ leftPage, rightPage, leftPreview, rightPreview });
     }
     return spreads;
   };
@@ -207,9 +241,18 @@ function PhotoBookOrdersView() {
                     )}
                   </div>
                 </div>
-                <div className="photobook-order-price">
-                  <span className="photobook-price-label">Total</span>
-                  <span className="photobook-price-value">${Number(order.total_price || 0).toFixed(2)}</span>
+                <div className="photobook-order-actions">
+                  <button
+                    className="photobook-delete-button"
+                    onClick={() => handleDeleteOrder(order.id)}
+                    title="Delete Order"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                  <div className="photobook-order-price">
+                    <span className="photobook-price-label">Total</span>
+                    <span className="photobook-price-value">${Number(order.total_price || 0).toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
 
@@ -251,16 +294,34 @@ function PhotoBookOrdersView() {
                             </div>
 
                             <div className="photobook-spread-preview">
-                              <img
-                                src={spread.preview}
-                                alt={`Spread ${index + 1} preview`}
-                                className="photobook-spread-preview-image"
-                                onClick={() => handlePreviewClick(spread.preview)}
-                                onError={(e) => {
-                                  console.error(`Failed to load preview image for spread ${index + 1}: ${spread.preview}`);
-                                  e.target.src = FALLBACK_IMAGE;
-                                }}
-                              />
+                              <div className="spread-preview-container">
+                                <div className="spread-preview-left">
+                                  <img
+                                    src={spread.leftPreview}
+                                    alt={`Spread ${index + 1} Left Page Preview`}
+                                    className="photobook-spread-preview-image"
+                                    onClick={() => handlePreviewClick(spread.leftPreview)}
+                                    onError={(e) => {
+                                      console.error(`Failed to load left preview image for spread ${index + 1}: ${spread.leftPreview}`);
+                                      e.target.src = FALLBACK_IMAGE;
+                                    }}
+                                  />
+                                </div>
+                                {spread.rightPage && spread.rightPreview && (
+                                  <div className="spread-preview-right">
+                                    <img
+                                      src={spread.rightPreview}
+                                      alt={`Spread ${index + 1} Right Page Preview`}
+                                      className="photobook-spread-preview-image"
+                                      onClick={() => handlePreviewClick(spread.rightPreview)}
+                                      onError={(e) => {
+                                        console.error(`Failed to load right preview image for spread ${index + 1}: ${spread.rightPreview}`);
+                                        e.target.src = FALLBACK_IMAGE;
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
                             </div>
 
                             {(spread.leftPage?.elements || spread.rightPage?.elements) && (
