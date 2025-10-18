@@ -307,20 +307,6 @@ function PhotoBookOrdersView() {
                                     }}
                                   />
                                 </div>
-                                {spread.rightPage && spread.rightPreview && (
-                                  <div className="spread-preview-right">
-                                    <img
-                                      src={spread.rightPreview}
-                                      alt={`Spread ${index + 1} Right Page Preview`}
-                                      className="photobook-spread-preview-image"
-                                      onClick={() => handlePreviewClick(spread.rightPreview)}
-                                      onError={(e) => {
-                                        console.error(`Failed to load right preview image for spread ${index + 1}: ${spread.rightPreview}`);
-                                        e.target.src = FALLBACK_IMAGE;
-                                      }}
-                                    />
-                                  </div>
-                                )}
                               </div>
                             </div>
 
