@@ -6,9 +6,9 @@ import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Plus, Image as ImageIcon, Sparkles, Sticker as StickerIcon, Upload, ArrowLeft, Type, ChevronLeft, ChevronRight, Trash2, ZoomIn, ZoomOut, RotateCw, Maximize2, Save, Scissors } from 'lucide-react';
 import './PhotoBook.css';
-import html2canvas from 'html2canvas';
 import domtoimage from 'dom-to-image';
-import { removeBackground } from '@imgly/background-removal'; // Import the library
+import { removeBackground } from '@imgly/background-removal';
+import ReactDOM from 'react-dom';
 
 const BASE_URL = 'http://82.180.146.4:8001';
 const FALLBACK_IMAGE = 'https://via.placeholder.com/300x200?text=No+Image';
@@ -141,7 +141,7 @@ function DraggableItem({ src, type }) {
   );
 }
 
-// DraggableElement Component (Updated with Background Removal)
+// DraggableElement Component (unchanged)
 function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
   const [isSelected, setIsSelected] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -315,11 +315,10 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
       const response = await fetch(element.content);
       const blob = await response.blob();
       const resultBlob = await removeBackground(blob, {
-        output: { format: 'image/png' }, // Ensure PNG output for transparency
+        output: { format: 'image/png' },
       });
       console.log('Background removed successfully, blob size:', resultBlob.size);
 
-      // Convert resultBlob to a File for upload
       const file = new File([resultBlob], `nobg_${Date.now()}.png`, { type: 'image/png' });
       const token = localStorage.getItem('token');
       const config = token ? { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } } : {};
@@ -329,7 +328,6 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
       const newImageUrl = getImageUrl(uploadResponse.data.image);
       console.log('Uploaded background-removed image:', newImageUrl);
 
-      // Update element with new image URL
       onUpdate(pageId, element.id, { content: newImageUrl });
     } catch (err) {
       console.error('Background removal failed:', err);
@@ -410,7 +408,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
       <img
         src={element.content}
         alt=""
-        style={{ width: '100%', height: '100%', objectFit: 'contain' }} // Changed to 'contain' to preserve transparency
+        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
         draggable={false}
       />
     );
@@ -703,7 +701,7 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
   );
 }
 
-// PhotoBookEditor Component (Updated to Handle PNG Uploads)
+// PhotoBookEditor Component (Updated to Handle Correct Spread Previews)
 function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   const [pages, setPages] = useState([
     {
@@ -751,12 +749,15 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   const user = useSelector((state) => state.user);
   const pageRefs = useRef({});
   const spreadRef = useRef(null);
+  const [previewDebugUrls, setPreviewDebugUrls] = useState([]); // For debugging previews
 
   const calculateTotalPrice = () => {
     const basePrice = parseFloat(paper.price || 0);
     const pagePrice = 2.00;
     const stickerPrice = 0.50;
-    const totalPages = pages.length;
+    const totalPages = pages.filter((page) =>
+      page.elements.some((el) => el.type !== 'placeholder' || el.content)
+    ).length;
     const totalStickers = pages.reduce(
       (count, page) => count + page.elements.filter((el) => el.type === 'sticker').length,
       0
@@ -764,64 +765,94 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
     return (basePrice + totalPages * pagePrice + totalStickers * stickerPrice).toFixed(2);
   };
 
-  const generateSpreadPreview = async (leftPageId, rightPageId, spreadIndex) => {
-    if (!spreadRef.current) {
-      console.error('Spread element not found');
-      return null;
-    }
-    try {
-      const images = spreadRef.current.getElementsByTagName('img');
-      const imagePromises = Array.from(images).map((img) => {
-        return new Promise((resolve, reject) => {
-          if (img.complete && img.naturalWidth !== 0) {
+  const generateSpreadPreview = async (leftPage, rightPage, spreadIndex) => {
+  try {
+    // Create a temporary off-screen div
+    const tempDiv = document.createElement('div');
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.left = '-9999px';
+    tempDiv.style.width = '800px'; // Fixed width for consistency
+    tempDiv.style.height = '600px'; // Fixed height for consistency
+    document.body.appendChild(tempDiv);
+
+    // Render the spread using ReactDOM.render
+    ReactDOM.render(
+      <BookSpread
+        leftPage={leftPage}
+        rightPage={rightPage}
+        background={selectedBackground ? selectedBackground.url : ''}
+        paperSize={paper.size}
+        onAddElement={() => {}}
+        onUpdateElement={() => {}}
+        onDeleteElement={() => {}}
+        pageRefs={pageRefs}
+      />,
+      tempDiv
+    );
+
+    // Wait for rendering and image loading
+    await new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        setTimeout(resolve, 500); // Increased delay to ensure rendering
+      });
+    });
+
+    // Preload images to ensure they are loaded before capture
+    const images = tempDiv.getElementsByTagName('img');
+    const imagePromises = Array.from(images).map((img) => {
+      return new Promise((resolve, reject) => {
+        if (img.complete && img.naturalWidth !== 0) {
+          console.log(`Image loaded: ${img.src}`);
+          resolve();
+        } else {
+          img.crossOrigin = 'Anonymous';
+          img.onload = () => {
             console.log(`Image loaded: ${img.src}`);
             resolve();
-          } else {
-            img.crossOrigin = 'Anonymous';
-            img.onload = () => {
-              console.log(`Image loaded: ${img.src}`);
-              resolve();
-            };
-            img.onerror = () => reject(new Error(`Failed to load image: ${img.src}`));
-            img.src = img.src;
-          }
-        });
+          };
+          img.onerror = () => {
+            console.error(`Failed to load image: ${img.src}`);
+            reject(new Error(`Failed to load image: ${img.src}`));
+          };
+          img.src = img.src; // Trigger reload if needed
+        }
       });
+    });
 
-      console.log(`Preloading ${imagePromises.length} images for spread ${spreadIndex + 1}`);
-      await Promise.all(imagePromises).catch((err) => {
-        console.error('Image preload failed:', err);
-      });
+    console.log(`Preloading ${imagePromises.length} images for spread ${spreadIndex + 1}`);
+    await Promise.all(imagePromises).catch((err) => {
+      console.error('Image preload failed:', err);
+    });
 
-      const scale = 3; // Increase resolution for better quality
-      const node = spreadRef.current;
-      const style = window.getComputedStyle(node);
-      const width = parseInt(style.width) * scale;
-      const height = parseInt(style.height) * scale;
+    // Capture preview
+    const dataUrl = await domtoimage.toPng(tempDiv, {
+      quality: 1.0,
+      width: 800,
+      height: 600,
+      cacheBust: true,
+    });
+    console.log(`Generated preview for spread ${spreadIndex + 1} (pages ${leftPage?.id || 'none'}, ${rightPage?.id || 'none'}): ${dataUrl.substring(0, 50)}...`);
 
-      const dataUrl = await domtoimage.toJpeg(spreadRef.current, {
-        quality: 1.0, // High quality
-        width,
-        height,
-        style: {
-          transform: `scale(${scale})`,
-          transformOrigin: 'top left',
-          width: `${width}px`,
-          height: `${height}px`,
-        },
-        cacheBust: true,
-      });
-      console.log(`Generated spread preview for spread ${spreadIndex + 1}`);
-      return {
-        spreadIndex,
-        pageIds: [leftPageId, rightPageId].filter(Boolean),
-        dataUrl,
-      };
-    } catch (err) {
-      console.error(`Failed to generate spread preview for pages ${leftPageId}, ${rightPageId}:`, err);
-      return null;
-    }
-  };
+    // Clean up
+    ReactDOM.unmountComponentAtNode(tempDiv);
+    document.body.removeChild(tempDiv);
+
+    // Store preview for debugging
+    setPreviewDebugUrls((prev) => [
+      ...prev,
+      { spreadIndex, pageIds: [leftPage?.id, rightPage?.id].filter(Boolean), dataUrl },
+    ]);
+
+    return {
+      spreadIndex,
+      pageIds: [leftPage?.id, rightPage?.id].filter(Boolean),
+      dataUrl,
+    };
+  } catch (err) {
+    console.error(`Failed to generate spread preview for spread ${spreadIndex + 1}:`, err);
+    return null;
+  }
+};
 
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -992,51 +1023,131 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   };
 
   const handleSaveOrder = async () => {
-    if (!user) {
-      setSaveError('You must be logged in to save an order.');
+  if (!user) {
+    setSaveError('You must be logged in to save an order.');
+    return;
+  }
+
+  setIsSaving(true);
+  setSaveError(null);
+  setPreviewDebugUrls([]); // Clear previous debug previews
+
+  try {
+    const token = localStorage.getItem('token');
+    const config = {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+    };
+
+    // Filter valid pages
+    const validPages = pages.filter((page) =>
+      page.elements.some((el) => el.type !== 'placeholder' || (el.type === 'placeholder' && el.content))
+    );
+
+    if (validPages.length === 0) {
+      setSaveError('No customized pages to save. Add images, text, or stickers to at least one page.');
+      setIsSaving(false);
       return;
     }
 
-    setIsSaving(true);
-    setSaveError(null);
+    // Store original page index
+    const originalPageIndex = currentPageIndex;
 
-    try {
-      const token = localStorage.getItem('token');
-      const config = {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      };
+    // Generate previews for each spread
+    const spreadPreviews = [];
+    for (let index = 0; index < Math.ceil(validPages.length / 2); index++) {
+      const newPageIndex = index * 2;
+      setCurrentPageIndex(newPageIndex); // Update visible spread
 
-      const validPages = pages.filter((page) => page.elements.length > 0);
+      // Wait for React to render the new spread
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => {
+          setTimeout(resolve, 500); // Increased delay for rendering
+        });
+      });
 
-      const spreadPreviews = await Promise.all(
-        Array.from({ length: Math.ceil(validPages.length / 2) }, async (_, index) => {
-          const leftPage = validPages[index * 2];
-          const rightPage = validPages[index * 2 + 1];
-          const preview = await generateSpreadPreview(leftPage?.id, rightPage?.id, index);
-          if (!preview) return null;
-          const response = await fetch(preview.dataUrl);
-          const blob = await response.blob();
-          const file = new File([blob], `spread_${index + 1}_preview.jpg`, { type: 'image/jpeg' });
-          console.log(`Generated file for spread ${index + 1}:`, { name: file.name, size: file.size, type: file.type });
-          return { pageIds: preview.pageIds, file };
-        })
-      );
+      const leftPage = validPages[newPageIndex];
+      const rightPage = validPages[newPageIndex + 1];
+      console.log(`Generating preview for spread ${index + 1} (pages ${leftPage?.id || 'none'}, ${rightPage?.id || 'none'})`);
 
-      const validPreviews = spreadPreviews.filter((preview) => preview !== null);
+      if (!spreadRef.current) {
+        console.warn(`Spread ref not available for spread ${index + 1}`);
+        continue;
+      }
 
-      const formData = new FormData();
-      formData.append('theme_id', theme.id);
-      formData.append('paper_id', paper.id);
-      formData.append('total_price', calculateTotalPrice());
+      // Preload images in the visible spread
+      const images = spreadRef.current.getElementsByTagName('img');
+      const imagePromises = Array.from(images).map((img) => {
+        return new Promise((resolve, reject) => {
+          if (img.complete && img.naturalWidth !== 0) {
+            console.log(`Image loaded: ${img.src}`);
+            resolve();
+          } else {
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+              console.log(`Image loaded: ${img.src}`);
+              resolve();
+            };
+            img.onerror = () => {
+              console.error(`Failed to load image: ${img.src}`);
+              reject(new Error(`Failed to load image: ${img.src}`));
+            };
+            img.src = img.src;
+          }
+        });
+      });
 
-      validPages.forEach((page, index) => {
-        const pageData = {
-          page_number: index + 1,
-          background_id: selectedBackground ? selectedBackground.id : null,
-          elements: page.elements.map((el) => ({
+      console.log(`Preloading ${imagePromises.length} images for spread ${index + 1}`);
+      await Promise.all(imagePromises).catch((err) => {
+        console.error('Image preload failed:', err);
+      });
+
+      // Capture preview from visible spread
+      const dataUrl = await domtoimage.toPng(spreadRef.current, {
+        quality: 1.0,
+        width: 800,
+        height: 600,
+        cacheBust: true,
+      });
+      console.log(`Generated preview for spread ${index + 1}: ${dataUrl.substring(0, 50)}...`);
+
+      // Store for debugging
+      setPreviewDebugUrls((prev) => [
+        ...prev,
+        { spreadIndex: index, pageIds: [leftPage?.id, rightPage?.id].filter(Boolean), dataUrl },
+      ]);
+
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
+      const file = new File([blob], `spread_${index + 1}_preview.png`, { type: 'image/png' });
+      console.log(`Generated file for spread ${index + 1}:`, { name: file.name, size: file.size, type: file.type });
+      spreadPreviews.push({ pageIds: [leftPage?.id, rightPage?.id].filter(Boolean), file });
+    }
+
+    // Restore original page index
+    setCurrentPageIndex(originalPageIndex);
+
+    const validPreviews = spreadPreviews.filter((preview) => preview !== null);
+    if (validPreviews.length === 0) {
+      setSaveError('Failed to generate any previews. Please try again.');
+      setIsSaving(false);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('theme_id', theme.id);
+    formData.append('paper_id', paper.id);
+    formData.append('total_price', calculateTotalPrice());
+
+    validPages.forEach((page, index) => {
+      const pageData = {
+        page_number: index + 1,
+        background_id: selectedBackground ? selectedBackground.id : null,
+        elements: page.elements
+          .filter((el) => el.type !== 'placeholder' || (el.type === 'placeholder' && el.content))
+          .map((el) => ({
             type: el.type,
             content: el.content,
             x: el.x,
@@ -1046,36 +1157,34 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
             rotation: el.rotation,
             z_index: el.zIndex,
           })),
-          client_page_id: page.id,
-        };
-        formData.append(`pages[${index}]`, JSON.stringify(pageData));
-        console.log(`Appended page data for index ${index}:`, pageData);
+        client_page_id: page.id,
+      };
+      formData.append(`pages[${index}]`, JSON.stringify(pageData));
+      console.log(`Appended page data for index ${index} (client_page_id: ${page.id}):`, pageData);
+    });
+
+    validPreviews.forEach((preview, index) => {
+      preview.pageIds.forEach((pageId) => {
+        console.log(`Appending page_previews[${pageId}]:`, { name: preview.file.name, size: preview.file.size });
+        formData.append(`page_previews[${pageId}]`, preview.file);
       });
+    });
 
-      validPreviews.forEach((preview) => {
-        preview.pageIds.forEach((pageId) => {
-          console.log(`Appending page_previews[${pageId}]:`, { name: preview.file.name, size: preview.file.size });
-          formData.append(`page_previews[${pageId}]`, preview.file);
-        });
-      });
-
-      for (let [key, value] of formData.entries()) {
-        console.log(`FormData entry: ${key} = ${value instanceof File ? `${value.name} (${value.size} bytes)` : value}`);
-      }
-
-      const response = await axios.post(`${BASE_URL}/orders/create/`, formData, config);
-      console.log('Order saved:', response.data);
-      alert('Order saved successfully!');
-    } catch (err) {
-      console.error('Order save failed:', err.response?.data || err.message);
-      setSaveError('Failed to save order. Please check your connection or try again.');
-    } finally {
-      setIsSaving(false);
+    // Log FormData entries
+    for (let [key, value] of formData.entries()) {
+      console.log(`FormData entry: ${key} = ${value instanceof File ? `${value.name} (${value.size} bytes)` : value}`);
     }
-  };
 
-  const leftPage = pages[currentPageIndex];
-  const rightPage = pages[currentPageIndex + 1];
+    const response = await axios.post(`${BASE_URL}/orders/create/`, formData, config);
+    console.log('Order saved:', response.data);
+    alert('Order saved successfully!');
+  } catch (err) {
+    console.error('Order save failed:', err.response?.data || err.message);
+    setSaveError('Failed to save order. Please check your connection or try again.');
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   return (
     <div className="editor-container">
@@ -1128,8 +1237,8 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
           <div className="canvas-wrapper">
             <div ref={spreadRef} className="spread-wrapper">
               <BookSpread
-                leftPage={leftPage}
-                rightPage={rightPage}
+                leftPage={pages[currentPageIndex]}
+                rightPage={pages[currentPageIndex + 1]}
                 background={selectedBackground ? selectedBackground.url : ''}
                 paperSize={paper.size}
                 onAddElement={addElementToPage}
@@ -1139,6 +1248,18 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
               />
             </div>
           </div>
+          {/* Debug Preview Display */}
+          {previewDebugUrls.length > 0 && (
+            <div className="preview-debug">
+              <h3>Debug Previews</h3>
+              {previewDebugUrls.map((preview) => (
+                <div key={preview.spreadIndex}>
+                  <p>Spread {preview.spreadIndex + 1} (Pages {preview.pageIds.join(', ')})</p>
+                  <img src={preview.dataUrl} alt={`Spread ${preview.spreadIndex + 1} Preview`} style={{ width: '200px', height: 'auto' }} />
+                </div>
+              ))}
+            </div>
+          )}
           <div className="pagination-controls">
             <button className="nav-btn" onClick={goToPreviousSpread} disabled={currentPageIndex === 0}>
               <ChevronLeft size={20} />
@@ -1271,4 +1392,3 @@ function PhotoBook() {
 }
 
 export default PhotoBook;
-

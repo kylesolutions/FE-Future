@@ -743,3 +743,17 @@
   height: 100%;
   position: relative;
 }
+
+.preview-debug {
+  margin-top: 20px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  background: #f9f9f9;
+}
+.preview-debug h3 {
+  margin-bottom: 10px;
+}
+.preview-debug img {
+  margin: 5px;
+  border: 1px solid #ddd;
+}

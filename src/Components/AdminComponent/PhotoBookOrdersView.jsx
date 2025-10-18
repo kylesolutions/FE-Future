@@ -7,7 +7,10 @@ const FALLBACK_IMAGE = 'https://images.pexels.com/photos/1762851/pexels-photo-17
 const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23f0f0f0" stroke="%23cbd5e0" stroke-width="2" stroke-dasharray="8,4"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="14" fill="%23a0aec0"%3EDrop Photo%3C/text%3E%3C/svg%3E';
 
 const getImageUrl = (path) => {
-  if (!path) return FALLBACK_IMAGE;
+  if (!path) {
+    console.warn('getImageUrl: No path provided, using FALLBACK_IMAGE');
+    return FALLBACK_IMAGE;
+  }
   if (path.startsWith('http')) return path;
   return `${BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
 };
@@ -91,7 +94,7 @@ function PhotoBookOrdersView() {
       const response = await fetch(`${BASE_URL}/orders/`, config);
 
       if (!response.ok) {
-        throw new Error('Failed to fetch orders');
+        throw new Error(`Failed to fetch orders: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -125,8 +128,10 @@ function PhotoBookOrdersView() {
     const spreads = [];
     for (let i = 0; i < pages.length; i += 2) {
       const leftPage = pages[i];
-      const rightPage = pages[i + 1];
-      spreads.push({ leftPage, rightPage });
+      const rightPage = pages[i + 1] || null;
+      const previewUrl = leftPage?.preview_image ? getImageUrl(leftPage.preview_image) : FALLBACK_IMAGE;
+      console.log(`Spread ${i / 2 + 1}: leftPage=${leftPage?.id || 'none'}, rightPage=${rightPage?.id || 'none'}, preview=${previewUrl}`);
+      spreads.push({ leftPage, rightPage, preview: previewUrl });
     }
     return spreads;
   };
@@ -242,23 +247,21 @@ function PhotoBookOrdersView() {
                         {getSpreads(order.pages).map((spread, index) => (
                           <div key={index} className="photobook-spread-card">
                             <div className="photobook-spread-number-badge">
-                              Spread {index + 1} (Pages {spread.leftPage?.page_number || ''}{spread.rightPage ? `-${spread.rightPage.page_number}` : ''})
+                              Spread {index + 1} (Pages {spread.leftPage?.page_number || 'N/A'}{spread.rightPage ? `-${spread.rightPage.page_number}` : ''})
                             </div>
 
-                            {spread.leftPage?.preview_image && (
-                              <div className="photobook-spread-preview">
-                                <img
-                                  src={getImageUrl(spread.leftPage.preview_image)}
-                                  alt={`Spread ${index + 1} preview`}
-                                  className="photobook-spread-preview-image"
-                                  onClick={() => handlePreviewClick(getImageUrl(spread.leftPage.preview_image))}
-                                  onError={(e) => {
-                                    console.error(`Failed to load preview image: ${spread.leftPage.preview_image}`);
-                                    e.target.src = FALLBACK_IMAGE;
-                                  }}
-                                />
-                              </div>
-                            )}
+                            <div className="photobook-spread-preview">
+                              <img
+                                src={spread.preview}
+                                alt={`Spread ${index + 1} preview`}
+                                className="photobook-spread-preview-image"
+                                onClick={() => handlePreviewClick(spread.preview)}
+                                onError={(e) => {
+                                  console.error(`Failed to load preview image for spread ${index + 1}: ${spread.preview}`);
+                                  e.target.src = FALLBACK_IMAGE;
+                                }}
+                              />
+                            </div>
 
                             {(spread.leftPage?.elements || spread.rightPage?.elements) && (
                               <div className="photobook-elements-section">
