@@ -1107,7 +1107,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
       // Capture preview from visible spread
       const dataUrl = await domtoimage.toPng(spreadRef.current, {
         quality: 1.0,
-        width: 800,
+        width: 900,
         height: 600,
         cacheBust: true,
       });
