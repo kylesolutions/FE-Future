@@ -569,7 +569,7 @@
   cursor: not-allowed;
 }
 
-.summary-section {
+.frame-summary-section {
   background: white;
   border-radius: 16px;
   padding: 20px;
@@ -578,21 +578,21 @@
   margin-top: auto;
 }
 
-.summary-section h3 {
+.frame-summary-section h3 {
   margin: 0 0 16px 0;
   color: #2d3748;
   font-size: 18px;
   font-weight: 600;
 }
 
-.summary-content {
+.frame-summary-content {
   display: flex;
   flex-direction: column;
   gap: 12px;
   margin-bottom: 20px;
 }
 
-.summary-item {
+.frame-summary-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -601,21 +601,21 @@
   font-size: 14px;
 }
 
-.summary-item:last-child {
+.frame-summary-item:last-child {
   border-bottom: none;
 }
 
-.summary-item span:first-child {
+.frame-summary-item span:first-child {
   color: #718096;
   font-weight: 500;
 }
 
-.summary-item span:last-child {
+.frame-summary-item span:last-child {
   color: #2d3748;
   font-weight: 600;
 }
 
-.summary-item.price {
+.frame-summary-item.price {
   font-size: 16px;
   font-weight: 600;
   color: #667eea;

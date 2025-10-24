@@ -2290,10 +2290,10 @@ function Headers({ activeCategory, onCategorySelect, setHasUploadedImages, isPri
           )}
           {isMackBoardEnabled && renderMackBoardOptions()}
           {!isPrintOnly && renderCategoryContent()}
-          <div className="summary-section">
+          <div className="frame-summary-section">
             <h3>Summary</h3>
-            <div className="summary-content">
-              <div className="summary-item">
+            <div className="frame-summary-content">
+              <div className="frame-summary-item">
                 <span>Size:</span>
                 <span>
                   {(selectedImage?.customSize?.width && selectedImage?.customSize?.height)
@@ -2301,27 +2301,27 @@ function Headers({ activeCategory, onCategorySelect, setHasUploadedImages, isPri
                     : `${selectedImage?.printOptions?.size?.width || 'N/A'}×${selectedImage?.printOptions?.size?.height || 'N/A'} ${selectedImage?.printOptions?.size?.unit || 'inches'}`}
                 </span>
               </div>
-              <div className="summary-item">
+              <div className="frame-summary-item">
                 <span>Media:</span>
                 <span>{selectedImage?.printOptions?.mediaType || 'None'}</span>
               </div>
               {selectedImage?.printOptions?.mediaType === 'Photopaper' && (
-                <div className="summary-item">
+                <div className="frame-summary-item">
                   <span>Paper Type:</span>
                   <span>{selectedImage?.printOptions?.paperType || 'None'}</span>
                 </div>
               )}
-              <div className="summary-item">
+              <div className="frame-summary-item">
                 <span>Fit:</span>
                 <span>{selectedImage?.printOptions?.fit || 'None'}</span>
               </div>
               {!isPrintOnly && (
                 <>
-                  <div className="summary-item">
+                  <div className="frame-summary-item">
                     <span>Frame:</span>
                     <span>{selectedImage?.frame?.name || 'None'}</span>
                   </div>
-                  <div className="summary-item">
+                  <div className="frame-summary-item">
                     <span>MackBoard:</span>
                     <span>
                       {selectedImage?.mackBoards.length > 0
@@ -2329,22 +2329,22 @@ function Headers({ activeCategory, onCategorySelect, setHasUploadedImages, isPri
                         : 'None'}
                     </span>
                   </div>
-                  <div className="summary-item">
+                  <div className="frame-summary-item">
                     <span>Frame Color:</span>
                     <span>{selectedImage?.customFrameColor ? `Custom (${selectedImage.customFrameColor})` : selectedImage?.variants?.color?.color_name || 'None'}</span>
                   </div>
-                  <div className="summary-item">
+                  <div className="frame-summary-item">
                     <span>Finish:</span>
                     <span>{selectedImage?.variants?.finish?.finish_name || 'None'}</span>
                   </div>
-                  <div className="summary-item">
+                  <div className="frame-summary-item">
                     <span>Hanging:</span>
                     <span>{selectedImage?.variants?.hanging?.hanging_name || 'None'}</span>
                   </div>
                 </>
               )}
               {(isPrintOnly ? (selectedImage?.printOptions?.size?.width && selectedImage?.printOptions?.size?.height) : selectedImage?.frame) && (
-                <div className="summary-item price">
+                <div className="frame-summary-item price">
                   <span>Total Price:</span>
                   <span>${calculatePrice(selectedImage).toFixed(2)}</span>
                 </div>
@@ -2364,3 +2364,4 @@ function Headers({ activeCategory, onCategorySelect, setHasUploadedImages, isPri
 }
 
 export default Headers;
+

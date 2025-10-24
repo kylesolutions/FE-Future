@@ -18,6 +18,7 @@ const ItemTypes = {
   IMAGE: 'image',
   STICKER: 'sticker',
   ELEMENT: 'element',
+  FRAME: 'frame',
 };
 
 const getImageUrl = (path) => {
@@ -121,42 +122,95 @@ function PaperSelector({ papers, onSelect, onBack }) {
 }
 
 // DraggableItem Component (unchanged)
-function DraggableItem({ src, type }) {
+function DraggableItem({ src, type, shape }) {
   const [{ isDragging }, drag] = useDrag(() => ({
-    type: type === 'image' ? ItemTypes.IMAGE : ItemTypes.STICKER,
-    item: { src, type },
+    type: type === 'image' ? ItemTypes.IMAGE : type === 'sticker' ? ItemTypes.STICKER : ItemTypes.FRAME,
+    item: { src, type, shape },
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),
     }),
-  }), [src, type]);
+  }), [src, type, shape]);
+
+  const getFrameStyle = () => {
+    const baseStyle = {
+      width: '100px',
+      height: '100px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: '#e0e0e0',
+      border: '2px dashed #999',
+    };
+
+    switch (shape) {
+      case 'circle':
+        return { ...baseStyle, borderRadius: '50%' };
+      case 'oval':
+        return { ...baseStyle, borderRadius: '50% / 30%' };
+      case 'square':
+        return { ...baseStyle };
+      case 'hexagon':
+        return {
+          ...baseStyle,
+          clipPath: 'polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%)',
+        };
+      case 'rectangle':
+      default:
+        return { ...baseStyle, width: '120px', height: '80px' };
+    }
+  };
 
   return (
     <div
       ref={drag}
       className="draggable-item"
       style={{ opacity: isDragging ? 0.5 : 1 }}
+      aria-label={type === 'frame' ? `Drag to add a ${shape} photo frame` : ''}
     >
-      <img src={src} alt="" draggable={false} />
+      {type === 'frame' ? (
+        <div style={getFrameStyle()}>
+          <span style={{ fontSize: '12px', color: '#999' }}>{shape.charAt(0).toUpperCase() + shape.slice(1)}</span>
+        </div>
+      ) : (
+        <img src={src} alt="" draggable={false} />
+      )}
     </div>
   );
 }
 
-// DraggableElement Component (unchanged)
 function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
   const [isSelected, setIsSelected] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isDraggingElement, setIsDraggingElement] = useState(false);
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [imageDragStart, setImageDragStart] = useState({ x: 0, y: 0 });
   const [isResizing, setIsResizing] = useState(false);
+  const [resizeType, setResizeType] = useState(null);
   const [resizeStart, setResizeStart] = useState({ width: 0, height: 0, x: 0, y: 0 });
   const [isRemovingBackground, setIsRemovingBackground] = useState(false);
+  const [imageOffsetX, setImageOffsetX] = useState(element.imageOffsetX || 0);
+  const [imageOffsetY, setImageOffsetY] = useState(element.imageOffsetY || 0);
+  const [imageScale, setImageScale] = useState(element.imageScale || 1);
   const elementRef = useRef(null);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
+  const imageRef = useRef(null);
+
+  // Text styling state
+  const [fontFamily, setFontFamily] = useState(element.fontFamily || 'Arial');
+  const [fontSize, setFontSize] = useState(element.fontSize || 16);
+  const [fontColor, setFontColor] = useState(element.fontColor || '#000000');
+  const [textAlign, setTextAlign] = useState(element.textAlign || 'left');
+  const [isBold, setIsBold] = useState(element.isBold || false);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (elementRef.current && !elementRef.current.contains(e.target)) {
+      if (
+        elementRef.current &&
+        !elementRef.current.contains(e.target) &&
+        !e.target.closest('.photobook-element-toolbar')
+      ) {
         setIsSelected(false);
         setIsEditing(false);
       }
@@ -176,10 +230,8 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
     if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
-    console.log('Mouse down on element:', { type: element.type, id: element.id, content: element.content });
     setIsSelected(true);
     if (element.type === 'text' && e.detail === 2) {
-      console.log('Double-click detected, enabling text edit');
       setIsEditing(true);
       return;
     }
@@ -191,23 +243,42 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
     });
   };
 
+  const handleImageMouseDown = (e) => {
+    if (e.button !== 0 || element.type !== 'image') return;
+    e.stopPropagation();
+    e.preventDefault();
+    setIsSelected(true);
+    setIsDraggingImage(true);
+    setImageDragStart({
+      x: e.clientX - imageOffsetX,
+      y: e.clientY - imageOffsetY,
+    });
+  };
+
   const handleMouseMove = (e) => {
-    if (!isDraggingElement || !pageRef.current) return;
-    const pageRect = pageRef.current.getBoundingClientRect();
-    const newX = e.clientX - pageRect.left - dragStart.x;
-    const newY = e.clientY - pageRect.top - dragStart.y;
-    const constrainedX = Math.max(0, Math.min(newX, pageRect.width - element.width));
-    const constrainedY = Math.max(0, Math.min(newY, pageRect.height - element.height));
-    console.log('Moving element:', { newX, newY, constrainedX, constrainedY });
-    onUpdate(pageId, element.id, { x: constrainedX, y: constrainedY });
+    if (isDraggingElement && pageRef.current) {
+      const pageRect = pageRef.current.getBoundingClientRect();
+      const newX = e.clientX - pageRect.left - dragStart.x;
+      const newY = e.clientY - pageRect.top - dragStart.y;
+      const constrainedX = Math.max(0, Math.min(newX, pageRect.width - element.width));
+      const constrainedY = Math.max(0, Math.min(newY, pageRect.height - element.height));
+      onUpdate(pageId, element.id, { x: constrainedX, y: constrainedY });
+    } else if (isDraggingImage && imageRef.current) {
+      const newOffsetX = e.clientX - imageDragStart.x;
+      const newOffsetY = e.clientY - imageDragStart.y;
+      setImageOffsetX(newOffsetX);
+      setImageOffsetY(newOffsetY);
+      onUpdate(pageId, element.id, { imageOffsetX: newOffsetX, imageOffsetY: newOffsetY });
+    }
   };
 
   const handleMouseUp = () => {
     setIsDraggingElement(false);
+    setIsDraggingImage(false);
   };
 
   useEffect(() => {
-    if (isDraggingElement) {
+    if (isDraggingElement || isDraggingImage) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       return () => {
@@ -215,12 +286,13 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDraggingElement, dragStart]);
+  }, [isDraggingElement, isDraggingImage, dragStart, imageDragStart]);
 
-  const handleResizeStart = (e) => {
+  const handleResizeStart = (e, type) => {
     e.stopPropagation();
     e.preventDefault();
     setIsResizing(true);
+    setResizeType(type);
     setResizeStart({
       width: element.width,
       height: element.height,
@@ -233,14 +305,25 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
     if (!isResizing) return;
     const deltaX = e.clientX - resizeStart.x;
     const deltaY = e.clientY - resizeStart.y;
-    const delta = Math.max(deltaX, deltaY);
-    const newWidth = Math.max(50, resizeStart.width + delta);
-    const newHeight = Math.max(50, resizeStart.height + delta);
-    onUpdate(pageId, element.id, { width: newWidth, height: newHeight });
+    let updates = {};
+    if (resizeType === 'horizontal') {
+      const newWidth = Math.max(50, resizeStart.width + deltaX);
+      updates = { width: newWidth };
+    } else if (resizeType === 'vertical') {
+      const newHeight = Math.max(50, resizeStart.height + deltaY);
+      updates = { height: newHeight };
+    } else if (resizeType === 'proportional') {
+      const delta = Math.max(deltaX, deltaY);
+      const newWidth = Math.max(50, resizeStart.width + delta);
+      const newHeight = Math.max(50, resizeStart.height + delta);
+      updates = { width: newWidth, height: newHeight };
+    }
+    onUpdate(pageId, element.id, updates);
   };
 
   const handleResizeEnd = () => {
     setIsResizing(false);
+    setResizeType(null);
   };
 
   useEffect(() => {
@@ -252,7 +335,21 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
         document.removeEventListener('mouseup', handleResizeEnd);
       };
     }
-  }, [isResizing, resizeStart]);
+  }, [isResizing, resizeStart, resizeType]);
+
+  const handleImageZoomIn = (e) => {
+    e.stopPropagation();
+    const newScale = imageScale * 1.1;
+    setImageScale(newScale);
+    onUpdate(pageId, element.id, { imageScale: newScale });
+  };
+
+  const handleImageZoomOut = (e) => {
+    e.stopPropagation();
+    const newScale = Math.max(0.5, imageScale * 0.9);
+    setImageScale(newScale);
+    onUpdate(pageId, element.id, { imageScale: newScale });
+  };
 
   const handleZoomIn = (e) => {
     e.stopPropagation();
@@ -283,7 +380,6 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
   };
 
   const handleTextChange = (e) => {
-    console.log('Text changed:', e.target.value);
     onUpdate(pageId, element.id, { content: e.target.value });
   };
 
@@ -297,8 +393,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
       formData.append('image', file);
       const response = await axios.post(`${BASE_URL}/upload-images/`, formData, config);
       const imageUrl = getImageUrl(response.data.image);
-      console.log('Image uploaded for placeholder:', imageUrl);
-      onUpdate(pageId, element.id, { content: imageUrl, type: 'image' });
+      onUpdate(pageId, element.id, { content: imageUrl, type: 'image', imageOffsetX: 0, imageOffsetY: 0, imageScale: 1 });
     } catch (err) {
       console.error('Image upload failed:', err);
       alert('Failed to upload image. Please try again.');
@@ -308,17 +403,13 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
   const handleRemoveBackground = async (e) => {
     e.stopPropagation();
     if (element.type !== 'image') return;
-
     setIsRemovingBackground(true);
     try {
-      console.log('Removing background for image:', element.content);
       const response = await fetch(element.content);
       const blob = await response.blob();
       const resultBlob = await removeBackground(blob, {
         output: { format: 'image/png' },
       });
-      console.log('Background removed successfully, blob size:', resultBlob.size);
-
       const file = new File([resultBlob], `nobg_${Date.now()}.png`, { type: 'image/png' });
       const token = localStorage.getItem('token');
       const config = token ? { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } } : {};
@@ -326,8 +417,6 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
       formData.append('image', file);
       const uploadResponse = await axios.post(`${BASE_URL}/upload-images/`, formData, config);
       const newImageUrl = getImageUrl(uploadResponse.data.image);
-      console.log('Uploaded background-removed image:', newImageUrl);
-
       onUpdate(pageId, element.id, { content: newImageUrl });
     } catch (err) {
       console.error('Background removal failed:', err);
@@ -339,8 +428,53 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
 
   const handleUploadClick = (e) => {
     e.stopPropagation();
-    console.log('Upload icon clicked, triggering file input');
     fileInputRef.current.click();
+  };
+
+  // Text styling handlers
+  const handleFontFamilyChange = (e) => {
+    const newFont = e.target.value;
+    setFontFamily(newFont);
+    onUpdate(pageId, element.id, { fontFamily: newFont });
+  };
+
+  const handleFontSizeChange = (e) => {
+    const newSize = parseInt(e.target.value, 10);
+    console.log('Selected font size:', newSize); // Debug log
+    setFontSize(newSize);
+    onUpdate(pageId, element.id, { fontSize: newSize });
+  };
+
+  const handleFontColorChange = (e) => {
+    const newColor = e.target.value;
+    setFontColor(newColor);
+    onUpdate(pageId, element.id, { fontColor: newColor });
+  };
+
+  const handleTextAlignChange = (align) => {
+    setTextAlign(align);
+    onUpdate(pageId, element.id, { textAlign: align });
+  };
+
+  const handleBoldToggle = () => {
+    setIsBold(!isBold);
+    onUpdate(pageId, element.id, { isBold: !isBold });
+  };
+
+  const getFrameShapeStyle = () => {
+    switch (element.shape) {
+      case 'circle':
+        return { borderRadius: '50%', clipPath: 'circle(50% at 50% 50%)' };
+      case 'oval':
+        return { borderRadius: '50% / 30%', clipPath: 'ellipse(50% 30% at 50% 50%)' };
+      case 'square':
+        return { clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%)' };
+      case 'hexagon':
+        return { clipPath: 'polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%)' };
+      case 'rectangle':
+      default:
+        return { clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%)' };
+    }
   };
 
   const renderContent = () => {
@@ -351,10 +485,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
             ref={textareaRef}
             value={element.content}
             onChange={handleTextChange}
-            onBlur={() => {
-              console.log('Textarea blurred, ending edit');
-              setIsEditing(false);
-            }}
+            onBlur={() => setIsEditing(false)}
             onClick={(e) => e.stopPropagation()}
             className="text-editor"
             style={{
@@ -364,30 +495,66 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
               background: 'transparent',
               resize: 'none',
               outline: 'none',
-              fontSize: '16px',
-              fontFamily: 'Arial, sans-serif',
+              fontFamily: fontFamily,
+              fontSize: `${fontSize}px`,
+              color: fontColor,
+              textAlign: textAlign,
+              fontWeight: isBold ? 'bold' : 'normal',
               padding: '8px',
             }}
           />
         );
       }
       return (
-        <div className="text-content" style={{ padding: '8px', fontSize: '16px' }}>
+        <div
+          className="text-content"
+          style={{
+            padding: '8px',
+            fontFamily: fontFamily,
+            fontSize: `${fontSize}px`, // Ensure fontSize is applied
+            color: fontColor,
+            textAlign: textAlign,
+            fontWeight: isBold ? 'bold' : 'normal',
+          }}
+        >
           {element.content || 'Double click to edit'}
         </div>
       );
     }
-    if (element.type === 'placeholder') {
+    if (element.type === 'placeholder' || element.type === 'image') {
+      const shapeStyle = getFrameShapeStyle();
       return (
-        <div className="placeholder-frame">
-          <img
-            src={element.content || PLACEHOLDER_IMAGE}
-            alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            draggable={false}
-          />
+        <div className="placeholder-frame" style={{ ...shapeStyle, overflow: 'hidden' }}>
+          <div
+            ref={imageRef}
+            style={{
+              width: '100%',
+              height: '100%',
+              overflow: 'hidden',
+              transform: `translate(${imageOffsetX}px, ${imageOffsetY}px) scale(${imageScale})`,
+              cursor: element.type === 'image' ? 'move' : 'default',
+            }}
+            onMouseDown={handleImageMouseDown}
+          >
+            <img
+              src={element.content || PLACEHOLDER_IMAGE}
+              alt=""
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center',
+                display: 'block',
+                clipPath: 'inherit',
+                borderRadius: 'inherit',
+                userSelect: 'none',
+                pointerEvents: 'none',
+              }}
+              draggable={false}
+            />
+          </div>
           {!element.content && (
-            <div className="upload-overlay">
+            <div className="photobook-upload-overlay">
               <button className="upload-icon-btn" onClick={handleUploadClick}>
                 <Upload size={24} />
                 <span>Upload Image</span>
@@ -401,16 +568,30 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
               />
             </div>
           )}
+          {isRemovingBackground && (
+            <div className="loading-overlay">
+              <div className="spinner"></div>
+              <span>Removing Background...</span>
+            </div>
+          )}
         </div>
       );
     }
     return (
-      <img
-        src={element.content}
-        alt=""
-        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-        draggable={false}
-      />
+      <div className="image-container" style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <img
+          src={element.content}
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          draggable={false}
+        />
+        {isRemovingBackground && (
+          <div className="loading-overlay">
+            <div className="spinner"></div>
+            <span>Removing Background...</span>
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -436,10 +617,28 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
       {isSelected && !isEditing && (
         <>
           <div className="element-border"></div>
-          <div className="resize-handle" onMouseDown={handleResizeStart}>
+          <div
+            className="resize-handle vertical "
+            onMouseDown={(e) => handleResizeStart(e, 'vertical')}
+            title="Resize vertical"
+          >
             <Maximize2 size={12} />
           </div>
-          <div className="element-toolbar">
+          <div
+            className="resize-handle horizontal"
+            onMouseDown={(e) => handleResizeStart(e, 'horizontal')}
+            title="Resize horizontal"
+          >
+            <Maximize2 size={12} />
+          </div>
+          <div
+            className="resize-handle proportional"
+            onMouseDown={(e) => handleResizeStart(e, 'proportional')}
+            title="Resize Proportionally"
+          >
+            <Maximize2 size={12} />
+          </div>
+          <div className="photobook-element-toolbar">
             {element.type === 'image' && (
               <>
                 <button
@@ -449,6 +648,83 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
                   disabled={isRemovingBackground}
                 >
                   <Scissors size={14} />
+                </button>
+                <button className="toolbar-btn" onClick={handleImageZoomIn} title="Zoom Image In">
+                  <ZoomIn size={14} />
+                </button>
+                <button className="toolbar-btn" onClick={handleImageZoomOut} title="Zoom Image Out">
+                  <ZoomOut size={14} />
+                </button>
+                <button className="toolbar-btn" onClick={handleZoomIn} title="Zoom Frame In">
+                  <ZoomIn size={14} />
+                </button>
+                <button className="toolbar-btn" onClick={handleZoomOut} title="Zoom Frame Out">
+                  <ZoomOut size={14} />
+                </button>
+                <button className="toolbar-btn" onClick={handleRotate} title="Rotate Frame">
+                  <RotateCw size={14} />
+                </button>
+              </>
+            )}
+            {element.type === 'text' && (
+              <>
+                <select
+                  className="toolbar-select"
+                  value={fontFamily}
+                  onChange={handleFontFamilyChange}
+                  title="Font Family"
+                >
+                  <option value="Arial">Arial</option>
+                  <option value="Helvetica">Helvetica</option>
+                  <option value="Times New Roman">Times New Roman</option>
+                  <option value="Georgia">Georgia</option>
+                  <option value="Courier New">Courier New</option>
+                </select>
+                <select
+                  className="toolbar-select"
+                  value={fontSize}
+                  onChange={handleFontSizeChange}
+                  title="Font Size"
+                >
+                  {[12, 14, 16, 18, 20, 24, 28, 32, 36].map((size) => (
+                    <option key={size} value={size}>{size}px</option>
+                  ))}
+                </select>
+                <input
+                  type="color"
+                  className="toolbar-color"
+                  value={fontColor}
+                  onChange={handleFontColorChange}
+                  title="Font Color"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <button
+                  className={`toolbar-btn ${textAlign === 'left' ? 'active' : ''}`}
+                  onClick={() => handleTextAlignChange('left')}
+                  title="Align Left"
+                >
+                  <span style={{ fontSize: '12px' }}>L</span>
+                </button>
+                <button
+                  className={`toolbar-btn ${textAlign === 'center' ? 'active' : ''}`}
+                  onClick={() => handleTextAlignChange('center')}
+                  title="Align Center"
+                >
+                  <span style={{ fontSize: '12px' }}>C</span>
+                </button>
+                <button
+                  className={`toolbar-btn ${textAlign === 'right' ? 'active' : ''}`}
+                  onClick={() => handleTextAlignChange('right')}
+                  title="Align Right"
+                >
+                  <span style={{ fontSize: '12px' }}>R</span>
+                </button>
+                <button
+                  className={`toolbar-btn ${isBold ? 'active' : ''}`}
+                  onClick={handleBoldToggle}
+                  title="Toggle Bold"
+                >
+                  <span style={{ fontSize: '12px', fontWeight: 'bold' }}>B</span>
                 </button>
                 <button className="toolbar-btn" onClick={handleZoomIn} title="Zoom In">
                   <ZoomIn size={14} />
@@ -484,37 +760,63 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
   );
 }
 
-// PageCanvas Component (unchanged)
 function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, onDeleteElement, pageRefs }) {
   const pageRef = useRef(null);
+
   const [{ isOver }, drop] = useDrop(
     () => ({
-      accept: [ItemTypes.IMAGE, ItemTypes.STICKER],
+      accept: [ItemTypes.IMAGE, ItemTypes.STICKER, ItemTypes.FRAME],
       drop: (item, monitor) => {
         const offset = monitor.getSourceClientOffset();
         if (!offset || !pageRef.current) return;
         const pageRect = pageRef.current.getBoundingClientRect();
-        const elementWidth = item.type === 'sticker' ? 150 : 200;
-        const elementHeight = item.type === 'sticker' ? 150 : 200;
-        const x = offset.x - pageRect.left - elementWidth / 2;
-        const y = offset.y - pageRect.top - elementHeight / 2;
-        const newElement = {
-          type: item.type,
-          content: item.src,
-          x: Math.max(0, Math.min(x, pageRect.width - elementWidth)),
-          y: Math.max(0, Math.min(y, pageRect.height - elementHeight)),
-          width: elementWidth,
-          height: elementHeight,
-          rotation: 0,
-          zIndex: Math.max(0, ...page.elements.map((el) => el.zIndex || 0)) + 1,
-        };
-        onAddElement(page.id, newElement);
+        const x = offset.x - pageRect.left;
+        const y = offset.y - pageRect.top;
+
+        const placeholder = page.elements.find((el) => {
+          if (el.type !== 'placeholder' && el.type !== 'image') return false;
+          const elX = el.x;
+          const elY = el.y;
+          const elWidth = el.width;
+          const elHeight = el.height;
+          return x >= elX && x <= elX + elWidth && y >= elY && y <= elY + elHeight;
+        });
+
+        if (item.type === ItemTypes.IMAGE && placeholder) {
+          onUpdateElement(page.id, placeholder.id, {
+            type: 'image',
+            content: item.src,
+            imageOffsetX: 0,
+            imageOffsetY: 0,
+            imageScale: 1,
+          });
+        } else {
+          const elementWidth = item.type === 'sticker' ? 150 : item.type === 'frame' ? 200 : 200;
+          const elementHeight = item.type === 'sticker' ? 150 : item.type === 'frame' ? 200 : 200;
+          const newElement = {
+            type: item.type === 'frame' ? 'placeholder' : item.type,
+            content: item.type === 'frame' ? '' : item.src,
+            x: Math.max(0, Math.min(x - elementWidth / 2, pageRect.width - elementWidth)),
+            y: Math.max(0, Math.min(y - elementHeight / 2, pageRect.height - elementHeight)),
+            width: elementWidth,
+            height: elementHeight,
+            rotation: 0,
+            zIndex: Math.max(0, ...page.elements.map((el) => el.zIndex || 0)) + 1,
+            shape: item.type === 'frame' ? item.shape : undefined,
+            fontFamily: item.type === 'text' ? 'Arial' : undefined,
+            fontSize: item.type === 'text' ? 16 : undefined,
+            fontColor: item.type === 'text' ? '#000000' : undefined,
+            textAlign: item.type === 'text' ? 'left' : undefined,
+            isBold: item.type === 'text' ? false : undefined,
+          };
+          onAddElement(page.id, newElement);
+        }
       },
       collect: (monitor) => ({
         isOver: !!monitor.isOver(),
       }),
     }),
-    [page.id]
+    [page.id, page.elements]
   );
 
   useEffect(() => {
@@ -551,7 +853,6 @@ function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, 
   );
 }
 
-// BookSpread Component (unchanged)
 function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, onUpdateElement, onDeleteElement, pageRefs }) {
   return (
     <div
@@ -590,9 +891,15 @@ function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, 
   );
 }
 
-// Sidebar Component (unchanged)
 function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, onBackgroundSelect }) {
   const [activeTab, setActiveTab] = useState('photos');
+  const frameShapes = [
+    { id: 'rectangle', name: 'Rectangle', shape: 'rectangle' },
+    { id: 'square', name: 'Square', shape: 'square' },
+    { id: 'circle', name: 'Circle', shape: 'circle' },
+    { id: 'oval', name: 'Oval', shape: 'oval' },
+    { id: 'hexagon', name: 'Hexagon', shape: 'hexagon' },
+  ];
 
   return (
     <div className="sidebar">
@@ -600,6 +907,7 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
         <button
           className={`tab-btn ${activeTab === 'photos' ? 'active' : ''}`}
           onClick={() => setActiveTab('photos')}
+          aria-label="Photos tab"
         >
           <ImageIcon size={18} />
           Photos
@@ -607,6 +915,7 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
         <button
           className={`tab-btn ${activeTab === 'themes' ? 'active' : ''}`}
           onClick={() => setActiveTab('themes')}
+          aria-label="Themes tab"
         >
           <Sparkles size={18} />
           Themes
@@ -614,9 +923,18 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
         <button
           className={`tab-btn ${activeTab === 'stickers' ? 'active' : ''}`}
           onClick={() => setActiveTab('stickers')}
+          aria-label="Stickers tab"
         >
           <StickerIcon size={18} />
           Stickers
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'frames' ? 'active' : ''}`}
+          onClick={() => setActiveTab('frames')}
+          aria-label="Frames tab"
+        >
+          <Plus size={18} />
+          Frames
         </button>
       </div>
       <div className="tab-content">
@@ -696,19 +1014,34 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
             )}
           </div>
         )}
+        {activeTab === 'frames' && (
+          <div className="tab-panel">
+            <h3 className="panel-title">Frames</h3>
+            <div className="item-grid">
+              {frameShapes.map((frame) => (
+                <DraggableItem
+                  key={frame.id}
+                  src={PLACEHOLDER_IMAGE}
+                  type="frame"
+                  shape={frame.shape}
+                />
+              ))}
+            </div>
+            <p className="hint">Drag a frame to any page to add a photo placeholder.</p>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// PhotoBookEditor Component (Updated to Handle Correct Spread Previews)
 function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   const [pages, setPages] = useState([
     {
       id: 1,
       elements: [
         {
-          id: `${Date.now()}-${Math.random()}`,
+          id: `${Date.now()}-default-left`,
           type: 'placeholder',
           content: '',
           x: 100,
@@ -717,6 +1050,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
           height: 200,
           rotation: 0,
           zIndex: 1,
+          shape: 'rectangle',
         },
       ],
     },
@@ -724,7 +1058,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
       id: 2,
       elements: [
         {
-          id: `${Date.now()}-${Math.random()}`,
+          id: `${Date.now()}-default-right`,
           type: 'placeholder',
           content: '',
           x: 100,
@@ -733,6 +1067,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
           height: 200,
           rotation: 0,
           zIndex: 1,
+          shape: 'rectangle',
         },
       ],
     },
@@ -749,7 +1084,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   const user = useSelector((state) => state.user);
   const pageRefs = useRef({});
   const spreadRef = useRef(null);
-  const [previewDebugUrls, setPreviewDebugUrls] = useState([]); // For debugging previews
+  const [previewDebugUrls, setPreviewDebugUrls] = useState([]);
 
   const calculateTotalPrice = () => {
     const basePrice = parseFloat(paper.price || 0);
@@ -766,93 +1101,86 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   };
 
   const generateSpreadPreview = async (leftPage, rightPage, spreadIndex) => {
-  try {
-    // Create a temporary off-screen div
-    const tempDiv = document.createElement('div');
-    tempDiv.style.position = 'absolute';
-    tempDiv.style.left = '-9999px';
-    tempDiv.style.width = '800px'; // Fixed width for consistency
-    tempDiv.style.height = '600px'; // Fixed height for consistency
-    document.body.appendChild(tempDiv);
+    try {
+      const tempDiv = document.createElement('div');
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '-9999px';
+      tempDiv.style.width = '800px';
+      tempDiv.style.height = '600px';
+      document.body.appendChild(tempDiv);
 
-    // Render the spread using ReactDOM.render
-    ReactDOM.render(
-      <BookSpread
-        leftPage={leftPage}
-        rightPage={rightPage}
-        background={selectedBackground ? selectedBackground.url : ''}
-        paperSize={paper.size}
-        onAddElement={() => {}}
-        onUpdateElement={() => {}}
-        onDeleteElement={() => {}}
-        pageRefs={pageRefs}
-      />,
-      tempDiv
-    );
+      ReactDOM.render(
+        <BookSpread
+          leftPage={leftPage}
+          rightPage={rightPage}
+          background={selectedBackground ? selectedBackground.url : ''}
+          paperSize={paper.size}
+          onAddElement={() => { }}
+          onUpdateElement={() => { }}
+          onDeleteElement={() => { }}
+          pageRefs={pageRefs}
+        />,
+        tempDiv
+      );
 
-    // Wait for rendering and image loading
-    await new Promise((resolve) => {
-      requestAnimationFrame(() => {
-        setTimeout(resolve, 500); // Increased delay to ensure rendering
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => {
+          setTimeout(resolve, 500);
+        });
       });
-    });
 
-    // Preload images to ensure they are loaded before capture
-    const images = tempDiv.getElementsByTagName('img');
-    const imagePromises = Array.from(images).map((img) => {
-      return new Promise((resolve, reject) => {
-        if (img.complete && img.naturalWidth !== 0) {
-          console.log(`Image loaded: ${img.src}`);
-          resolve();
-        } else {
-          img.crossOrigin = 'Anonymous';
-          img.onload = () => {
+      const images = tempDiv.getElementsByTagName('img');
+      const imagePromises = Array.from(images).map((img) => {
+        return new Promise((resolve, reject) => {
+          if (img.complete && img.naturalWidth !== 0) {
             console.log(`Image loaded: ${img.src}`);
             resolve();
-          };
-          img.onerror = () => {
-            console.error(`Failed to load image: ${img.src}`);
-            reject(new Error(`Failed to load image: ${img.src}`));
-          };
-          img.src = img.src; // Trigger reload if needed
-        }
+          } else {
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+              console.log(`Image loaded: ${img.src}`);
+              resolve();
+            };
+            img.onerror = () => {
+              console.error(`Failed to load image: ${img.src}`);
+              reject(new Error(`Failed to load image: ${img.src}`));
+            };
+            img.src = img.src;
+          }
+        });
       });
-    });
 
-    console.log(`Preloading ${imagePromises.length} images for spread ${spreadIndex + 1}`);
-    await Promise.all(imagePromises).catch((err) => {
-      console.error('Image preload failed:', err);
-    });
+      console.log(`Preloading ${imagePromises.length} images for spread ${spreadIndex + 1}`);
+      await Promise.all(imagePromises).catch((err) => {
+        console.error('Image preload failed:', err);
+      });
 
-    // Capture preview
-    const dataUrl = await domtoimage.toPng(tempDiv, {
-      quality: 1.0,
-      width: 800,
-      height: 600,
-      cacheBust: true,
-    });
-    console.log(`Generated preview for spread ${spreadIndex + 1} (pages ${leftPage?.id || 'none'}, ${rightPage?.id || 'none'}): ${dataUrl.substring(0, 50)}...`);
+      const dataUrl = await domtoimage.toPng(tempDiv, {
+        quality: 1.0,
+        width: 800,
+        height: 600,
+        cacheBust: true,
+      });
+      console.log(`Generated preview for spread ${spreadIndex + 1} (pages ${leftPage?.id || 'none'}, ${rightPage?.id || 'none'}): ${dataUrl.substring(0, 50)}...`);
 
-    // Clean up
-    ReactDOM.unmountComponentAtNode(tempDiv);
-    document.body.removeChild(tempDiv);
+      ReactDOM.unmountComponentAtNode(tempDiv);
+      document.body.appendChild(tempDiv);
 
-    // Store preview for debugging
-    setPreviewDebugUrls((prev) => [
-      ...prev,
-      { spreadIndex, pageIds: [leftPage?.id, rightPage?.id].filter(Boolean), dataUrl },
-    ]);
+      setPreviewDebugUrls((prev) => [
+        ...prev,
+        { spreadIndex, pageIds: [leftPage?.id, rightPage?.id].filter(Boolean), dataUrl },
+      ]);
 
-    return {
-      spreadIndex,
-      pageIds: [leftPage?.id, rightPage?.id].filter(Boolean),
-      dataUrl,
-    };
-  } catch (err) {
-    console.error(`Failed to generate spread preview for spread ${spreadIndex + 1}:`, err);
-    return null;
-  }
-};
+      return {
+        spreadIndex,
+        pageIds: [leftPage?.id, rightPage?.id].filter(Boolean),
+        dataUrl,
+      };
+    } catch (err) {
+      console.error(`Failed to generate spread preview for spread ${spreadIndex + 1}:`, err);
+      return null;
+    }
+  };
 
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -868,20 +1196,6 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
       });
       const uploaded = await Promise.all(uploadPromises);
       setUploadedImages([...uploadedImages, ...uploaded]);
-      uploaded.forEach((img) => {
-        const currentPage = pages[currentPageIndex];
-        if (currentPage) {
-          addElementToPage(currentPage.id, {
-            type: 'image',
-            content: img.url,
-            x: 100,
-            y: 100,
-            width: 200,
-            height: 200,
-            rotation: 0,
-          });
-        }
-      });
     } catch (err) {
       console.error('Image upload failed:', err);
       setSaveError('Failed to upload images. Please try again.');
@@ -901,6 +1215,11 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
                 ...element,
                 id: `${Date.now()}-${Math.random()}`,
                 zIndex: maxZIndex + 1,
+                fontFamily: element.type === 'text' ? 'Arial' : undefined,
+                fontSize: element.type === 'text' ? 16 : undefined,
+                fontColor: element.type === 'text' ? '#000000' : undefined,
+                textAlign: element.type === 'text' ? 'left' : undefined,
+                isBold: element.type === 'text' ? false : undefined,
               },
             ],
           };
@@ -949,21 +1268,11 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
         width: 200,
         height: 60,
         rotation: 0,
-      });
-    }
-  };
-
-  const addImagePlaceholder = () => {
-    const currentPage = pages[currentPageIndex];
-    if (currentPage) {
-      addElementToPage(currentPage.id, {
-        type: 'placeholder',
-        content: '',
-        x: 100,
-        y: 100,
-        width: 200,
-        height: 200,
-        rotation: 0,
+        fontFamily: 'Arial',
+        fontSize: 16,
+        fontColor: '#000000',
+        textAlign: 'left',
+        isBold: false,
       });
     }
   };
@@ -976,7 +1285,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
         id: lastPageId + 1,
         elements: [
           {
-            id: `${Date.now()}-${Math.random()}`,
+            id: `${Date.now()}-default-${lastPageId + 1}`,
             type: 'placeholder',
             content: '',
             x: 100,
@@ -985,6 +1294,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
             height: 200,
             rotation: 0,
             zIndex: 1,
+            shape: 'rectangle',
           },
         ],
       },
@@ -992,7 +1302,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
         id: lastPageId + 2,
         elements: [
           {
-            id: `${Date.now()}-${Math.random()}`,
+            id: `${Date.now()}-default-${lastPageId + 2}`,
             type: 'placeholder',
             content: '',
             x: 100,
@@ -1001,6 +1311,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
             height: 200,
             rotation: 0,
             zIndex: 1,
+            shape: 'rectangle',
           },
         ],
       },
@@ -1023,168 +1334,164 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   };
 
   const handleSaveOrder = async () => {
-  if (!user) {
-    setSaveError('You must be logged in to save an order.');
-    return;
-  }
-
-  setIsSaving(true);
-  setSaveError(null);
-  setPreviewDebugUrls([]); // Clear previous debug previews
-
-  try {
-    const token = localStorage.getItem('token');
-    const config = {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data',
-      },
-    };
-
-    // Filter valid pages
-    const validPages = pages.filter((page) =>
-      page.elements.some((el) => el.type !== 'placeholder' || (el.type === 'placeholder' && el.content))
-    );
-
-    if (validPages.length === 0) {
-      setSaveError('No customized pages to save. Add images, text, or stickers to at least one page.');
-      setIsSaving(false);
+    if (!user) {
+      setSaveError('You must be logged in to save an order.');
       return;
     }
 
-    // Store original page index
-    const originalPageIndex = currentPageIndex;
+    setIsSaving(true);
+    setSaveError(null);
+    setPreviewDebugUrls([]);
 
-    // Generate previews for each spread
-    const spreadPreviews = [];
-    for (let index = 0; index < Math.ceil(validPages.length / 2); index++) {
-      const newPageIndex = index * 2;
-      setCurrentPageIndex(newPageIndex); // Update visible spread
+    try {
+      const token = localStorage.getItem('token');
+      const config = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      };
 
-      // Wait for React to render the new spread
-      await new Promise((resolve) => {
-        requestAnimationFrame(() => {
-          setTimeout(resolve, 500); // Increased delay for rendering
-        });
-      });
+      const validPages = pages.filter((page) =>
+        page.elements.some((el) => el.type !== 'placeholder' || (el.type === 'placeholder' && el.content))
+      );
 
-      const leftPage = validPages[newPageIndex];
-      const rightPage = validPages[newPageIndex + 1];
-      console.log(`Generating preview for spread ${index + 1} (pages ${leftPage?.id || 'none'}, ${rightPage?.id || 'none'})`);
-
-      if (!spreadRef.current) {
-        console.warn(`Spread ref not available for spread ${index + 1}`);
-        continue;
+      if (validPages.length === 0) {
+        setSaveError('No customized pages to save. Add images, text, or stickers to at least one page.');
+        setIsSaving(false);
+        return;
       }
 
-      // Preload images in the visible spread
-      const images = spreadRef.current.getElementsByTagName('img');
-      const imagePromises = Array.from(images).map((img) => {
-        return new Promise((resolve, reject) => {
-          if (img.complete && img.naturalWidth !== 0) {
-            console.log(`Image loaded: ${img.src}`);
-            resolve();
-          } else {
-            img.crossOrigin = 'Anonymous';
-            img.onload = () => {
+      const originalPageIndex = currentPageIndex;
+      const spreadPreviews = [];
+      for (let index = 0; index < Math.ceil(validPages.length / 2); index++) {
+        const newPageIndex = index * 2;
+        setCurrentPageIndex(newPageIndex);
+
+        await new Promise((resolve) => {
+          requestAnimationFrame(() => {
+            setTimeout(resolve, 500);
+          });
+        });
+
+        const leftPage = validPages[newPageIndex];
+        const rightPage = validPages[newPageIndex + 1];
+        console.log(`Generating preview for spread ${index + 1} (pages ${leftPage?.id || 'none'}, ${rightPage?.id || 'none'})`);
+
+        if (!spreadRef.current) {
+          console.warn(`Spread ref not available for spread ${index + 1}`);
+          continue;
+        }
+
+        const images = spreadRef.current.getElementsByTagName('img');
+        const imagePromises = Array.from(images).map((img) => {
+          return new Promise((resolve, reject) => {
+            if (img.complete && img.naturalWidth !== 0) {
               console.log(`Image loaded: ${img.src}`);
               resolve();
-            };
-            img.onerror = () => {
-              console.error(`Failed to load image: ${img.src}`);
-              reject(new Error(`Failed to load image: ${img.src}`));
-            };
-            img.src = img.src;
-          }
+            } else {
+              img.crossOrigin = 'Anonymous';
+              img.onload = () => {
+                console.log(`Image loaded: ${img.src}`);
+                resolve();
+              };
+              img.onerror = () => {
+                console.error(`Failed to load image: ${img.src}`);
+                reject(new Error(`Failed to load image: ${img.src}`));
+              };
+              img.src = img.src;
+            }
+          });
+        });
+
+        console.log(`Preloading ${imagePromises.length} images for spread ${index + 1}`);
+        await Promise.all(imagePromises).catch((err) => {
+          console.error('Image preload failed:', err);
+        });
+
+        const dataUrl = await domtoimage.toPng(spreadRef.current, {
+          quality: 1.0,
+          width: 900,
+          height: 600,
+          cacheBust: true,
+        });
+        console.log(`Generated preview for spread ${index + 1}: ${dataUrl.substring(0, 50)}...`);
+
+        setPreviewDebugUrls((prev) => [
+          ...prev,
+          { spreadIndex: index, pageIds: [leftPage?.id, rightPage?.id].filter(Boolean), dataUrl },
+        ]);
+
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        const file = new File([blob], `spread_${index + 1}_preview.png`, { type: 'image/png' });
+        console.log(`Generated file for spread ${index + 1}:`, { name: file.name, size: file.size, type: file.type });
+        spreadPreviews.push({ pageIds: [leftPage?.id, rightPage?.id].filter(Boolean), file });
+      }
+
+      setCurrentPageIndex(originalPageIndex);
+
+      const validPreviews = spreadPreviews.filter((preview) => preview !== null);
+      if (validPreviews.length === 0) {
+        setSaveError('Failed to generate any previews. Please try again.');
+        setIsSaving(false);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('theme_id', theme.id);
+      formData.append('paper_id', paper.id);
+      formData.append('total_price', calculateTotalPrice());
+
+      validPages.forEach((page, index) => {
+        const pageData = {
+          page_number: index + 1,
+          background_id: selectedBackground ? selectedBackground.id : null,
+          elements: page.elements
+            .filter((el) => el.type !== 'placeholder' || (el.type === 'placeholder' && el.content))
+            .map((el) => ({
+              type: el.type,
+              content: el.content,
+              x: el.x,
+              y: el.y,
+              width: el.width,
+              height: el.height,
+              rotation: el.rotation,
+              z_index: el.zIndex,
+              shape: el.shape,
+              fontFamily: el.fontFamily,
+              fontSize: el.fontSize,
+              fontColor: el.fontColor,
+              textAlign: el.textAlign,
+              isBold: el.isBold,
+            })),
+          client_page_id: page.id,
+        };
+        formData.append(`pages[${index}]`, JSON.stringify(pageData));
+        console.log(`Appended page data for index ${index} (client_page_id: ${page.id}):`, pageData);
+      });
+
+      validPreviews.forEach((preview, index) => {
+        preview.pageIds.forEach((pageId) => {
+          console.log(`Appending page_previews[${pageId}]:`, { name: preview.file.name, size: preview.file.size });
+          formData.append(`page_previews[${pageId}]`, preview.file);
         });
       });
 
-      console.log(`Preloading ${imagePromises.length} images for spread ${index + 1}`);
-      await Promise.all(imagePromises).catch((err) => {
-        console.error('Image preload failed:', err);
-      });
+      for (let [key, value] of formData.entries()) {
+        console.log(`FormData entry: ${key} = ${value instanceof File ? `${value.name} (${value.size} bytes)` : value}`);
+      }
 
-      // Capture preview from visible spread
-      const dataUrl = await domtoimage.toPng(spreadRef.current, {
-        quality: 1.0,
-        width: 900,
-        height: 600,
-        cacheBust: true,
-      });
-      console.log(`Generated preview for spread ${index + 1}: ${dataUrl.substring(0, 50)}...`);
-
-      // Store for debugging
-      setPreviewDebugUrls((prev) => [
-        ...prev,
-        { spreadIndex: index, pageIds: [leftPage?.id, rightPage?.id].filter(Boolean), dataUrl },
-      ]);
-
-      const response = await fetch(dataUrl);
-      const blob = await response.blob();
-      const file = new File([blob], `spread_${index + 1}_preview.png`, { type: 'image/png' });
-      console.log(`Generated file for spread ${index + 1}:`, { name: file.name, size: file.size, type: file.type });
-      spreadPreviews.push({ pageIds: [leftPage?.id, rightPage?.id].filter(Boolean), file });
-    }
-
-    // Restore original page index
-    setCurrentPageIndex(originalPageIndex);
-
-    const validPreviews = spreadPreviews.filter((preview) => preview !== null);
-    if (validPreviews.length === 0) {
-      setSaveError('Failed to generate any previews. Please try again.');
+      const response = await axios.post(`${BASE_URL}/orders/create/`, formData, config);
+      console.log('Order saved:', response.data);
+      alert('Order saved successfully!');
+    } catch (err) {
+      console.error('Order save failed:', err.response?.data || err.message);
+      setSaveError('Failed to save order. Please check your connection or try again.');
+    } finally {
       setIsSaving(false);
-      return;
     }
-
-    const formData = new FormData();
-    formData.append('theme_id', theme.id);
-    formData.append('paper_id', paper.id);
-    formData.append('total_price', calculateTotalPrice());
-
-    validPages.forEach((page, index) => {
-      const pageData = {
-        page_number: index + 1,
-        background_id: selectedBackground ? selectedBackground.id : null,
-        elements: page.elements
-          .filter((el) => el.type !== 'placeholder' || (el.type === 'placeholder' && el.content))
-          .map((el) => ({
-            type: el.type,
-            content: el.content,
-            x: el.x,
-            y: el.y,
-            width: el.width,
-            height: el.height,
-            rotation: el.rotation,
-            z_index: el.zIndex,
-          })),
-        client_page_id: page.id,
-      };
-      formData.append(`pages[${index}]`, JSON.stringify(pageData));
-      console.log(`Appended page data for index ${index} (client_page_id: ${page.id}):`, pageData);
-    });
-
-    validPreviews.forEach((preview, index) => {
-      preview.pageIds.forEach((pageId) => {
-        console.log(`Appending page_previews[${pageId}]:`, { name: preview.file.name, size: preview.file.size });
-        formData.append(`page_previews[${pageId}]`, preview.file);
-      });
-    });
-
-    // Log FormData entries
-    for (let [key, value] of formData.entries()) {
-      console.log(`FormData entry: ${key} = ${value instanceof File ? `${value.name} (${value.size} bytes)` : value}`);
-    }
-
-    const response = await axios.post(`${BASE_URL}/orders/create/`, formData, config);
-    console.log('Order saved:', response.data);
-    alert('Order saved successfully!');
-  } catch (err) {
-    console.error('Order save failed:', err.response?.data || err.message);
-    setSaveError('Failed to save order. Please check your connection or try again.');
-  } finally {
-    setIsSaving(false);
-  }
-};
+  };
 
   return (
     <div className="editor-container">
@@ -1206,10 +1513,6 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
           <button className="action-btn" onClick={addTextElement}>
             <Type size={18} />
             Add Text
-          </button>
-          <button className="action-btn" onClick={addImagePlaceholder}>
-            <Plus size={18} />
-            Add Frame
           </button>
           <button className="action-btn" onClick={handleSaveOrder} disabled={isSaving}>
             <Save size={18} />
@@ -1248,7 +1551,6 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
               />
             </div>
           </div>
-          {/* Debug Preview Display */}
           {previewDebugUrls.length > 0 && (
             <div className="preview-debug">
               <h3>Debug Previews</h3>
@@ -1276,7 +1578,6 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   );
 }
 
-// Main PhotoBook Component (unchanged)
 function PhotoBook() {
   const navigate = useNavigate();
   const user = useSelector((state) => state.user);
