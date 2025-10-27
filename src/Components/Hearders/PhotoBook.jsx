@@ -32,39 +32,39 @@ const getAspectRatio = (size) => {
   return ratios[size] || '1';
 };
 
-// ThemeSelector Component (unchanged)
+// ThemeSelector Component
 function ThemeSelector({ themes, onSelect }) {
   const safeThemes = Array.isArray(themes) ? themes : [];
 
   return (
-    <div className="photobook-container">
-      <div className="header-section">
+    <div className="pb-theme-container">
+      <div className="pb-theme-header-section">
         <h1>Personalize Your Photobook</h1>
-        <p className="subtitle">Create beautiful memories with our photobook printing service</p>
+        <p className="pb-theme-subtitle">Create beautiful memories with our photobook printing service</p>
       </div>
-      <div className="selection-section">
+      <div className="pb-theme-selection-section">
         <h2>Select Your Photobook Theme</h2>
         {safeThemes.length === 0 ? (
-          <div className="empty-state">
+          <div className="pb-theme-empty-state">
             <Sparkles size={48} />
             <p>No themes available</p>
-            <p className="hint">Please check your connection or try again later</p>
+            <p className="pb-theme-hint">Please check your connection or try again later</p>
           </div>
         ) : (
-          <div className="theme-grid">
+          <div className="pb-theme-grid">
             {safeThemes.map((theme) => (
               <div
                 key={theme.id}
-                className="theme-card"
+                className="pb-theme-card"
                 onClick={() => onSelect(theme)}
               >
-                <div className="theme-image-wrapper">
+                <div className="pb-theme-image-wrapper">
                   <img
                     src={theme.backgrounds && theme.backgrounds[0] ? getImageUrl(theme.backgrounds[0].image) : FALLBACK_IMAGE}
                     alt={theme.theme_name || 'Theme'}
                   />
                 </div>
-                <div className="theme-info">
+                <div className="pb-theme-info">
                   <h3>{theme.theme_name || 'Unnamed Theme'}</h3>
                   <p>{theme.backgrounds ? theme.backgrounds.length : 0} backgrounds available</p>
                 </div>
@@ -77,40 +77,40 @@ function ThemeSelector({ themes, onSelect }) {
   );
 }
 
-// PaperSelector Component (unchanged)
+// PaperSelector Component
 function PaperSelector({ papers, onSelect, onBack }) {
   const safePapers = Array.isArray(papers) ? papers : [];
 
   return (
-    <div className="photobook-container">
-      <button className="back-button" onClick={onBack}>
+    <div className="pb-paper-container">
+      <button className="pb-paper-back-button" onClick={onBack}>
         <ArrowLeft size={20} />
         Back to Themes
       </button>
-      <div className="header-section">
+      <div className="pb-paper-header-section">
         <h1>Choose Your Photobook Size</h1>
-        <p className="subtitle">Select the perfect size for your memories</p>
+        <p className="pb-paper-subtitle">Select the perfect size for your memories</p>
       </div>
-      <div className="selection-section">
+      <div className="pb-paper-selection-section">
         {safePapers.length === 0 ? (
-          <div className="empty-state">
+          <div className="pb-paper-empty-state">
             <p>No paper sizes available</p>
-            <p className="hint">Please check your connection or try again later</p>
+            <p className="pb-sidebar-hint">Please check your connection or try again later</p>
           </div>
         ) : (
-          <div className="paper-grid">
+          <div className="pb-paper-grid">
             {safePapers.map((paper) => (
               <div
                 key={paper.id}
-                className="paper-card"
+                className="pb-paper-card"
                 onClick={() => onSelect(paper)}
               >
-                <div className="paper-image-wrapper">
+                <div className="pb-paper-image-wrapper">
                   <img src={getImageUrl(paper.image)} alt={paper.size || 'Paper'} />
                 </div>
-                <div className="paper-info">
+                <div className="pb-paper-info">
                   <h3>{paper.size || 'Unknown Size'}</h3>
-                  <p className="price">${Number(paper.price || 0).toFixed(2)}</p>
+                  <p className="pb-paper-price">${Number(paper.price || 0).toFixed(2)}</p>
                 </div>
               </div>
             ))}
@@ -121,7 +121,7 @@ function PaperSelector({ papers, onSelect, onBack }) {
   );
 }
 
-// DraggableItem Component (unchanged)
+// DraggableItem Component
 function DraggableItem({ src, type, shape }) {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: type === 'image' ? ItemTypes.IMAGE : type === 'sticker' ? ItemTypes.STICKER : ItemTypes.FRAME,
@@ -163,7 +163,7 @@ function DraggableItem({ src, type, shape }) {
   return (
     <div
       ref={drag}
-      className="draggable-item"
+      className="pb-draggable-item"
       style={{ opacity: isDragging ? 0.5 : 1 }}
       aria-label={type === 'frame' ? `Drag to add a ${shape} photo frame` : ''}
     >
@@ -178,6 +178,7 @@ function DraggableItem({ src, type, shape }) {
   );
 }
 
+// DraggableElement Component
 function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
   const [isSelected, setIsSelected] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -209,7 +210,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
       if (
         elementRef.current &&
         !elementRef.current.contains(e.target) &&
-        !e.target.closest('.photobook-element-toolbar')
+        !e.target.closest('.pb-element-toolbar')
       ) {
         setIsSelected(false);
         setIsEditing(false);
@@ -440,7 +441,6 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
 
   const handleFontSizeChange = (e) => {
     const newSize = parseInt(e.target.value, 10);
-    console.log('Selected font size:', newSize); // Debug log
     setFontSize(newSize);
     onUpdate(pageId, element.id, { fontSize: newSize });
   };
@@ -487,7 +487,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
             onChange={handleTextChange}
             onBlur={() => setIsEditing(false)}
             onClick={(e) => e.stopPropagation()}
-            className="text-editor"
+            className="pb-element-text-editor"
             style={{
               width: '100%',
               height: '100%',
@@ -507,11 +507,11 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
       }
       return (
         <div
-          className="text-content"
+          className="pb-element-text-content"
           style={{
             padding: '8px',
             fontFamily: fontFamily,
-            fontSize: `${fontSize}px`, // Ensure fontSize is applied
+            fontSize: `${fontSize}px`,
             color: fontColor,
             textAlign: textAlign,
             fontWeight: isBold ? 'bold' : 'normal',
@@ -524,7 +524,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
     if (element.type === 'placeholder' || element.type === 'image') {
       const shapeStyle = getFrameShapeStyle();
       return (
-        <div className="placeholder-frame" style={{ ...shapeStyle, overflow: 'hidden' }}>
+        <div className="pb-element-placeholder-frame" style={{ ...shapeStyle, overflow: 'hidden' }}>
           <div
             ref={imageRef}
             style={{
@@ -554,8 +554,8 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
             />
           </div>
           {!element.content && (
-            <div className="photobook-upload-overlay">
-              <button className="upload-icon-btn" onClick={handleUploadClick}>
+            <div className="pb-element-upload-overlay">
+              <button className="pb-element-upload-icon-btn" onClick={handleUploadClick}>
                 <Upload size={24} />
                 <span>Upload Image</span>
               </button>
@@ -569,8 +569,8 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
             </div>
           )}
           {isRemovingBackground && (
-            <div className="loading-overlay">
-              <div className="spinner"></div>
+            <div className="pb-element-loading-overlay">
+              <div className="pb-global-spinner"></div>
               <span>Removing Background...</span>
             </div>
           )}
@@ -578,7 +578,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
       );
     }
     return (
-      <div className="image-container" style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div className="pb-element-image-container" style={{ position: 'relative', width: '100%', height: '100%' }}>
         <img
           src={element.content}
           alt=""
@@ -586,8 +586,8 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
           draggable={false}
         />
         {isRemovingBackground && (
-          <div className="loading-overlay">
-            <div className="spinner"></div>
+          <div className="pb-element-loading-overlay">
+            <div className="pb-global-spinner"></div>
             <span>Removing Background...</span>
           </div>
         )}
@@ -598,7 +598,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
   return (
     <div
       ref={elementRef}
-      className={`draggable-element ${isSelected ? 'selected' : ''} ${element.type === 'text' ? 'text-element' : ''}`}
+      className={`pb-element-wrapper ${isSelected ? 'pb-element-selected' : ''} ${element.type === 'text' ? 'pb-element-text' : ''}`}
       style={{
         position: 'absolute',
         left: `${element.x}px`,
@@ -616,52 +616,52 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
       {renderContent()}
       {isSelected && !isEditing && (
         <>
-          <div className="element-border"></div>
+          <div className="pb-element-border"></div>
           <div
-            className="resize-handle vertical "
+            className="pb-element-resize-handle pb-element-resize-vertical"
             onMouseDown={(e) => handleResizeStart(e, 'vertical')}
             title="Resize vertical"
           >
             <Maximize2 size={12} />
           </div>
           <div
-            className="resize-handle horizontal"
+            className="pb-element-resize-handle pb-element-resize-horizontal"
             onMouseDown={(e) => handleResizeStart(e, 'horizontal')}
             title="Resize horizontal"
           >
             <Maximize2 size={12} />
           </div>
           <div
-            className="resize-handle proportional"
+            className="pb-element-resize-handle pb-element-resize-proportional"
             onMouseDown={(e) => handleResizeStart(e, 'proportional')}
             title="Resize Proportionally"
           >
             <Maximize2 size={12} />
           </div>
-          <div className="photobook-element-toolbar">
+          <div className="pb-element-toolbar">
             {element.type === 'image' && (
               <>
                 <button
-                  className="toolbar-btn"
+                  className="pb-element-toolbar-btn"
                   onClick={handleRemoveBackground}
                   title="Remove Background"
                   disabled={isRemovingBackground}
                 >
                   <Scissors size={14} />
                 </button>
-                <button className="toolbar-btn" onClick={handleImageZoomIn} title="Zoom Image In">
+                <button className="pb-element-toolbar-btn" onClick={handleImageZoomIn} title="Zoom Image In">
                   <ZoomIn size={14} />
                 </button>
-                <button className="toolbar-btn" onClick={handleImageZoomOut} title="Zoom Image Out">
+                <button className="pb-element-toolbar-btn" onClick={handleImageZoomOut} title="Zoom Image Out">
                   <ZoomOut size={14} />
                 </button>
-                <button className="toolbar-btn" onClick={handleZoomIn} title="Zoom Frame In">
+                <button className="pb-element-toolbar-btn" onClick={handleZoomIn} title="Zoom Frame In">
                   <ZoomIn size={14} />
                 </button>
-                <button className="toolbar-btn" onClick={handleZoomOut} title="Zoom Frame Out">
+                <button className="pb-element-toolbar-btn" onClick={handleZoomOut} title="Zoom Frame Out">
                   <ZoomOut size={14} />
                 </button>
-                <button className="toolbar-btn" onClick={handleRotate} title="Rotate Frame">
+                <button className="pb-element-toolbar-btn" onClick={handleRotate} title="Rotate Frame">
                   <RotateCw size={14} />
                 </button>
               </>
@@ -669,7 +669,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
             {element.type === 'text' && (
               <>
                 <select
-                  className="toolbar-select"
+                  className="pb-element-toolbar-select"
                   value={fontFamily}
                   onChange={handleFontFamilyChange}
                   title="Font Family"
@@ -681,7 +681,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
                   <option value="Courier New">Courier New</option>
                 </select>
                 <select
-                  className="toolbar-select"
+                  className="pb-element-toolbar-select"
                   value={fontSize}
                   onChange={handleFontSizeChange}
                   title="Font Size"
@@ -692,65 +692,65 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
                 </select>
                 <input
                   type="color"
-                  className="toolbar-color"
+                  className="pb-element-toolbar-color"
                   value={fontColor}
                   onChange={handleFontColorChange}
                   title="Font Color"
                   onClick={(e) => e.stopPropagation()}
                 />
                 <button
-                  className={`toolbar-btn ${textAlign === 'left' ? 'active' : ''}`}
+                  className={`pb-element-toolbar-btn ${textAlign === 'left' ? 'pb-element-toolbar-active' : ''}`}
                   onClick={() => handleTextAlignChange('left')}
                   title="Align Left"
                 >
                   <span style={{ fontSize: '12px' }}>L</span>
                 </button>
                 <button
-                  className={`toolbar-btn ${textAlign === 'center' ? 'active' : ''}`}
+                  className={`pb-element-toolbar-btn ${textAlign === 'center' ? 'pb-element-toolbar-active' : ''}`}
                   onClick={() => handleTextAlignChange('center')}
                   title="Align Center"
                 >
                   <span style={{ fontSize: '12px' }}>C</span>
                 </button>
                 <button
-                  className={`toolbar-btn ${textAlign === 'right' ? 'active' : ''}`}
+                  className={`pb-element-toolbar-btn ${textAlign === 'right' ? 'pb-element-toolbar-active' : ''}`}
                   onClick={() => handleTextAlignChange('right')}
                   title="Align Right"
                 >
                   <span style={{ fontSize: '12px' }}>R</span>
                 </button>
                 <button
-                  className={`toolbar-btn ${isBold ? 'active' : ''}`}
+                  className={`pb-element-toolbar-btn ${isBold ? 'pb-element-toolbar-active' : ''}`}
                   onClick={handleBoldToggle}
                   title="Toggle Bold"
                 >
                   <span style={{ fontSize: '12px', fontWeight: 'bold' }}>B</span>
                 </button>
-                <button className="toolbar-btn" onClick={handleZoomIn} title="Zoom In">
+                <button className="pb-element-toolbar-btn" onClick={handleZoomIn} title="Zoom In">
                   <ZoomIn size={14} />
                 </button>
-                <button className="toolbar-btn" onClick={handleZoomOut} title="Zoom Out">
+                <button className="pb-element-toolbar-btn" onClick={handleZoomOut} title="Zoom Out">
                   <ZoomOut size={14} />
                 </button>
-                <button className="toolbar-btn" onClick={handleRotate} title="Rotate">
+                <button className="pb-element-toolbar-btn" onClick={handleRotate} title="Rotate">
                   <RotateCw size={14} />
                 </button>
               </>
             )}
             {element.type !== 'text' && element.type !== 'image' && (
               <>
-                <button className="toolbar-btn" onClick={handleZoomIn} title="Zoom In">
+                <button className="pb-element-toolbar-btn" onClick={handleZoomIn} title="Zoom In">
                   <ZoomIn size={14} />
                 </button>
-                <button className="toolbar-btn" onClick={handleZoomOut} title="Zoom Out">
+                <button className="pb-element-toolbar-btn" onClick={handleZoomOut} title="Zoom Out">
                   <ZoomOut size={14} />
                 </button>
-                <button className="toolbar-btn" onClick={handleRotate} title="Rotate">
+                <button className="pb-element-toolbar-btn" onClick={handleRotate} title="Rotate">
                   <RotateCw size={14} />
                 </button>
               </>
             )}
-            <button className="toolbar-btn delete" onClick={handleDelete} title="Delete">
+            <button className="pb-element-toolbar-btn pb-element-toolbar-delete" onClick={handleDelete} title="Delete">
               <Trash2 size={14} />
             </button>
           </div>
@@ -760,6 +760,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
   );
 }
 
+// PageCanvas Component
 function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, onDeleteElement, pageRefs }) {
   const pageRef = useRef(null);
 
@@ -831,13 +832,13 @@ function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, 
   return (
     <div
       ref={pageRef}
-      className={`page ${position} ${isOver ? 'drag-over' : ''}`}
+      className={`pb-page pb-page-${position} ${isOver ? 'pb-page-drag-over' : ''}`}
       style={{
         aspectRatio: getAspectRatio(paperSize),
         background: 'transparent',
       }}
     >
-      <div className="page-content">
+      <div className="pb-page-content">
         {page.elements.map((element) => (
           <DraggableElement
             key={element.id}
@@ -853,10 +854,11 @@ function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, 
   );
 }
 
+// BookSpread Component
 function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, onUpdateElement, onDeleteElement, pageRefs }) {
   return (
     <div
-      className="book-spread"
+      className="pb-spread"
       style={{
         backgroundImage: background ? `url(${background})` : 'none',
         backgroundSize: 'cover',
@@ -864,7 +866,7 @@ function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, 
         backgroundRepeat: 'no-repeat',
       }}
     >
-      <div className="book-spine"></div>
+      <div className="pb-spread-spine"></div>
       {leftPage && (
         <PageCanvas
           page={leftPage}
@@ -891,6 +893,7 @@ function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, 
   );
 }
 
+// Sidebar Component
 function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, onBackgroundSelect }) {
   const [activeTab, setActiveTab] = useState('photos');
   const frameShapes = [
@@ -902,46 +905,50 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
   ];
 
   return (
-    <div className="sidebar">
-      <div className="tab-buttons">
-        <button
-          className={`tab-btn ${activeTab === 'photos' ? 'active' : ''}`}
-          onClick={() => setActiveTab('photos')}
-          aria-label="Photos tab"
-        >
-          <ImageIcon size={18} />
-          Photos
-        </button>
-        <button
-          className={`tab-btn ${activeTab === 'themes' ? 'active' : ''}`}
-          onClick={() => setActiveTab('themes')}
-          aria-label="Themes tab"
-        >
-          <Sparkles size={18} />
-          Themes
-        </button>
-        <button
-          className={`tab-btn ${activeTab === 'stickers' ? 'active' : ''}`}
-          onClick={() => setActiveTab('stickers')}
-          aria-label="Stickers tab"
-        >
-          <StickerIcon size={18} />
-          Stickers
-        </button>
-        <button
-          className={`tab-btn ${activeTab === 'frames' ? 'active' : ''}`}
-          onClick={() => setActiveTab('frames')}
-          aria-label="Frames tab"
-        >
-          <Plus size={18} />
-          Frames
-        </button>
+    <div className="pb-sidebar">
+      <div className="pb-sidebar-tab-buttons col-lg-12">
+        <div className='col-lg-6'>
+          <button
+            className={`pb-sidebar-tab-btn ${activeTab === 'photos' ? 'pb-sidebar-tab-active' : ''}`}
+            onClick={() => setActiveTab('photos')}
+            aria-label="Photos tab"
+          >
+            <ImageIcon size={18} />
+            Photos
+          </button>
+          <button
+            className={`pb-sidebar-tab-btn ${activeTab === 'themes' ? 'pb-sidebar-tab-active' : ''}`}
+            onClick={() => setActiveTab('themes')}
+            aria-label="Themes tab"
+          >
+            <Sparkles size={18} />
+            Themes
+          </button>
+        </div>
+        <div  className='col-lg-6'>
+          <button
+            className={`pb-sidebar-tab-btn ${activeTab === 'stickers' ? 'pb-sidebar-tab-active' : ''}`}
+            onClick={() => setActiveTab('stickers')}
+            aria-label="Stickers tab"
+          >
+            <StickerIcon size={18} />
+            Stickers
+          </button>
+          <button
+            className={`pb-sidebar-tab-btn ${activeTab === 'frames' ? 'pb-sidebar-tab-active' : ''}`}
+            onClick={() => setActiveTab('frames')}
+            aria-label="Frames tab"
+          >
+            <Plus size={18} />
+            Frames
+          </button>
+        </div>
       </div>
-      <div className="tab-content">
+      <div className="pb-sidebar-tab-content">
         {activeTab === 'photos' && (
-          <div className="tab-panel">
-            <div className="upload-section">
-              <label htmlFor="file-upload" className="upload-btn">
+          <div className="pb-sidebar-tab-panel">
+            <div className="pb-sidebar-upload-section">
+              <label htmlFor="file-upload" className="pb-sidebar-upload-btn">
                 <Upload size={18} />
                 Upload Photos
               </label>
@@ -955,69 +962,69 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
               />
             </div>
             {uploadedImages.length > 0 ? (
-              <div className="item-grid">
+              <div className="pb-sidebar-item-grid">
                 {uploadedImages.map((img, index) => (
                   <DraggableItem key={index} src={img.url} type="image" />
                 ))}
               </div>
             ) : (
-              <div className="empty-state">
+              <div className="pb-sidebar-empty-state">
                 <ImageIcon size={48} />
                 <p>No photos uploaded yet</p>
-                <p className="hint">Upload photos to get started</p>
+                <p className="pb-sidebar-hint">Upload photos to get started</p>
               </div>
             )}
           </div>
         )}
         {activeTab === 'themes' && (
-          <div className="tab-panel">
-            <h3 className="panel-title">Theme Backgrounds</h3>
+          <div className="pb-sidebar-tab-panel">
+            <h3 className="pb-sidebar-panel-title">Theme Backgrounds</h3>
             {themeBackgrounds.length > 0 ? (
-              <div className="item-grid">
+              <div className="pb-sidebar-item-grid">
                 {themeBackgrounds.map((bg, index) => (
                   <div
                     key={index}
-                    className="theme-bg-item"
+                    className="pb-sidebar-theme-bg-item"
                     onClick={() => onBackgroundSelect(bg)}
                   >
                     <img src={bg.url} alt={`Background ${index + 1}`} />
-                    <div className="overlay">
+                    <div className="pb-sidebar-overlay">
                       <span>Apply</span>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="empty-state">
+              <div className="pb-sidebar-empty-state">
                 <Sparkles size={48} />
                 <p>No backgrounds available</p>
-                <p className="hint">Select a theme with backgrounds</p>
+                <p className="pb-sidebar-hint">Select a theme with backgrounds</p>
               </div>
             )}
           </div>
         )}
         {activeTab === 'stickers' && (
-          <div className="tab-panel">
-            <h3 className="panel-title">Stickers & Decorations</h3>
+          <div className="pb-sidebar-tab-panel">
+            <h3 className="pb-sidebar-panel-title">Stickers & Decorations</h3>
             {stickers.length > 0 ? (
-              <div className="item-grid">
+              <div className="pb-sidebar-item-grid">
                 {stickers.map((sticker, index) => (
                   <DraggableItem key={index} src={sticker.url} type="sticker" />
                 ))}
               </div>
             ) : (
-              <div className="empty-state">
+              <div className="pb-sidebar-empty-state">
                 <StickerIcon size={48} />
                 <p>No stickers available</p>
-                <p className="hint">Add stickers to decorate your photobook</p>
+                <p className="pb-sidebar-hint">Add stickers to decorate your photobook</p>
               </div>
             )}
           </div>
         )}
         {activeTab === 'frames' && (
-          <div className="tab-panel">
-            <h3 className="panel-title">Frames</h3>
-            <div className="item-grid">
+          <div className="pb-sidebar-tab-panel">
+            <h3 className="pb-sidebar-panel-title">Frames</h3>
+            <div className="pb-sidebar-item-grid">
               {frameShapes.map((frame) => (
                 <DraggableItem
                   key={frame.id}
@@ -1027,7 +1034,7 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
                 />
               ))}
             </div>
-            <p className="hint">Drag a frame to any page to add a photo placeholder.</p>
+            <p className="pb-sidebar-hint">Drag a frame to any page to add a photo placeholder.</p>
           </div>
         )}
       </div>
@@ -1035,6 +1042,7 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
   );
 }
 
+// PhotoBookEditor Component
 function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   const [pages, setPages] = useState([
     {
@@ -1164,7 +1172,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
       console.log(`Generated preview for spread ${spreadIndex + 1} (pages ${leftPage?.id || 'none'}, ${rightPage?.id || 'none'}): ${dataUrl.substring(0, 50)}...`);
 
       ReactDOM.unmountComponentAtNode(tempDiv);
-      document.body.appendChild(tempDiv);
+      document.body.removeChild(tempDiv);
 
       setPreviewDebugUrls((prev) => [
         ...prev,
@@ -1494,34 +1502,34 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   };
 
   return (
-    <div className="editor-container">
-      <div className="editor-header">
-        <button className="back-button" onClick={onBack}>
+    <div className="pb-editor-container">
+      <div className="pb-editor-header">
+        <button className="pb-paper-back-button" onClick={onBack}>
           <ArrowLeft size={20} />
           Back
         </button>
-        <div className="header-info">
+        <div className="pb-editor-header-info">
           <h2>
             {theme.theme_name || 'Unnamed Theme'} - {paper.size || 'Unknown Size'}
           </h2>
-          <span className="page-indicator">
+          <span className="pb-editor-page-indicator">
             Pages {currentPageIndex + 1}-{currentPageIndex + 2} of {pages.length}
           </span>
-          <span className="price-display">Total Price: ${calculateTotalPrice()}</span>
+          <span className="pb-editor-price-display">Total Price: ${calculateTotalPrice()}</span>
         </div>
-        <div className="header-actions">
-          <button className="action-btn" onClick={addTextElement}>
+        <div className="pb-editor-header-actions">
+          <button className="pb-editor-action-btn" onClick={addTextElement}>
             <Type size={18} />
             Add Text
           </button>
-          <button className="action-btn" onClick={handleSaveOrder} disabled={isSaving}>
+          <button className="pb-editor-action-btn" onClick={handleSaveOrder} disabled={isSaving}>
             <Save size={18} />
             {isSaving ? 'Saving...' : 'Save Order'}
           </button>
         </div>
       </div>
-      {saveError && <div className="error-message">{saveError}</div>}
-      <div className="editor-main">
+      {saveError && <div className="pb-editor-error-message">{saveError}</div>}
+      <div className="pb-editor-main">
         <Sidebar
           uploadedImages={uploadedImages}
           themeBackgrounds={
@@ -1536,9 +1544,9 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
             setSelectedBackground(bg);
           }}
         />
-        <div className="canvas-area">
-          <div className="canvas-wrapper">
-            <div ref={spreadRef} className="spread-wrapper">
+        <div className="pb-editor-canvas-area">
+          <div className="pb-editor-canvas-wrapper">
+            <div ref={spreadRef} className="pb-spread-wrapper">
               <BookSpread
                 leftPage={pages[currentPageIndex]}
                 rightPage={pages[currentPageIndex + 1]}
@@ -1552,7 +1560,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
             </div>
           </div>
           {previewDebugUrls.length > 0 && (
-            <div className="preview-debug">
+            <div className="pb-editor-preview-debug">
               <h3>Debug Previews</h3>
               {previewDebugUrls.map((preview) => (
                 <div key={preview.spreadIndex}>
@@ -1562,12 +1570,12 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
               ))}
             </div>
           )}
-          <div className="pagination-controls">
-            <button className="nav-btn" onClick={goToPreviousSpread} disabled={currentPageIndex === 0}>
+          <div className="pb-editor-pagination-controls">
+            <button className="pb-editor-nav-btn" onClick={goToPreviousSpread} disabled={currentPageIndex === 0}>
               <ChevronLeft size={20} />
               Previous
             </button>
-            <button className="nav-btn" onClick={goToNextSpread}>
+            <button className="pb-editor-nav-btn" onClick={goToNextSpread}>
               Next
               <ChevronRight size={20} />
             </button>
@@ -1578,6 +1586,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
   );
 }
 
+// PhotoBook Main Component
 function PhotoBook() {
   const navigate = useNavigate();
   const user = useSelector((state) => state.user);
@@ -1652,8 +1661,8 @@ function PhotoBook() {
 
   if (isLoading) {
     return (
-      <div className="loading-container">
-        <div className="spinner"></div>
+      <div className="pb-global-loading-container">
+        <div className="pb-global-spinner"></div>
         <p>Loading...</p>
       </div>
     );
@@ -1661,7 +1670,7 @@ function PhotoBook() {
 
   if (error) {
     return (
-      <div className="error-container">
+      <div className="pb-global-error-container">
         <p>{error}</p>
         <button onClick={() => window.location.reload()}>Retry</button>
       </div>
