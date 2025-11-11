@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { Plus, Image as ImageIcon, Sparkles, Sticker as StickerIcon, Upload, ArrowLeft, Type, ChevronLeft, ChevronRight, Trash2, ZoomIn, ZoomOut, RotateCw, Maximize2, Save, Scissors } from 'lucide-react';
+import { Plus, Image as ImageIcon, Sparkles, Sticker as StickerIcon, Upload, ArrowLeft, Type, ChevronLeft, ChevronRight, ChevronDown, AlignLeft, AlignCenter, AlignRight, Bold, Minimize2, Trash2, ZoomIn, ZoomOut, RotateCw, Maximize2, Save, Scissors, X, HelpCircle, BookOpen } from 'lucide-react';
 import './PhotoBook.css';
 import domtoimage from 'dom-to-image';
 import { removeBackground } from '@imgly/background-removal';
@@ -32,13 +32,126 @@ const getAspectRatio = (size) => {
   return ratios[size] || '1';
 };
 
+// Help Modal Component
+function HelpModal({ isOpen, onClose }) {
+  if (!isOpen) return null;
+
+  const guideSections = [
+    {
+      icon: Sparkles,
+      title: 'Theme Selection',
+      description: 'Choose a beautiful theme for your photobook. Each theme comes with multiple background options to personalize your spreads.'
+    },
+    {
+      icon: ImageIcon,
+      title: 'Paper Size Selection',
+      description: 'Select the perfect paper size like A4 or 8x10 for your photobook. Prices vary based on size.'
+    },
+    {
+      icon: Upload,
+      title: 'Upload Photos',
+      description: 'Upload your images from the Photos tab in the sidebar. Drag them onto pages to place them.'
+    },
+    {
+      icon: StickerIcon,
+      title: 'Add Stickers & Decorations',
+      description: 'Browse stickers in the sidebar and drag them to decorate your pages. Resize and rotate as needed.'
+    },
+    {
+      icon: Plus,
+      title: 'Add Frames',
+      description: 'Drag frames from the Frames tab to create photo placeholders in various shapes like circle, square, or hexagon.'
+    },
+    {
+      icon: Type,
+      title: 'Add Text',
+      description: 'Click "Add Text" in the header to place editable text boxes. Double-click to edit content.'
+    },
+    {
+      icon: Bold,
+      title: 'Text Styling',
+      description: 'When text is selected, use the global toolbar at the top to change font, size, color, alignment, bold, and background.'
+    },
+    {
+      icon: Maximize2,
+      title: 'Resize Elements',
+      description: 'Select an element and drag the corner handle to resize proportionally, or side handles for horizontal/vertical.'
+    },
+    {
+      icon: RotateCw,
+      title: 'Rotate Elements',
+      description: 'Click the rotate icon in the element toolbar to rotate by 15 degrees increments.'
+    },
+    {
+      icon: ZoomIn,
+      title: 'Zoom & Pan Images',
+      description: 'For images, use zoom in/out in the toolbar. Drag inside the image to pan the view.'
+    },
+    {
+      icon: Scissors,
+      title: 'Remove Background',
+      description: 'Select an image and click the scissors icon to automatically remove the background.'
+    },
+    {
+      icon: Save,
+      title: 'Save Order',
+      description: 'Click "Save Order" to generate previews and submit your photobook for printing. Total price is calculated automatically.'
+    },
+    {
+      icon: ChevronLeft,
+      title: 'Navigate Pages',
+      description: 'Use Previous/Next buttons to flip through spreads. Add new pages automatically when navigating forward.'
+    }
+  ];
+
+  return (
+    <div className="pb-help-modal-overlay" onClick={onClose}>
+      <div className="pb-help-modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="pb-help-modal-header">
+          <h2><BookOpen size={24} className="pb-help-icon" /> Photobook Editor Guide</h2>
+          <button onClick={onClose} className="pb-help-close-btn">
+            <X size={24} />
+          </button>
+        </div>
+        <div className="pb-help-modal-body">
+          <p>Welcome to your Photobook Editor! Follow this guide to create stunning memories.</p>
+          <div className="pb-help-sections">
+            {guideSections.map((section, index) => (
+              <div key={index} className="pb-help-section">
+                <section.icon size={32} className="pb-help-section-icon" />
+                <div>
+                  <h3>{section.title}</h3>
+                  <p>{section.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="pb-help-modal-footer">
+          <button onClick={onClose} className="pb-help-done-btn">
+            Got it!
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ThemeSelector Component
 function ThemeSelector({ themes, onSelect }) {
+  const [showHelp, setShowHelp] = useState(false);
+
   const safeThemes = Array.isArray(themes) ? themes : [];
 
   return (
     <div className="pb-theme-container">
+      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
       <div className="pb-theme-header-section">
+        <div className="pb-theme-header-actions">
+          <button className="pb-help-btn" onClick={() => setShowHelp(true)}>
+            <HelpCircle size={20} />
+          </button>
+        </div>
         <h1>Personalize Your Photobook</h1>
         <p className="pb-theme-subtitle">Create beautiful memories with our photobook printing service</p>
       </div>
@@ -79,18 +192,26 @@ function ThemeSelector({ themes, onSelect }) {
 
 // PaperSelector Component
 function PaperSelector({ papers, onSelect, onBack }) {
+  const [showHelp, setShowHelp] = useState(false);
+
   const safePapers = Array.isArray(papers) ? papers : [];
 
   return (
     <div className="pb-paper-container">
+      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
+      <div className="pb-paper-header-section">
+        <div className="pb-paper-header-actions">
+          <button className="pb-help-btn" onClick={() => setShowHelp(true)}>
+            <HelpCircle size={20} />
+          </button>
+        </div>
+        <h1>Choose Your Photobook Size</h1>
+        <p className="pb-paper-subtitle">Select the perfect size for your memories</p>
+      </div>
       <button className="pb-paper-back-button" onClick={onBack}>
         <ArrowLeft size={20} />
         Back to Themes
       </button>
-      <div className="pb-paper-header-section">
-        <h1>Choose Your Photobook Size</h1>
-        <p className="pb-paper-subtitle">Select the perfect size for your memories</p>
-      </div>
       <div className="pb-paper-selection-section">
         {safePapers.length === 0 ? (
           <div className="pb-paper-empty-state">
@@ -179,7 +300,7 @@ function DraggableItem({ src, type, shape }) {
 }
 
 // DraggableElement Component
-function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
+function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef, onTextSelect, onTextDeselect }) {
   const [isSelected, setIsSelected] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isDraggingElement, setIsDraggingElement] = useState(false);
@@ -199,26 +320,31 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
   const imageRef = useRef(null);
 
   // Text styling state
-  const [fontFamily, setFontFamily] = useState(element.fontFamily || 'Arial');
-  const [fontSize, setFontSize] = useState(element.fontSize || 16);
-  const [fontColor, setFontColor] = useState(element.fontColor || '#000000');
-  const [textAlign, setTextAlign] = useState(element.textAlign || 'left');
-  const [isBold, setIsBold] = useState(element.isBold || false);
+  const [fontFamily, setFontFamily] = useState(element.fontFamily ?? 'Arial');
+  const [fontSize, setFontSize] = useState(element.fontSize ?? 16);
+  const [fontColor, setFontColor] = useState(element.fontColor ?? '#000000');
+  const [backgroundColor, setBackgroundColor] = useState(element.backgroundColor ?? null);
+  const [textAlign, setTextAlign] = useState(element.textAlign ?? 'left');
+  const [isBold, setIsBold] = useState(element.isBold ?? false);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (
         elementRef.current &&
         !elementRef.current.contains(e.target) &&
-        !e.target.closest('.pb-element-toolbar')
+        !e.target.closest('.pb-element-toolbar') &&
+        !e.target.closest('.pb-global-text-toolbar')
       ) {
         setIsSelected(false);
         setIsEditing(false);
+        if (element.type === 'text') {
+          onTextDeselect();
+        }
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [element.type, onTextDeselect]);
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
@@ -232,6 +358,9 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
     e.stopPropagation();
     e.preventDefault();
     setIsSelected(true);
+    if (element.type === 'text') {
+      onTextSelect(pageId, element);
+    }
     if (element.type === 'text' && e.detail === 2) {
       setIsEditing(true);
       return;
@@ -378,7 +507,12 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
   const handleDelete = (e) => {
     e.stopPropagation();
     onDelete(pageId, element.id);
+    if (element.type === 'text') {
+      onTextDeselect();
+    }
   };
+
+
 
   const handleTextChange = (e) => {
     onUpdate(pageId, element.id, { content: e.target.value });
@@ -432,6 +566,18 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
     fileInputRef.current.click();
   };
 
+  useEffect(() => {
+    setFontFamily(element.fontFamily ?? 'Arial');
+    setFontSize(element.fontSize ?? 16);
+    setFontColor(element.fontColor ?? '#000000');
+    setBackgroundColor(element.backgroundColor ?? null);
+    setTextAlign(element.textAlign ?? 'left');
+    setIsBold(element.isBold ?? false);
+    setImageOffsetX(element.imageOffsetX ?? 0);
+    setImageOffsetY(element.imageOffsetY ?? 0);
+    setImageScale(element.imageScale ?? 1);
+  }, [element]);
+
   // Text styling handlers
   const handleFontFamilyChange = (e) => {
     const newFont = e.target.value;
@@ -451,14 +597,21 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
     onUpdate(pageId, element.id, { fontColor: newColor });
   };
 
+  const handleBackgroundColorChange = (e) => {
+    const newColor = e.target.value;
+    setBackgroundColor(newColor);
+    onUpdate(pageId, element.id, { backgroundColor: newColor });
+  };
+
   const handleTextAlignChange = (align) => {
     setTextAlign(align);
     onUpdate(pageId, element.id, { textAlign: align });
   };
 
   const handleBoldToggle = () => {
-    setIsBold(!isBold);
-    onUpdate(pageId, element.id, { isBold: !isBold });
+    const newBold = !isBold;
+    setIsBold(newBold);
+    onUpdate(pageId, element.id, { isBold: newBold });
   };
 
   const getFrameShapeStyle = () => {
@@ -479,28 +632,33 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
 
   const renderContent = () => {
     if (element.type === 'text') {
+      const textStyle = {
+        padding: '8px',
+        fontFamily,
+        fontSize: `${fontSize}px`,
+        color: fontColor,
+        textAlign,
+        fontWeight: isBold ? 'bold' : 'normal',
+        background: backgroundColor || 'transparent',
+        border: element.content ? 'none' : '1px dashed #ccc',
+      };
       if (isEditing) {
         return (
           <textarea
             ref={textareaRef}
             value={element.content}
-            onChange={handleTextChange}
+            onChange={(e) => onUpdate(pageId, element.id, { content: e.target.value })}
             onBlur={() => setIsEditing(false)}
             onClick={(e) => e.stopPropagation()}
             className="pb-element-text-editor"
             style={{
+              ...textStyle,
               width: '100%',
               height: '100%',
-              border: 'none',
-              background: 'transparent',
+              border: '1px solid #ccc',
+              background: backgroundColor || 'transparent',
               resize: 'none',
               outline: 'none',
-              fontFamily: fontFamily,
-              fontSize: `${fontSize}px`,
-              color: fontColor,
-              textAlign: textAlign,
-              fontWeight: isBold ? 'bold' : 'normal',
-              padding: '8px',
             }}
           />
         );
@@ -508,14 +666,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
       return (
         <div
           className="pb-element-text-content"
-          style={{
-            padding: '8px',
-            fontFamily: fontFamily,
-            fontSize: `${fontSize}px`,
-            color: fontColor,
-            textAlign: textAlign,
-            fontWeight: isBold ? 'bold' : 'normal',
-          }}
+          style={textStyle}
         >
           {element.content || 'Double click to edit'}
         </div>
@@ -617,142 +768,33 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
       {isSelected && !isEditing && (
         <>
           <div className="pb-element-border"></div>
-          <div
-            className="pb-element-resize-handle pb-element-resize-vertical"
-            onMouseDown={(e) => handleResizeStart(e, 'vertical')}
-            title="Resize vertical"
-          >
+          {/* Resize handles */}
+          <div className="pb-element-resize-handle pb-element-resize-vertical" onMouseDown={(e) => handleResizeStart(e, 'vertical')} title="Resize vertical">
             <Maximize2 size={12} />
           </div>
-          <div
-            className="pb-element-resize-handle pb-element-resize-horizontal"
-            onMouseDown={(e) => handleResizeStart(e, 'horizontal')}
-            title="Resize horizontal"
-          >
+          <div className="pb-element-resize-handle pb-element-resize-horizontal" onMouseDown={(e) => handleResizeStart(e, 'horizontal')} title="Resize horizontal">
             <Maximize2 size={12} />
           </div>
-          <div
-            className="pb-element-resize-handle pb-element-resize-proportional"
-            onMouseDown={(e) => handleResizeStart(e, 'proportional')}
-            title="Resize Proportionally"
-          >
+          <div className="pb-element-resize-handle pb-element-resize-proportional" onMouseDown={(e) => handleResizeStart(e, 'proportional')} title="Resize Proportionally">
             <Maximize2 size={12} />
           </div>
-          <div className="pb-element-toolbar">
+
+          {/* MODERN CANVA-STYLE TOOLBAR - Common tools only for text, full for others */}
+          <div className="pb-element-toolbar-modern" onClick={(e) => e.stopPropagation()}>
+            {/* Common Tools */}
+            <button className="pb-toolbar-btn" onClick={handleZoomIn}><Maximize2 size={12} /></button>
+            <button className="pb-toolbar-btn" onClick={handleZoomOut}><Minimize2 size={12} /></button>
+            <button className="pb-toolbar-btn" onClick={handleRotate}><RotateCw size={12} /></button>
+
             {element.type === 'image' && (
               <>
-                <button
-                  className="pb-element-toolbar-btn"
-                  onClick={handleRemoveBackground}
-                  title="Remove Background"
-                  disabled={isRemovingBackground}
-                >
-                  <Scissors size={14} />
-                </button>
-                <button className="pb-element-toolbar-btn" onClick={handleImageZoomIn} title="Zoom Image In">
-                  <ZoomIn size={14} />
-                </button>
-                <button className="pb-element-toolbar-btn" onClick={handleImageZoomOut} title="Zoom Image Out">
-                  <ZoomOut size={14} />
-                </button>
-                <button className="pb-element-toolbar-btn" onClick={handleZoomIn} title="Zoom Frame In">
-                  <ZoomIn size={14} />
-                </button>
-                <button className="pb-element-toolbar-btn" onClick={handleZoomOut} title="Zoom Frame Out">
-                  <ZoomOut size={14} />
-                </button>
-                <button className="pb-element-toolbar-btn" onClick={handleRotate} title="Rotate Frame">
-                  <RotateCw size={14} />
-                </button>
+                <button className="pb-toolbar-btn" onClick={handleRemoveBackground}><Scissors size={12} /></button>
+                <button className="pb-toolbar-btn" onClick={handleImageZoomIn}><ZoomIn size={12} /></button>
+                <button className="pb-toolbar-btn" onClick={handleImageZoomOut}><ZoomOut size={12} /></button>
               </>
             )}
-            {element.type === 'text' && (
-              <>
-                <select
-                  className="pb-element-toolbar-select"
-                  value={fontFamily}
-                  onChange={handleFontFamilyChange}
-                  title="Font Family"
-                >
-                  <option value="Arial">Arial</option>
-                  <option value="Helvetica">Helvetica</option>
-                  <option value="Times New Roman">Times New Roman</option>
-                  <option value="Georgia">Georgia</option>
-                  <option value="Courier New">Courier New</option>
-                </select>
-                <select
-                  className="pb-element-toolbar-select"
-                  value={fontSize}
-                  onChange={handleFontSizeChange}
-                  title="Font Size"
-                >
-                  {[12, 14, 16, 18, 20, 24, 28, 32, 36].map((size) => (
-                    <option key={size} value={size}>{size}px</option>
-                  ))}
-                </select>
-                <input
-                  type="color"
-                  className="pb-element-toolbar-color"
-                  value={fontColor}
-                  onChange={handleFontColorChange}
-                  title="Font Color"
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <button
-                  className={`pb-element-toolbar-btn ${textAlign === 'left' ? 'pb-element-toolbar-active' : ''}`}
-                  onClick={() => handleTextAlignChange('left')}
-                  title="Align Left"
-                >
-                  <span style={{ fontSize: '12px' }}>L</span>
-                </button>
-                <button
-                  className={`pb-element-toolbar-btn ${textAlign === 'center' ? 'pb-element-toolbar-active' : ''}`}
-                  onClick={() => handleTextAlignChange('center')}
-                  title="Align Center"
-                >
-                  <span style={{ fontSize: '12px' }}>C</span>
-                </button>
-                <button
-                  className={`pb-element-toolbar-btn ${textAlign === 'right' ? 'pb-element-toolbar-active' : ''}`}
-                  onClick={() => handleTextAlignChange('right')}
-                  title="Align Right"
-                >
-                  <span style={{ fontSize: '12px' }}>R</span>
-                </button>
-                <button
-                  className={`pb-element-toolbar-btn ${isBold ? 'pb-element-toolbar-active' : ''}`}
-                  onClick={handleBoldToggle}
-                  title="Toggle Bold"
-                >
-                  <span style={{ fontSize: '12px', fontWeight: 'bold' }}>B</span>
-                </button>
-                <button className="pb-element-toolbar-btn" onClick={handleZoomIn} title="Zoom In">
-                  <ZoomIn size={14} />
-                </button>
-                <button className="pb-element-toolbar-btn" onClick={handleZoomOut} title="Zoom Out">
-                  <ZoomOut size={14} />
-                </button>
-                <button className="pb-element-toolbar-btn" onClick={handleRotate} title="Rotate">
-                  <RotateCw size={14} />
-                </button>
-              </>
-            )}
-            {element.type !== 'text' && element.type !== 'image' && (
-              <>
-                <button className="pb-element-toolbar-btn" onClick={handleZoomIn} title="Zoom In">
-                  <ZoomIn size={14} />
-                </button>
-                <button className="pb-element-toolbar-btn" onClick={handleZoomOut} title="Zoom Out">
-                  <ZoomOut size={14} />
-                </button>
-                <button className="pb-element-toolbar-btn" onClick={handleRotate} title="Rotate">
-                  <RotateCw size={14} />
-                </button>
-              </>
-            )}
-            <button className="pb-element-toolbar-btn pb-element-toolbar-delete" onClick={handleDelete} title="Delete">
-              <Trash2 size={14} />
-            </button>
+
+            <button className="pb-toolbar-btn delete" onClick={handleDelete}><Trash2 size={12} /></button>
           </div>
         </>
       )}
@@ -761,7 +803,7 @@ function DraggableElement({ element, pageId, onUpdate, onDelete, pageRef }) {
 }
 
 // PageCanvas Component
-function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, onDeleteElement, pageRefs }) {
+function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, onDeleteElement, pageRefs, onTextSelect, onTextDeselect }) {
   const pageRef = useRef(null);
 
   const [{ isOver }, drop] = useDrop(
@@ -807,6 +849,7 @@ function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, 
             fontFamily: item.type === 'text' ? 'Arial' : undefined,
             fontSize: item.type === 'text' ? 16 : undefined,
             fontColor: item.type === 'text' ? '#000000' : undefined,
+            backgroundColor: item.type === 'text' ? null : undefined,
             textAlign: item.type === 'text' ? 'left' : undefined,
             isBold: item.type === 'text' ? false : undefined,
           };
@@ -847,6 +890,8 @@ function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, 
             onUpdate={onUpdateElement}
             onDelete={onDeleteElement}
             pageRef={pageRef}
+            onTextSelect={onTextSelect}
+            onTextDeselect={onTextDeselect}
           />
         ))}
       </div>
@@ -855,7 +900,7 @@ function PageCanvas({ page, position, paperSize, onAddElement, onUpdateElement, 
 }
 
 // BookSpread Component
-function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, onUpdateElement, onDeleteElement, pageRefs }) {
+function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, onUpdateElement, onDeleteElement, pageRefs, onTextSelect, onTextDeselect }) {
   return (
     <div
       className="pb-spread"
@@ -876,6 +921,8 @@ function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, 
           onUpdateElement={onUpdateElement}
           onDeleteElement={onDeleteElement}
           pageRefs={pageRefs}
+          onTextSelect={onTextSelect}
+          onTextDeselect={onTextDeselect}
         />
       )}
       {rightPage && (
@@ -887,6 +934,8 @@ function BookSpread({ leftPage, rightPage, background, paperSize, onAddElement, 
           onUpdateElement={onUpdateElement}
           onDeleteElement={onDeleteElement}
           pageRefs={pageRefs}
+          onTextSelect={onTextSelect}
+          onTextDeselect={onTextDeselect}
         />
       )}
     </div>
@@ -925,7 +974,7 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
             Themes
           </button>
         </div>
-        <div  className='col-lg-6'>
+        <div className='col-lg-6'>
           <button
             className={`pb-sidebar-tab-btn ${activeTab === 'stickers' ? 'pb-sidebar-tab-active' : ''}`}
             onClick={() => setActiveTab('stickers')}
@@ -1042,8 +1091,144 @@ function Sidebar({ uploadedImages, themeBackgrounds, stickers, onImageUpload, on
   );
 }
 
+function GlobalTextToolbar({ element, pageId, onUpdate, onClose }) {
+  const [fontFamily, setFontFamily] = useState(element.fontFamily || 'Arial');
+  const [fontSize, setFontSize] = useState(element.fontSize || 16);
+  const [fontColor, setFontColor] = useState(element.fontColor || '#000000');
+  const [backgroundColor, setBackgroundColor] = useState(element.backgroundColor || null);
+  const [textAlign, setTextAlign] = useState(element.textAlign || 'left');
+  const [isBold, setIsBold] = useState(element.isBold || false);
+
+  const fonts = ['Arial', 'Helvetica', 'Georgia', 'Times New Roman', 'Courier New', 'Dancing Script', 'Pacifico', 'Lobster', 'Roboto'];
+  const sizes = [12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 60, 72];
+
+  useEffect(() => {
+    setFontFamily(element.fontFamily || 'Arial');
+    setFontSize(element.fontSize || 16);
+    setFontColor(element.fontColor || '#000000');
+    setBackgroundColor(element.backgroundColor || null);
+    setTextAlign(element.textAlign || 'left');
+    setIsBold(element.isBold || false);
+  }, [element]);
+
+  const handleUpdate = (updates) => {
+    onUpdate(pageId, element.id, updates);
+  };
+
+  const handleFontFamilyChange = (e) => {
+    const newFont = e.target.value;
+    setFontFamily(newFont);
+    handleUpdate({ fontFamily: newFont });
+  };
+
+  const handleFontSizeChange = (e) => {
+    const newSize = parseInt(e.target.value, 10);
+    setFontSize(newSize);
+    handleUpdate({ fontSize: newSize });
+  };
+
+  const handleFontColorChange = (e) => {
+    const newColor = e.target.value;
+    setFontColor(newColor);
+    handleUpdate({ fontColor: newColor });
+  };
+
+  const handleBackgroundColorChange = (e) => {
+    const newColor = e.target.value;
+    setBackgroundColor(newColor);
+    handleUpdate({ backgroundColor: newColor });
+  };
+
+  const handleTextAlignChange = (align) => {
+    setTextAlign(align);
+    handleUpdate({ textAlign: align });
+  };
+
+  const handleBoldToggle = () => {
+    const newBold = !isBold;
+    setIsBold(newBold);
+    handleUpdate({ isBold: newBold });
+  };
+
+  return (
+    <div className="pb-global-text-toolbar" onClick={(e) => e.stopPropagation()}>
+      <div className="pb-toolbar-group">
+        <select
+          value={fontFamily}
+          onChange={handleFontFamilyChange}
+          className="pb-toolbar-select"
+        >
+          {fonts.map(f => (
+            <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+          ))}
+        </select>
+
+        <select
+          value={fontSize}
+          onChange={handleFontSizeChange}
+          className="pb-toolbar-select"
+        >
+          {sizes.map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="pb-toolbar-group">
+        <input
+          type="color"
+          value={fontColor}
+          onChange={handleFontColorChange}
+          className="pb-toolbar-color"
+          title="Text Color"
+        />
+        <input
+          type="color"
+          value={backgroundColor || '#ffffff'}
+          onChange={handleBackgroundColorChange}
+          className="pb-toolbar-color"
+          title="Background Color"
+        />
+      </div>
+
+      <div className="pb-toolbar-group">
+        <button
+          className={`pb-toolbar-btn ${textAlign === 'left' ? 'active' : ''}`}
+          onClick={() => handleTextAlignChange('left')}
+        >
+          <AlignLeft size={16} />
+        </button>
+        <button
+          className={`pb-toolbar-btn ${textAlign === 'center' ? 'active' : ''}`}
+          onClick={() => handleTextAlignChange('center')}
+        >
+          <AlignCenter size={16} />
+        </button>
+        <button
+          className={`pb-toolbar-btn ${textAlign === 'right' ? 'active' : ''}`}
+          onClick={() => handleTextAlignChange('right')}
+        >
+          <AlignRight size={16} />
+        </button>
+        <button
+          className={`pb-toolbar-btn ${isBold ? 'active' : ''}`}
+          onClick={handleBoldToggle}
+        >
+          <Bold size={16} />
+        </button>
+      </div>
+
+      <button className="pb-toolbar-close-btn" onClick={onClose}>
+        <X size={16} />
+      </button>
+    </div>
+  );
+}
+
 // PhotoBookEditor Component
 function PhotoBookEditor({ theme, paper, stickers, onBack }) {
+  const [selectedTextElement, setSelectedTextElement] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
   const [pages, setPages] = useState([
     {
       id: 1,
@@ -1226,6 +1411,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
                 fontFamily: element.type === 'text' ? 'Arial' : undefined,
                 fontSize: element.type === 'text' ? 16 : undefined,
                 fontColor: element.type === 'text' ? '#000000' : undefined,
+                backgroundColor: element.type === 'text' ? null : undefined,
                 textAlign: element.type === 'text' ? 'left' : undefined,
                 isBold: element.type === 'text' ? false : undefined,
               },
@@ -1265,6 +1451,14 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
     );
   };
 
+  const handleTextSelect = (pageId, element) => {
+    setSelectedTextElement({ pageId, element });
+  };
+
+  const handleTextDeselect = () => {
+    setSelectedTextElement(null);
+  };
+
   const addTextElement = () => {
     const currentPage = pages[currentPageIndex];
     if (currentPage) {
@@ -1279,6 +1473,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
         fontFamily: 'Arial',
         fontSize: 16,
         fontColor: '#000000',
+        backgroundColor: null,
         textAlign: 'left',
         isBold: false,
       });
@@ -1470,6 +1665,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
               fontFamily: el.fontFamily,
               fontSize: el.fontSize,
               fontColor: el.fontColor,
+              backgroundColor: el.backgroundColor,
               textAlign: el.textAlign,
               isBold: el.isBold,
             })),
@@ -1503,6 +1699,7 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
 
   return (
     <div className="pb-editor-container">
+      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
       <div className="pb-editor-header">
         <button className="pb-paper-back-button" onClick={onBack}>
           <ArrowLeft size={20} />
@@ -1518,6 +1715,9 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
           <span className="pb-editor-price-display">Total Price: ${calculateTotalPrice()}</span>
         </div>
         <div className="pb-editor-header-actions">
+          <button className="pb-help-btn" onClick={() => setShowHelp(true)}>
+            <HelpCircle size={20} />
+          </button>
           <button className="pb-editor-action-btn" onClick={addTextElement}>
             <Type size={18} />
             Add Text
@@ -1529,6 +1729,16 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
         </div>
       </div>
       {saveError && <div className="pb-editor-error-message">{saveError}</div>}
+
+      {selectedTextElement && (
+        <GlobalTextToolbar
+          element={selectedTextElement.element}
+          pageId={selectedTextElement.pageId}
+          onUpdate={updateElement}
+          onClose={() => setSelectedTextElement(null)}
+        />
+      )}
+
       <div className="pb-editor-main">
         <Sidebar
           uploadedImages={uploadedImages}
@@ -1556,6 +1766,8 @@ function PhotoBookEditor({ theme, paper, stickers, onBack }) {
                 onUpdateElement={updateElement}
                 onDeleteElement={deleteElement}
                 pageRefs={pageRefs}
+                onTextSelect={handleTextSelect}
+                onTextDeselect={handleTextDeselect}
               />
             </div>
           </div>
